@@ -13,17 +13,5 @@ class Vehicle:
         self.time_step = time_step
         self.destination_queue = destination_queue
         self.next_desitnation = None
-
-    def update(self):
-        raise NotImplementedError("This method should be overridden by subclasses")
-
-
-    def get_next_destination(self):
-        if not self.destination_queue.empty():
-            return self.destination_queue.pop()
-        else:
-            return None
-        
-
             
         
