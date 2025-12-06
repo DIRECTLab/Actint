@@ -5,7 +5,7 @@ class Destination:
                  target_speed_to_next_destination: int,
                  error: float,
                  ):
-        self.position_x = position_x
-        self.position_y = position_y
-        self.target_speed_to_next_destination = target_speed_to_next_destination
-        self.error = error
+        self.position_x = position_x # Longitude
+        self.position_y = position_y # Latitude
+        self.target_speed_to_next_destination = target_speed_to_next_destination # Km/h
+        self.error = error # (lat/lon degrees)
