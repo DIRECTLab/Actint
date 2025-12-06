@@ -37,4 +37,4 @@ class ThreeDVehicle(TwoDVehicle):
         self.pitch_angle = pitch_angle
 
     def update(self):
-        raise NotImplementedError("This method should be overridden by subclasses")
+        pass
