@@ -125,6 +125,10 @@ class Position3D(Position2D):
         1.7320508075688772
     """
     # If the other position is a Position2D, ignore z components
+    if not isinstance(position, (Position2D, Position3D)):
+        raise TypeError(f"Unsupported position type: {type(position).__name__}. "
+                       f"Must be Position2D or Position3D")
+    
     if isinstance(position, Position2D):
         return super().distance_to(position)
     else:
