@@ -71,6 +71,9 @@ class Position2D(Position):
     """
     # If the other position is also a Position2D, ignore z components
     return np.sqrt(np.dot(self.x - position.x, self.y - position.y))
+  
+  def __str__(self):
+    return f'Position2D({self.x:.2f}, {self.y:.2f})'
 
 
 class Position3D(Position2D):
@@ -126,3 +129,6 @@ class Position3D(Position2D):
         return super().distance_to(position)
     else:
         return np.linalg.norm([self.x, self.y, self.z] - [position.x, position.y, position.z])
+    
+  def __str__(self):
+    return f'Position3D({self.x:.2f}, {self.y:.2f}, {self.z:.2f})'
