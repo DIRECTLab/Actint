@@ -103,7 +103,7 @@ class Position3D(Position2D):
         z (float): The z-coordinate
     """
     super().__init__(x, y)
-    self.position_z = z
+    self.z = z
 
   def distance_to(self, position: Position) -> float:
     """
