@@ -50,7 +50,7 @@ class Position2D(Position):
     self.x = x
     self.y = y
 
-  def distance_to(self, position):
+  def distance_to(self, position: Position) -> float:
     """
     Calculate the Euclidean distance to another position.
     
@@ -105,7 +105,7 @@ class Position3D(Position2D):
     super().__init__(x, y)
     self.position_z = z
 
-  def distance_to(self, position):
+  def distance_to(self, position: Position) -> float:
     """
     Calculate the Euclidean distance to another position.
     
