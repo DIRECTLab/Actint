@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from Position import Position, Position2D, Position3D
 
 class Destination:
@@ -9,6 +10,13 @@ class Destination:
           self.position = position
           self.target_speed_to_next_destination = target_speed_to_next_destination
           self.error = error
+
+    def distance_to_dest(self, position: Position) -> float:
+      return self.position.distance_to(position)
+
+    def has_reached(self, position: Position) -> bool:
+      distance_to_dest = self.distance_to_dest(position)
+      return abs(distance_to_dest) < self.error
 
 class Destination2D(Destination):
     def __init__(self,
