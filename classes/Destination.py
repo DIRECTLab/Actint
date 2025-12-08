@@ -1,7 +1,7 @@
-from abc import abstractmethod
+from abc import ABC
 from Position import Position, Position2D, Position3D
 
-class Destination:
+class Destination(ABC):
     def __init__(self,
                  position: Position,
                  target_speed_to_next_destination: int,

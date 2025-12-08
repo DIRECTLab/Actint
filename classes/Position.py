@@ -1,7 +1,7 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 import numpy as np
 
-class Position():
+class Position(ABC):
   @abstractmethod
   def distance_to(self, position: 'Position') -> float:
     """
