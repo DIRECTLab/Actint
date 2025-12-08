@@ -69,6 +69,9 @@ class Position2D(Position):
         >>> pos1.distance_to(pos2)
         5.0
     """
+    if not isinstance(position, (Position2D, Position3D)):
+        raise TypeError(f"Unsupported position type: {type(position).__name__}. "
+                       f"Must be Position2D or Position3D")
     # If the other position is also a Position2D, ignore z components
     return np.sqrt(np.dot(self.x - position.x, self.y - position.y))
   
