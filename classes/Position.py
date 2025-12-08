@@ -5,13 +5,13 @@ class Position(ABC):
   @abstractmethod
   def distance_to(self, position: 'Position') -> float:
     """
-    Calculate the Euclidean distance to another position.
+    Calculate the distance to another position.
     
     Args:
         position (Position): Another position object to calculate distance to
         
     Returns:
-        float: The Euclidean distance between this position and the other position
+        float: The distance between this position and the other position
         
     Raises:
         NotImplementedError: This method must be implemented by subclasses
