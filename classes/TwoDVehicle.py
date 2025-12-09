@@ -42,11 +42,9 @@ class TwoDVehicle(Vehicle):
         # If there isn't a current destination but there are more destinations, assign one
         if self.next_destination is None and self._has_next_destination() is True:
             self._assign_next_destination()
-            self._update_desired_heading()
         # If we are at the current destination, assign the next one
         if self._is_at_destination():
             self._assign_next_destination()
-            self._update_desired_heading()
         # If there is a current destination, move towards it
         self._move_towards_destination()
     
@@ -61,12 +59,6 @@ class TwoDVehicle(Vehicle):
             if abs(self.position_y - self.next_destination.position_y) <= self.next_destination.error:
                 return True
         return False
-    
-
-    def _update_desired_heading(self):
-  
-        return
-
 
     def _move_towards_destination(self):
         self._move_forward()
@@ -74,24 +66,39 @@ class TwoDVehicle(Vehicle):
         self._update_heading()
 
     def _move_forward(self):
-        self.position_x += math.cos(self.heading) * self.current_velocity * (self.time_step / 3600)
-        self.position_y += math.sin(self.heading) * self.current_velocity * (self.time_step / 3600)
+        # Convert velocity from km/h to km/s, then multiply by time_step in seconds
+        # km/h ÷ 3600 = km/s, then × seconds = km traveled
+        distance = self.current_velocity * (self.time_step / 3600)
+        self.position_x += math.cos(self.heading) * distance
+        self.position_y += math.sin(self.heading) * distance
         return
     
     def _update_velocity(self):
-        # If current velocity is equal to target speed, do nothing
         if self.current_velocity == self.next_destination.target_speed_to_next_destination:
             return
+        
+        max_velocity_change = self.max_acceleration * 3600/1000 * self.time_step
         # If current velocity is less than target speed, accelerate
-        elif self.current_velocity < self.next_destination.target_speed_to_next_destination:
-            self.current_velocity += self.max_acceleration * (self.time_step / 3600)
+        if self.current_velocity < self.next_destination.target_speed_to_next_destination:
+            self.current_velocity += min(max_velocity_change, self.next_destination.target_speed_to_next_destination - self.current_velocity)
         # If current velocity is greater than target speed, decelerate
         elif self.current_velocity > self.next_destination.target_speed_to_next_destination:
-            self.current_velocity -= self.max_acceleration * (self.time_step / 3600)
+            self.current_velocity -= min(max_velocity_change, self.current_velocity - self.next_destination.target_speed_to_next_destination)
         # Ensure velocity does not exceed max velocity
         if self.current_velocity > self.max_velocity:
             self.current_velocity = self.max_velocity
 
     def _update_heading(self):
+        # Calculate desired heading towards destination
+        delta_x = self.next_destination.position_x - self.position_x
+        delta_y = self.next_destination.position_y - self.position_y
+        desired_heading = math.atan2(delta_y, delta_x)
 
+        if desired_heading == self.heading:
+            return
+        # Adjust heading gradually: max_heading_delta (rad/s) × time_step (s) = max radians to turn
+        if desired_heading < self.heading:
+            self.heading -= min(self.max_heading_delta * self.time_step, self.heading - desired_heading)
+        elif desired_heading > self.heading:
+            self.heading += min(self.max_heading_delta * self.time_step, desired_heading - self.heading)
         pass
