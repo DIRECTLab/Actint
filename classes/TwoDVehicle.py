@@ -61,9 +61,9 @@ class TwoDVehicle(Vehicle):
         return False
 
     def _move_towards_destination(self):
-        self._move_forward()
         self._update_velocity()
         self._update_heading()
+        self._move_forward()
 
     def _move_forward(self):
         # Convert velocity from km/h to km/s, then multiply by time_step in seconds
