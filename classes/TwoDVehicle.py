@@ -1,11 +1,10 @@
 from queue import Queue
-from classes import Vehicle
+from classes import Vehicle, Position
 import math
 
 class TwoDVehicle(Vehicle):
     def __init__(self,
-                 position_x: float,
-                 position_y: float,
+                 position: Position,
                  current_velocity: float,
                  max_velocity: float,
                  max_acceleration: float,
@@ -22,8 +21,7 @@ class TwoDVehicle(Vehicle):
                          destination_queue,
                          time_step,
                          )
-        self.position_x = position_x # Longitude
-        self.position_y = position_y # Latitude
+        self.position = position
         self.current_velocity = current_velocity # Km/h
         self.max_velocity = max_velocity # Km/h
         self.max_acceleration = max_acceleration # m/s^2
@@ -43,22 +41,11 @@ class TwoDVehicle(Vehicle):
         if self.next_destination is None and self._has_next_destination() is True:
             self._assign_next_destination()
         # If we are at the current destination, assign the next one
-        if self._is_at_destination():
+        if self.next_destination.has_reached(self.position):
             self._assign_next_destination()
         # If there is a current destination, move towards it
         self._move_towards_destination()
     
-
-    def _is_at_destination(self) -> bool:
-        """
-        Check if the vehicle is at its next destination within the allowed error margin.
-        
-        Returns True if at destination, otherwise False.
-        """
-        if abs(self.position_x - self.next_destination.position_x) <= self.next_destination.error:
-            if abs(self.position_y - self.next_destination.position_y) <= self.next_destination.error:
-                return True
-        return False
 
     def _move_towards_destination(self):
         self._update_velocity()
@@ -68,9 +55,9 @@ class TwoDVehicle(Vehicle):
     def _move_forward(self):
         # Convert velocity from km/h to km/s, then multiply by time_step in seconds
         # km/h ÷ 3600 = km/s, then × seconds = km traveled
-        distance = self.current_velocity * (self.time_step / 3600)
-        self.position_x += math.cos(self.heading) * distance
-        self.position_y += math.sin(self.heading) * distance
+        max_distance = self.current_velocity * (self.time_step / 3600)
+        self.position.x += math.cos(self.heading) * max_distance
+        self.position.y += math.sin(self.heading) * max_distance
         return
     
     def _update_velocity(self):

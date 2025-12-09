@@ -31,6 +31,7 @@ class Destination(ABC):
         self.position = position
         self.target_speed_to_next_destination = target_speed_to_next_destination
         self.error = error
+        self.heading_error: float = 0.174533 # ~10 degrees in radians
     
     def distance_to_dest(self, position: Position) -> float:
         """
@@ -44,7 +45,7 @@ class Destination(ABC):
         """
         return self.position.distance_to(position)
     
-    def has_reached(self, position: Position) -> bool:
+    def has_reached(self, position: Position, heading: float) -> bool:
         """
         Check if a given position has reached this destination within the error margin.
         
@@ -55,8 +56,12 @@ class Destination(ABC):
             bool: True if the position is within the error margin of the destination,
                   False otherwise
         """
+        heading_error = abs(heading - self.position.get_heading(position)) < self.heading_error
+
         distance_to_dest = self.distance_to_dest(position)
-        return abs(distance_to_dest) < self.error
+        position_error = abs(distance_to_dest) < self.error
+
+        return position_error and heading_error
 
 class Destination2D(Destination):
     """
