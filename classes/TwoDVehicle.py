@@ -1,10 +1,10 @@
-from queue import Queue
+import queue
 from classes import Vehicle, Position
 import math
 
 class TwoDVehicle(Vehicle):
     def __init__(self,
-                 position: Position,
+                 position: Position.Position2D,
                  current_velocity: float,
                  max_velocity: float,
                  max_acceleration: float,
@@ -13,7 +13,7 @@ class TwoDVehicle(Vehicle):
 
                  vehicle_type: str,
                  vehicle_id: int,
-                 destination_queue: Queue,
+                 destination_queue: queue.Queue,
                  time_step: int,
                  ):
         super().__init__(vehicle_type,
@@ -28,11 +28,17 @@ class TwoDVehicle(Vehicle):
         self.heading = heading # radians
         self.desired_heading = None # radians
         self.max_heading_delta = max_heading_delta # radians/second
+        # Inherited from Vehicle:
+        # self.vehicle_type = vehicle_type
+        # self.vehicle_id = vehicle_id
+        # self.time_step = time_step
+        # self.destination_queue = destination_queue
+        # self.next_destination: Destination = None
 
 
     def update(self):
         """
-        Update the vehicle's position and state. Does nothing is there is no current or next destination.
+        Update the vehicle's position and state. Does nothing if there is no current or next destination.
         """
         # If there isn't a current destination and no more destinations, do nothing
         if self.next_destination is None and self._has_next_destination() is False:
@@ -48,19 +54,25 @@ class TwoDVehicle(Vehicle):
     
 
     def _move_towards_destination(self):
+        """
+        Move the vehicle towards its next destination by updating velocity, heading, and position.
+        """
         self._update_velocity()
         self._update_heading()
         self._move_forward()
 
-    def _move_forward(self):
-        # Convert velocity from km/h to km/s, then multiply by time_step in seconds
-        # km/h ÷ 3600 = km/s, then × seconds = km traveled
-        max_distance = self.current_velocity * (self.time_step / 3600)
-        self.position.x += math.cos(self.heading) * max_distance
-        self.position.y += math.sin(self.heading) * max_distance
-        return
-    
     def _update_velocity(self):
+        """
+        If current velocity is equal to target speed, do nothing.
+
+        If current velocity is less than target speed, accelerate.
+        
+        If current velocity is greater than target speed, decelerate.
+        
+        Ensure velocity does not exceed max velocity.
+        
+        :param self: The TwoDVehicle instance.
+        """
         if self.current_velocity == self.next_destination.target_speed_to_next_destination:
             return
         
@@ -76,16 +88,26 @@ class TwoDVehicle(Vehicle):
             self.current_velocity = self.max_velocity
 
     def _update_heading(self):
-        # Calculate desired heading towards destination
-        delta_x = self.next_destination.position_x - self.position_x
-        delta_y = self.next_destination.position_y - self.position_y
-        desired_heading = math.atan2(delta_y, delta_x)
+        # # Calculate desired heading towards destination
+        # delta_x = self.next_destination.x - self.x
+        # delta_y = self.next_destination.position_y - self.position_y
+        # desired_heading = math.atan2(delta_y, delta_x)
 
-        if desired_heading == self.heading:
-            return
-        # Adjust heading gradually: max_heading_delta (rad/s) × time_step (s) = max radians to turn
-        if desired_heading < self.heading:
-            self.heading -= min(self.max_heading_delta * self.time_step, self.heading - desired_heading)
-        elif desired_heading > self.heading:
-            self.heading += min(self.max_heading_delta * self.time_step, desired_heading - self.heading)
-        pass
+        # if desired_heading == self.heading:
+        #     return
+        # # Adjust heading gradually: max_heading_delta (rad/s) × time_step (s) = max radians to turn
+        # if desired_heading < self.heading:
+        #     self.heading -= min(self.max_heading_delta * self.time_step, self.heading - desired_heading)
+        # elif desired_heading > self.heading:
+        #     self.heading += min(self.max_heading_delta * self.time_step, desired_heading - self.heading)
+        # pass
+
+        self.position.get_heading(self.next_destination.position)
+
+    def _move_forward(self):
+        # Convert velocity from km/h to km/s, then multiply by time_step in seconds
+        # km/h ÷ 3600 = km/s, then × seconds = km traveled
+        max_distance = self.current_velocity * (self.time_step / 3600)
+        self.position.x += math.cos(self.heading) * max_distance
+        self.position.y += math.sin(self.heading) * max_distance
+        return

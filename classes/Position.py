@@ -41,11 +41,11 @@ class Position(ABC):
     Raises:
         NotImplementedError: This method must be implemented by subclasses
     """
-    pass
+    raise NotImplementedError("This method is abstract ands hould be written.")
   
   @abstractmethod
   def get_heading(self, position: 'Position') -> float:
-    pass
+    raise NotImplementedError("This method is abstract ands hould be written.")
 
 
 
@@ -336,7 +336,9 @@ class Position3DGCS(Position2DGCS):
     if isinstance(position, Position2DGCS):
         return horizonal_diff
     else:
-        
-    
+       #TODO
+       pass
+
+
   def __str__(self):
     return f'{type(self).__name__}({self.x:.2f}, {self.y:.2f}, {self.z:.2f})'
