@@ -174,6 +174,9 @@ class Position3D(Position2D):
   def __str__(self):
     return f'{type(self).__name__}({self.x:.2f}, {self.y:.2f}, {self.z:.2f})'
   
+  def get_heading(self, position: 'Position') -> float:
+    raise NotImplementedError("This method should be written.")
+  
 class Position2DGCS(Position):
   """
   2D position representation in Cartesian coordinates.

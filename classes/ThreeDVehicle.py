@@ -1,5 +1,6 @@
 import queue
 from classes import TwoDVehicle, Position
+import math
 
 class ThreeDVehicle(TwoDVehicle):
     def __init__(self,
@@ -32,7 +33,7 @@ class ThreeDVehicle(TwoDVehicle):
                          time_step)
         self.current_elevation = current_elevation
         self.max_elevation = max_elevation
-        self.pitch_angle = pitch_angle
+        self.pitch_angle = pitch_angle # Degrees
 
         # Inherited from TwoDVehicle:
         # self.desired_heading = None # radians
@@ -77,6 +78,15 @@ class ThreeDVehicle(TwoDVehicle):
         """
         Update both the heading and pitch angle to face the next destination.
         """
+        self.position.get_heading(self.next_destination.position)
 
+        
+        
         # Update heading using the TwoDVehicle method
         super()._update_heading()
+
+    def _move_forward(self):
+        self.current_elevation += self.current_velocity * math.sin(math.radians(self.pitch_angle))
+        if self.current_elevation > self.max_elevation:
+            self.current_elevation = self.max_elevation
+            self.pitch_angle = 0
