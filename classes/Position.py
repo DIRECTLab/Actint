@@ -42,11 +42,6 @@ class Position(ABC):
         NotImplementedError: This method must be implemented by subclasses
     """
     raise NotImplementedError("This method is abstract ands hould be written.")
-  
-  @abstractmethod
-  def get_heading(self, position: 'Position') -> float:
-    raise NotImplementedError("This method is abstract ands hould be written.")
-
 
 
 
@@ -109,9 +104,7 @@ class Position2D(Position):
   
   def __str__(self):
     return f'{type(self).__name__}({self.x:.2f}, {self.y:.2f})'
-  
-  def get_heading(self, position: 'Position') -> float:
-    raise NotImplementedError("This method should be written.")
+
 
 class Position3D(Position2D):
   """
@@ -174,8 +167,6 @@ class Position3D(Position2D):
   def __str__(self):
     return f'{type(self).__name__}({self.x:.2f}, {self.y:.2f}, {self.z:.2f})'
   
-  def get_heading(self, position: 'Position') -> float:
-    raise NotImplementedError("This method should be written.")
   
 class Position2DGCS(Position):
   """
