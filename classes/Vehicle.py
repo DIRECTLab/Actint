@@ -2,7 +2,6 @@ import queue
 from classes import Destination
 
 class Vehicle:
-
     def __init__(self,
                  vehicle_type: str,
                  vehicle_id: int,
