@@ -185,6 +185,19 @@ class Vehicle2D(Vehicle):
         return truncate(steer, self.max_force)
 
     def update(self, dt: float, window_w: int, window_h: int) -> None:
+        """
+        Update the vehicle's position and state. Does nothing if there is no current or next destination.
+        """
+        # If there isn't a current destination and no more destinations, do nothing
+        if self.next_destination is None and self._has_next_destination() is False:
+            return
+        # If there isn't a current destination but there are more destinations, assign one
+        if self.next_destination is None and self._has_next_destination() is True:
+            self._assign_next_destination()
+        # If we are at the current destination, assign the next one
+        if self.next_destination.has_reached(self.position):
+            self._assign_next_destination()
+
         distance_to_target = self.position.distance_to(self.target)
 
         if self.action == 'seek':
