@@ -2,29 +2,29 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 def _haversine_distance_numpy(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """
-    Calculate the great circle distance between two points 
-    on the earth (specified in decimal degrees)
-    Returns distance in kilometers
-    
-    All inputs can be scalars or arrays of the same shape.
-    """
-    # Convert decimal degrees to radians
-    lat1 = np.radians(lat1)
-    lon1 = np.radians(lon1)
-    lat2 = np.radians(lat2)
-    lon2 = np.radians(lon2)
-    
-    # Haversine formula
-    dlat = lat2 - lat1
-    dlon = lon2 - lon1
-    a = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
-    c = 2 * np.arcsin(np.sqrt(a))
-    
-    # Radius of earth in kilometers
-    r = 6371
-    
-    return c * r
+  """
+  Calculate the great circle distance between two points 
+  on the earth (specified in decimal degrees)
+  Returns distance in kilometers
+  
+  All inputs can be scalars or arrays of the same shape.
+  """
+  # Convert decimal degrees to radians
+  lat1 = np.radians(lat1)
+  lon1 = np.radians(lon1)
+  lat2 = np.radians(lat2)
+  lon2 = np.radians(lon2)
+  
+  # Haversine formula
+  dlat = lat2 - lat1
+  dlon = lon2 - lon1
+  a = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
+  c = 2 * np.arcsin(np.sqrt(a))
+  
+  # Radius of earth in kilometers
+  r = 6371
+  
+  return c * r
 
 class Position(ABC):
   @abstractmethod
@@ -33,13 +33,13 @@ class Position(ABC):
     Calculate the distance to another position.
     
     Args:
-        position (Position): Another position object to calculate distance to
+    position (Position): Another position object to calculate distance to
         
     Returns:
-        float: The distance between this position and the other position
+      float: The distance between this position and the other position
         
     Raises:
-        NotImplementedError: This method must be implemented by subclasses
+      NotImplementedError: This method must be implemented by subclasses
     """
     raise NotImplementedError("This method is abstract ands hould be written.")
 
@@ -53,29 +53,48 @@ class Position2D(Position):
   It inherits from Position and provides 2D-specific functionality.
 
   Example:
-      >>> pos = Position2D(3.0, 4.0)
-      >>> print(pos.x, pos.y)
-      3.0 4.0
-      
+    >>> pos = Position2D(3.0, 4.0)
+    >>> print(pos.x, pos.y)
+    3.0 4.0
+    
   Attributes:
-      x (float): The x-coordinate of the position
-      y (float): The y-coordinate of the position
+    x (float): The x-coordinate of the position
+    y (float): The y-coordinate of the position
   """
   
-  def __init__(
-      self,
-      x: float,
-      y: float
-  ):
+  def __init__(self, x: float, y: float):
     """
     Initialize a 2D position with x and y coordinates.
     
     Args:
-        x (float): The x-coordinate
-        y (float): The y-coordinate
+      x (float): The x-coordinate
+      y (float): The y-coordinate
     """
-    self.x = x
-    self.y = y
+    self.v_ector = np.array([x, y], dtype=np.float64)
+
+
+  @property
+  def x(self) -> float:
+    """The x-coordinate of the position."""
+    return self._vector[0]
+
+  @x.setter
+  def x(self, value: float) -> None:
+    self._vector[0] = value
+
+  @property
+  def y(self) -> float:
+    """The y-coordinate of the position."""
+    return self._vector[1]
+
+  @y.setter
+  def y(self, value: float) -> None:
+    self._vector[1] = value
+
+  @property
+  def vector(self) -> np.NDArray[np.float64]:
+    """Return the position as a numpy array."""
+    return self._vector.copy()  # Return a copy to prevent external modification
 
   def distance_to(self, position: Position) -> float:
     """
@@ -85,16 +104,16 @@ class Position2D(Position):
     If the other position is 2D, all components are considered.
     
     Args:
-        position (Union[Position2D, Position3D]): Another position to calculate distance to
+      position (Union[Position2D, Position3D]): Another position to calculate distance to
         
     Returns:
-        float: The Euclidean distance between positions
+      float: The Euclidean distance between positions
         
     Example:
-        >>> pos1 = Position2D(0, 0)
-        >>> pos2 = Position2D(3, 4)
-        >>> pos1.distance_to(pos2)
-        5.0
+      >>> pos1 = Position2D(0, 0)
+      >>> pos2 = Position2D(3, 4)
+      >>> pos1.distance_to(pos2)
+      5.0
     """
     if not isinstance(position, (Position2D, Position3D)):
         raise TypeError(f"Unsupported position type: {type(position).__name__}. "
@@ -102,8 +121,53 @@ class Position2D(Position):
     # If the other position is also a Position2D, ignore z components
     return np.sqrt((self.x - position.x)**2 + (self.y - position.y)**2)
   
+  def get_heading(self, position: 'Position') -> float:
+    """
+    Calculate the heading (angle) to another position in radians.
+    
+    Args:
+      position (Position): Another position to calculate heading to
+        
+    Returns:
+      float: The heading in radians (0 = north, clockwise)
+    """
+    if isinstance(position, Position2D):
+      diff = position._vector - self._vector
+    else:
+      raise TypeError(f"Unsupported position type: {type(position).__name__}. " f"Must be Position2D")
+  
+    # arctan2 gives angle from positive x-axis (counterclockwise)
+    # We want angle from positive y-axis (north), clockwise
+    # So we need: π/2 - angle (to convert to north-oriented)
+    # But we also need to handle the clockwise convention properly
+    angle = np.arctan2(diff[1], diff[0])
+    # Convert to maritime convention (0° = north, clockwise)
+    heading = (np.pi / 2 - angle) % (2 * np.pi)
+    return heading
+
   def __str__(self):
     return f'{type(self).__name__}({self.x:.2f}, {self.y:.2f})'
+  
+  def __repr__(self) -> str:
+    return f'{type(self).__name__}(x={self.x}, y={self.y})'
+    
+  def __eq__(self, other: object) -> bool:
+    """Check equality with another position."""
+    if not isinstance(other, Position2D):
+      return False
+    return np.allclose(self._vector, other._vector)
+  
+  def __add__(self, other: 'Position2D') -> 'Position2D':
+    """Add two positions."""
+    if isinstance(other, Position2D):
+      return Position2D(self.x + other.x, self.y + other.y)
+    raise TypeError(f"Can only add Position2D to Position2D NOT {type(other).__name__}")
+  
+  def __sub__(self, other: 'Position2D') -> 'Position2D':
+    """Subtract two positions."""
+    if isinstance(other, Position2D):
+      return Position2D(self.x - other.x, self.y - other.y)
+    raise TypeError(f"Can only subtract Position2D from Position2D NOT {type(other).__name__}")
 
 
 class Position3D(Position2D):

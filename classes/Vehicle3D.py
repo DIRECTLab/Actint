@@ -1,8 +1,8 @@
 import queue
-from classes import TwoDVehicle, Position
+from classes import Vehicle2D, Position
 import math
 
-class ThreeDVehicle(TwoDVehicle):
+class ThreeDVehicle(Vehicle2D):
     def __init__(self,
                  current_elevation: int,
                  max_elevation: int,
