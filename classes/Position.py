@@ -103,7 +103,7 @@ class Position2D(Position):
 
   def distance_to(self, position: Position) -> float:
     """
-    Calculate the Euclidean distance to another position.
+    Calculate the Euclidean distance to another position. This will be used for now to imitate UTM distance with objects in the same UTM zone. As we progress we will need to update this for objects in different UTM zones.
     
     If the other position is 3D, the z component is ignored.
     If the other position is 2D, all components are considered.

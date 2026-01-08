@@ -17,17 +17,17 @@ class Vehicle:
     def update(self):
         raise NotImplementedError("This method should be overridden by subclasses")
     
-    def _assign_next_destination(self):
+    def _assign_next_destination(self) -> bool:
         """Assign the next destination from the queue to `self.next_destination`.
 
-        Returns the destination object if one was assigned, otherwise None.
+        Returns True if a destination was assigned, otherwise False.
         """
         try:
             self.next_destination = self.destination_queue.get_nowait()
-            return self.next_destination
+            return True
         except queue.Empty:
             self.next_destination = None
-            return None
+            return False
         
     def _has_next_destination(self) -> bool:
         """Check if there is a next destination in the queue.
