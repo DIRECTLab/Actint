@@ -1,7 +1,8 @@
 from csv_print import csv_print_data, csv_print_header
 
 def main():
-    filename: str = csv_print_header()
+    default_filename: str = "JFN-Groudtruth-Simulator_result.csv"
+    filename: str = csv_print_header(default_filename)
 
     all_done=False
     while not all_done:

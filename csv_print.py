@@ -2,6 +2,7 @@ import csv
 from pathlib import Path
 from classes import Vehicle2D
 
+# Helper function to generate unique filenames for the csv_print_header function.
 def _name_file(file: str) -> Path:
   """Generate a unique filename by appending a counter if the file already exists.
   
@@ -27,7 +28,7 @@ def _name_file(file: str) -> Path:
 
   return new_path
 
-def csv_print_header() -> str:
+def csv_print_header(file: str) -> str:
   """Create a new CSV file with headers for vehicle simulation data.
   
   Creates a CSV file named "JFN-Groudtruth-Simulator_result.csv" (or an
@@ -38,9 +39,9 @@ def csv_print_header() -> str:
   Returns:
     The name of the created CSV file as a string.
   """
-  filename =_name_file("JFN-Groudtruth-Simulator_result.csv").name
-  with open(filename, mode="w", newline="") as file:
-    writer = csv.DictWriter(file, fieldnames=["vehicle_id", "time_stamp","heading",
+  filename =_name_file(file).name
+  with open(filename, mode="w", newline="") as f:
+    writer = csv.DictWriter(f, fieldnames=["vehicle_id", "time_stamp","heading",
     "position_x", "position_y", "position_z",
     "velocity_x", "velocity_y", "velocity_z",
     "acceleration_x", "acceleration_y", "acceleration_z"])
