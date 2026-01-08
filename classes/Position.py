@@ -27,21 +27,26 @@ def _haversine_distance_numpy(lat1: float, lon1: float, lat2: float, lon2: float
   return c * r
 
 class Position(ABC):
+  """Abstract base class for position representations."""
+  
+  @property
+  @abstractmethod
+  def vector(self) -> np.NDArray[np.float64]:
+    """Return the position as a numpy array."""
+    pass
+  
   @abstractmethod
   def distance_to(self, position: 'Position') -> float:
-    """
-    Calculate the distance to another position.
-    
-    Args:
-    position (Position): Another position object to calculate distance to
-        
-    Returns:
-      float: The distance between this position and the other position
-        
-    Raises:
-      NotImplementedError: This method must be implemented by subclasses
-    """
-    raise NotImplementedError("This method is abstract ands hould be written.")
+    """Calculate the distance to another position."""
+    pass
+  
+  @abstractmethod
+  def get_heading(self, position: 'Position') -> float:
+    """Calculate the heading (angle) to another position in radians."""
+    pass
+  
+  def get_heading_deg(self, position: 'Position') -> float:
+    return np.rad2deg(self.get_heading(position))
 
 
 
