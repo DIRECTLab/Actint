@@ -17,15 +17,13 @@ def _name_file(file: str) -> Path:
 
 
 
-def csv_print(filename: str = "JFN-Groudtruth-Simulator_result.csv"):
+def csv_print(vehicles: list, name: str = "JFN-Groudtruth-Simulator_result.csv") -> None:
   """
-  Docstring for csv_print
+  Takes list of vehicles and prints their data to a CSV file. Default filename is "JFN-Groudtruth-Simulator_result_0.csv" with 0 being incremented to the next available number to avoid overwriting previous runs.
   """
-  filename = _name_file(filename)
+  filename = _name_file(name)
      
 
   with open(filename, mode="w", newline="") as file:
-    writer = csv.writer(file)
-    writer.writerow(["Column1", "Column2", "Column3"])
-    writer.writerow([1, 2, 3])
-    writer.writerow([4, 5, 6])
+    writer = csv.DictWriter(file, fieldnames=["vehicle_id", "time_stamp", "position_x", "position_y", "position_z", "velocity_x", "velocity_y", "velocity_z", "acceleration_x", "acceleration_y", "acceleration_z", "heading", "action"])
+    writer.writeheader()
