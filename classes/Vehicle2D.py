@@ -1,6 +1,6 @@
 import queue, math, random
 import numpy as np
-import pyglet.shapes as shapes
+import pyglet
 from classes import Vehicle, Position
 
 # Helper functions adapted to use Position2D
@@ -115,7 +115,7 @@ class Vehicle2D(Vehicle):
     def acceleration(self, acceleration: Position.Position2D) -> None:
         self._acceleration = Position.Position2D(acceleration.x, acceleration.y)
 
-    def _build_arrow(self) -> np.NDArray[np.float64]:
+    def _build_arrow(self) -> np.ndarray[np.float64]:
         return np.array([
             [1, 0],
             [-1, 0.5],
@@ -205,4 +205,9 @@ class Vehicle2D(Vehicle):
         for i in range(len(coords_for_drawing)):
             start_x, start_y = coords_for_drawing[i]
             end_x, end_y = coords_for_drawing[(i + 1) % len(coords_for_drawing)]
-            shapes.Line(start_x, start_y, end_x, end_y, color=(0, 200, 255)).draw()
+            pyglet.graphics.draw(
+                2,
+                pyglet.gl.GL_LINES,
+                ('v2f', [start_x, start_y, end_x, end_y]),
+                ('c3B', [0, 200, 255, 0, 200, 255])
+            )

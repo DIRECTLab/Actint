@@ -1,5 +1,5 @@
 from abc import ABC
-from Position import Position, Position2D, Position3D
+from .Position import Position, Position2D, Position3D
 
 class Destination(ABC):
     """
