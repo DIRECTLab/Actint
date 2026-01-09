@@ -250,61 +250,67 @@ class Position3D(Position2D):
         # Other position is 3D, use all components
         return np.sqrt((self.x - position.x)**2 + (self.y - position.y)**2 + (self.z - position.z)**2)
   
-  def get_heading(self, position: 'Position') -> float:
+  def get_direction_vector(self, position: 'Position') -> 'Position3D':
     """
-    Calculate the heading (angle) to another position in radians.
+    Get a normalized 3D direction vector to another position.
     
-    The heading is calculated based on the x-y plane projection,
-    ignoring the z component (similar to compass heading).
-    
-    Args:
-      position (Position): Another position to calculate heading to
-        
-    Returns:
-      float: The heading in radians (0 = north, clockwise)
-    """
-    if isinstance(position, (Position2D, Position3D)):
-      # Calculate heading in x-y plane only
-      diff_x = position.x - self.x
-      diff_y = position.y - self.y
-      
-      # arctan2 gives angle from positive x-axis (counterclockwise)
-      # We want angle from positive y-axis (north), clockwise
-      angle = np.arctan2(diff_y, diff_x)
-      # Convert to maritime convention (0° = north, clockwise)
-      heading = (np.pi / 2 - angle) % (2 * np.pi)
-      return heading
-    else:
-      raise TypeError(f"Unsupported position type: {type(position).__name__}. " f"Must be Position2D or Position3D")
-
-  def get_pitch(self, position: 'Position') -> float:
-    """
-    Calculate the pitch (elevation angle) to another position in radians.
-    
-    Pitch is the angle above or below the horizontal plane. Positive pitch
-    indicates the target is above, negative indicates below.
+    Calculates both heading (horizontal direction) and pitch (vertical angle)
+    and combines them into a single 3D unit direction vector.
     
     Args:
-      position (Position): Another position to calculate pitch to
+      position (Position): Another position to calculate direction to
         
     Returns:
-      float: The pitch in radians (-π/2 to π/2, where 0 = horizontal)
+      Position3D: A normalized unit direction vector pointing to the target
+      
+    Example:
+      >>> pos1 = Position3D(0, 0, 0)
+      >>> pos2 = Position3D(10, 0, 5)
+      >>> direction = pos1.get_direction_vector(pos2)
+      >>> # direction is a unit vector pointing towards pos2
     """
-    if isinstance(position, (Position2D, Position3D)):
-      # Calculate horizontal distance in x-y plane
-      diff_x = position.x - self.x
-      diff_y = position.y - self.y
-      horizontal_dist = np.sqrt(diff_x**2 + diff_y**2)
-      
-      # Calculate vertical distance
-      diff_z = position.z - self.z if isinstance(position, Position3D) else 0
-      
-      # Pitch is the angle from the horizontal plane
-      # arctan(vertical / horizontal)
-      pitch = np.arctan2(diff_z, horizontal_dist)
-      return pitch
-    else:
+    if not isinstance(position, (Position2D, Position3D)):
       raise TypeError(f"Unsupported position type: {type(position).__name__}. " f"Must be Position2D or Position3D")
+    
+    # Calculate differences
+    diff_x = position.x - self.x
+    diff_y = position.y - self.y
+    diff_z = position.z - self.z if isinstance(position, Position3D) else 0
+    
+    # Calculate horizontal distance in x-y plane
+    horizontal_dist = np.sqrt(diff_x**2 + diff_y**2)
+    
+    # Calculate heading in x-y plane
+    # arctan2 gives angle from positive x-axis (counterclockwise)
+    # We want angle from positive y-axis (north), clockwise
+    angle = np.arctan2(diff_y, diff_x)
+    heading = (np.pi / 2 - angle) % (2 * np.pi)
+    
+    # Calculate pitch (elevation angle)
+    pitch = np.arctan2(diff_z, horizontal_dist)
+    
+    # Convert angles to 3D Cartesian coordinates
+    # heading: 0 = north (positive y), π/2 = east (positive x), π = south, 3π/2 = west
+    # pitch: 0 = horizontal, positive = upward, negative = downward
+    
+    # Horizontal magnitude reduces as pitch increases
+    horizontal_mag = np.cos(pitch)
+    
+    # Calculate direction components
+    direction_x = np.sin(heading) * horizontal_mag
+    direction_y = np.cos(heading) * horizontal_mag
+    direction_z = np.sin(pitch)
+    
+    # Normalize to unit vector
+    magnitude = np.sqrt(direction_x**2 + direction_y**2 + direction_z**2)
+    if magnitude > 1e-9:
+      return Position3D(
+        float(direction_x / magnitude),
+        float(direction_y / magnitude),
+        float(direction_z / magnitude)
+      )
+    else:
+      return Position3D(0.0, 0.0, 0.0)
 
   def __str__(self):
     return f'{type(self).__name__}({self.x:.2f}, {self.y:.2f}, {self.z:.2f})'
