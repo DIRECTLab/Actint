@@ -75,7 +75,7 @@ class Position2D(Position):
       x (float): The x-coordinate
       y (float): The y-coordinate
     """
-    self.v_ector = np.array([x, y], dtype=np.float64)
+    self._vector = np.array([x, y], dtype=np.float64)
 
 
   @property
@@ -201,8 +201,23 @@ class Position3D(Position2D):
         y (float): The y-coordinate
         z (float): The z-coordinate
     """
-    super().__init__(x, y)
-    self.z = z
+    # Initialize the parent Position2D with x, y
+    # But we need to override _vector to be 3D
+    self._vector = np.array([x, y, z], dtype=np.float64)
+
+  @property
+  def z(self) -> float:
+    """The z-coordinate of the position."""
+    return self._vector[2]
+
+  @z.setter
+  def z(self, value: float) -> None:
+    self._vector[2] = value
+
+  @property
+  def vector(self) -> np.NDArray[np.float64]:
+    """Return the position as a numpy array."""
+    return self._vector.copy()  # Return a copy to prevent external modification
 
   def distance_to(self, position: Position) -> float:
     """
@@ -228,13 +243,92 @@ class Position3D(Position2D):
         raise TypeError(f"Unsupported position type: {type(position).__name__}. "
                        f"Must be Position2D or Position3D")
     
-    if isinstance(position, Position2D):
-        return super().distance_to(position)
+    if isinstance(position, Position2D) and not isinstance(position, Position3D):
+        # Other position is 2D only, ignore z component
+        return np.sqrt((self.x - position.x)**2 + (self.y - position.y)**2)
     else:
-        return np.linalg.norm([self.x, self.y, self.z] - [position.x, position.y, position.z])
+        # Other position is 3D, use all components
+        return np.sqrt((self.x - position.x)**2 + (self.y - position.y)**2 + (self.z - position.z)**2)
+  
+  def get_heading(self, position: 'Position') -> float:
+    """
+    Calculate the heading (angle) to another position in radians.
     
+    The heading is calculated based on the x-y plane projection,
+    ignoring the z component (similar to compass heading).
+    
+    Args:
+      position (Position): Another position to calculate heading to
+        
+    Returns:
+      float: The heading in radians (0 = north, clockwise)
+    """
+    if isinstance(position, (Position2D, Position3D)):
+      # Calculate heading in x-y plane only
+      diff_x = position.x - self.x
+      diff_y = position.y - self.y
+      
+      # arctan2 gives angle from positive x-axis (counterclockwise)
+      # We want angle from positive y-axis (north), clockwise
+      angle = np.arctan2(diff_y, diff_x)
+      # Convert to maritime convention (0° = north, clockwise)
+      heading = (np.pi / 2 - angle) % (2 * np.pi)
+      return heading
+    else:
+      raise TypeError(f"Unsupported position type: {type(position).__name__}. " f"Must be Position2D or Position3D")
+
+  def get_pitch(self, position: 'Position') -> float:
+    """
+    Calculate the pitch (elevation angle) to another position in radians.
+    
+    Pitch is the angle above or below the horizontal plane. Positive pitch
+    indicates the target is above, negative indicates below.
+    
+    Args:
+      position (Position): Another position to calculate pitch to
+        
+    Returns:
+      float: The pitch in radians (-π/2 to π/2, where 0 = horizontal)
+    """
+    if isinstance(position, (Position2D, Position3D)):
+      # Calculate horizontal distance in x-y plane
+      diff_x = position.x - self.x
+      diff_y = position.y - self.y
+      horizontal_dist = np.sqrt(diff_x**2 + diff_y**2)
+      
+      # Calculate vertical distance
+      diff_z = position.z - self.z if isinstance(position, Position3D) else 0
+      
+      # Pitch is the angle from the horizontal plane
+      # arctan(vertical / horizontal)
+      pitch = np.arctan2(diff_z, horizontal_dist)
+      return pitch
+    else:
+      raise TypeError(f"Unsupported position type: {type(position).__name__}. " f"Must be Position2D or Position3D")
+
   def __str__(self):
     return f'{type(self).__name__}({self.x:.2f}, {self.y:.2f}, {self.z:.2f})'
+  
+  def __repr__(self) -> str:
+    return f'{type(self).__name__}(x={self.x}, y={self.y}, z={self.z})'
+    
+  def __eq__(self, other: object) -> bool:
+    """Check equality with another position."""
+    if not isinstance(other, Position3D):
+      return False
+    return np.allclose(self._vector, other._vector)
+  
+  def __add__(self, other: 'Position3D') -> 'Position3D':
+    """Add two positions."""
+    if isinstance(other, Position3D):
+      return Position3D(self.x + other.x, self.y + other.y, self.z + other.z)
+    raise TypeError(f"Can only add Position3D to Position3D NOT {type(other).__name__}")
+  
+  def __sub__(self, other: 'Position3D') -> 'Position3D':
+    """Subtract two positions."""
+    if isinstance(other, Position3D):
+      return Position3D(self.x - other.x, self.y - other.y, self.z - other.z)
+    raise TypeError(f"Can only subtract Position3D from Position3D NOT {type(other).__name__}")
   
   
 class Position2DGCS(Position):
