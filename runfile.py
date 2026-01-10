@@ -1,6 +1,6 @@
 import csv
 import queue
-from classes import Vehicle2D, Vehicle3D, Position
+from classes import Vehicle2D, Vehicle3D, Position, Position2D, Position3D
 from classes.Destination import Destination2D, Destination3D
 
 
@@ -39,10 +39,10 @@ def read_csv(filepath: str) -> list:
 
         if is_3d:
             dest_z = float(row.get("dest_z", 0.0))
-            dest_pos = Position.Position3D(dest_x, dest_y, dest_z)
+            dest_pos = Position3D(dest_x, dest_y, dest_z)
             dest = Destination3D(dest_pos, dest_speed, dest_error)
         else:
-            dest_pos = Position.Position2D(dest_x, dest_y)
+            dest_pos = Position2D(dest_x, dest_y)
             dest = Destination2D(dest_pos, dest_speed, dest_error)
 
         dq.put(dest)
@@ -59,7 +59,7 @@ def read_csv(filepath: str) -> list:
             pos_x = float(row["position_x"])  # required
             pos_y = float(row["position_y"])  # required
             pos_z = float(row.get("position_z", 0.0))
-            position = Position.Position3D(pos_x, pos_y, pos_z)
+            position = Position3D(pos_x, pos_y, pos_z)
 
             vehicle = Vehicle3D(
                 current_elevation=int(row.get("current_elevation", pos_z)),
@@ -79,13 +79,14 @@ def read_csv(filepath: str) -> list:
         else:
             pos_x = float(row["position_x"])  # required
             pos_y = float(row["position_y"])  # required
-            position = Position.Position2D(pos_x, pos_y)
+            position = Position2D(pos_x, pos_y)
 
             vehicle = Vehicle2D(
                 position=position,
                 vehicle_type=vehicle_type,
                 vehicle_id=vehicle_id,
                 destination_queue=dq,
+                time_step=int(row.get("time_step", 1)),
                 velocity_x=float(row.get("velocity_x", 0.0)),
                 velocity_y=float(row.get("velocity_y", 0.0)),
                 mass=float(row.get("mass", 1.0)),

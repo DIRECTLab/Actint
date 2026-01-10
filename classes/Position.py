@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
+from numpy.typing import NDArray
 
 def _haversine_distance_numpy(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
   """
@@ -31,7 +32,7 @@ class Position(ABC):
   
   @property
   @abstractmethod
-  def vector(self) -> np.ndarray[np.float64]:
+  def vector(self) -> NDArray[np.float64]:
     """Return the position as a numpy array."""
     pass
   
@@ -97,7 +98,7 @@ class Position2D(Position):
     self._vector[1] = value
 
   @property
-  def vector(self) -> np.ndarray[np.float64]:
+  def vector(self) -> NDArray[np.float64]:
     """Return the position as a numpy array."""
     return self._vector.copy()  # Return a copy to prevent external modification
 
@@ -215,7 +216,7 @@ class Position3D(Position2D):
     self._vector[2] = value
 
   @property
-  def vector(self) -> np.ndarray[np.float64]:
+  def vector(self) -> NDArray[np.float64]:
     """Return the position as a numpy array."""
     return self._vector.copy()  # Return a copy to prevent external modification
 

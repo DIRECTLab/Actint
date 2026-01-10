@@ -1,5 +1,5 @@
 import queue
-from classes import Destination
+from .Destination import Destination
 
 class Vehicle:
     def __init__(self,
