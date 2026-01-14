@@ -1,0 +1,11 @@
+vehicle_id,vehicle_type,is_3d,is_destination,position_x,position_y,position_z,velocity_x,velocity_y,mass,max_speed,max_force,scale,max_turn_rate,time_step,dest_speed,dest_error,action
+1,car,FALSE,FALSE,0,0,,0,0,1.5,100,200,10,3.14159,.4,,,seek
+2,drone,TRUE,FALSE,0,0,0,0,0,,150,300,,2.5,.4,,,seek
+1,,FALSE,TRUE,1000,1000,,,,,,,,,,25,5,
+1,,FALSE,TRUE,500,1000,,,,,,,,,,50,5,
+1,,FALSE,TRUE,500,500,,,,,,,,,,75,5,
+1,,FALSE,TRUE,1000,500,,,,,,,,,,100,5,
+2,,TRUE,TRUE,1000,1000,1000,,,,,,,,,30,10,
+2,,TRUE,TRUE,500,1000,500,,,,,,,,,60,10,
+2,,TRUE,TRUE,500,500,1000,,,,,,,,,90,10,
+2,,TRUE,TRUE,1000,500,500,,,,,,,,,120,10,
