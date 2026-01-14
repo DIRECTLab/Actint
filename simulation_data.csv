@@ -1,3 +1,11 @@
-vehicle_id,vehicle_type,position_x,position_y,position_z,velocity_x,velocity_y,velocity_z,current_velocity,max_velocity,max_acceleration,heading,max_heading_delta,mass,scale,max_speed,max_force,max_turn_rate,time_step,is_3d,dest_x,dest_y,dest_z,dest_speed,dest_error,max_elevation,pitch_angle,current_elevation
-1,car,100,200,,5,0,,0,100,200,0,3.14159,1.0,10.0,100.0,200.0,3.14159,1,false,400,500,,60,5,,,
-2,drone,50,75,20,0,0,0,0,120,250,0,3.14159,1.0,10.0,120.0,250.0,3.14159,1,true,300,350,100,80,10,1000,5.0,20
+vehicle_id,vehicle_type,is_3d,is_destination,position_x,position_y,position_z,velocity_x,velocity_y,mass,max_speed,max_force,scale,max_turn_rate,time_step,dest_speed,dest_error,action
+1,car,FALSE,FALSE,0,0,,0,0,1.5,100,200,10,3.14159,.4,,,seek
+2,drone,TRUE,FALSE,0,0,0,0,0,,150,300,,2.5,.4,,,seek
+1,,FALSE,TRUE,1000,1000,,,,,,,,,,25,5,
+1,,FALSE,TRUE,500,1000,,,,,,,,,,50,5,
+1,,FALSE,TRUE,500,500,,,,,,,,,,75,5,
+1,,FALSE,TRUE,1000,500,,,,,,,,,,100,5,
+2,,TRUE,TRUE,1000,1000,1000,,,,,,,,,30,10,
+2,,TRUE,TRUE,500,1000,500,,,,,,,,,60,10,
+2,,TRUE,TRUE,500,500,1000,,,,,,,,,90,10,
+2,,TRUE,TRUE,1000,500,500,,,,,,,,,120,10,

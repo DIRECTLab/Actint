@@ -10,8 +10,7 @@ def normalize(v: Position2D) -> Position2D:
     vec = v.vector
     norm = np.linalg.norm(vec)
     if norm > 1e-9:
-        unit = vec / norm
-        return Position2D(float(unit[0]), float(unit[1]))
+        return Position2D(*[float(x) for x in vec / norm])
     return Position2D(0.0, 0.0)
 
 def truncate(v: Position2D, limit: float) -> Position2D:
@@ -19,7 +18,7 @@ def truncate(v: Position2D, limit: float) -> Position2D:
     norm = np.linalg.norm(vec)
     if norm > limit:
         scaled = vec * (limit / norm)
-        return Position2D(float(scaled[0]), float(scaled[1]))
+        return Position2D(*[float(x) for x in scaled])
     return v
 
 def scale_position(pos: Position2D, scalar: float) -> Position2D:
@@ -27,26 +26,30 @@ def scale_position(pos: Position2D, scalar: float) -> Position2D:
     return Position2D(pos.x * scalar, pos.y * scalar)
 
 class Vehicle2D(Vehicle):
-    def __init__(self,
-                 position: Position2D,
-                 vehicle_type: str,
-                 vehicle_id: int,
-                 destination_queue: queue.Queue,
-                 time_step: int = 1,
+    def __init__(
+            self,
+            vehicle_type: str,
+            vehicle_id: int,
+            destination_queue: queue.Queue,
+            time_step: float = 1,
 
-                 velocity_x: float = 0.0,
-                 velocity_y: float = 0.0,
-                 mass: float = 1.0,
-                 max_speed: float = 100.0,
-                 max_force: float = 200.0,
-                 scale: float = 10.0,
-                 max_turn_rate: float = math.pi,
-                 ):
-        super().__init__(vehicle_type,
-                         vehicle_id,
-                         destination_queue,
-                         time_step,
-                         )
+            position: Position2D = Position2D(0,0),
+            velocity_x: float = 0.0,
+            velocity_y: float = 0.0,
+            mass: float = 1.0,
+            max_speed: float = 100.0,
+            max_force: float = 200.0,
+            max_turn_rate: float = math.pi,
+            scale: float = 10.0,
+            action: str = 'none',
+            ):
+        super().__init__(
+            vehicle_type,
+            vehicle_id,
+            destination_queue,
+            time_step,
+            action
+            )
         self.position: Position2D = position
         self._velocity: Position2D = Position2D(velocity_x, velocity_y)
         self._acceleration: Position2D = Position2D(0.0, 0.0)
@@ -57,10 +60,10 @@ class Vehicle2D(Vehicle):
         self.heading: np.float64 = np.float64(0.0)
         self.scale: float = scale
         self.vertices = self._build_arrow()
-        self.target = Position2D(0.0, 0.0)
-        self.action = 'none'
+        self.target: Position2D = Position2D(0.0, 0.0)
         # Inherited from Vehicle:
         # self.next_destination: Destination = None
+        # self.action : str = 'none'
 
 
     @property
@@ -127,14 +130,21 @@ class Vehicle2D(Vehicle):
             [-1, -0.5]
         ], dtype=np.float64) * self.scale
 
+    def _assign_next_destination(self) -> bool:
+        """Assign the next destination and set target to the destination's position."""
+        success = super()._assign_next_destination()
+        if success and self.next_destination:
+            self.target = self.next_destination.position
+        return success
+
     def seek(self) -> Position2D:
         desired_direction = normalize(self.target - self.position)
-        desired_velocity = scale_position(desired_direction, self.max_speed)
+        desired_velocity = scale_position(desired_direction, min(self.max_speed, self.target_speed()))
         return truncate(desired_velocity - self.velocity, self.max_force)
     
     def flee(self) -> Position2D:
         desired_direction = normalize(self.target - self.position)
-        desired_velocity = scale_position(desired_direction, -self.max_speed)
+        desired_velocity = scale_position(desired_direction, -min(self.max_speed, self.target_speed()))
         return truncate(desired_velocity - self.velocity, self.max_force)
     
     def arrive(self) -> Position2D:
@@ -153,9 +163,9 @@ class Vehicle2D(Vehicle):
         if distance < 3:
             desired_speed = 0.01
         elif distance < 200:
-            desired_speed = self.max_speed * (distance / 200)
+            desired_speed = min(self.max_speed, self.target_speed()) * (distance / 200)
         else:
-            desired_speed = self.max_speed
+            desired_speed = min(self.max_speed, self.target_speed())
 
         # Calculate the desired velocity
         # First, normalize the 'to_target' vector to get the direction

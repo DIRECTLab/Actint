@@ -1,5 +1,7 @@
 import csv
 import queue
+
+from numpy import rint
 from classes import Vehicle2D, Vehicle3D, Position, Position2D, Position3D
 from classes.Destination import Destination2D, Destination3D
 
@@ -28,17 +30,19 @@ def read_csv(filepath: str) -> list:
     # Destinations section
     dest_queues_by_id: dict[int, queue.Queue] = {}
     for row in rows:
+        if not _parse_bool(row.get("is_destination", "false")):
+            continue
         vehicle_id = int(row["vehicle_id"])  # required
         dq = dest_queues_by_id.setdefault(vehicle_id, queue.Queue())
 
-        dest_x = float(row["dest_x"])  # required
-        dest_y = float(row["dest_y"])  # required
+        dest_x = float(row["position_x"])  # required
+        dest_y = float(row["position_y"])  # required
         dest_speed = float(row.get("dest_speed", 50.0))
         dest_error = float(row.get("dest_error", 5.0))
         is_3d = _parse_bool(row.get("is_3d", "false"))
 
         if is_3d:
-            dest_z = float(row.get("dest_z", 0.0))
+            dest_z = float(row.get("position_z", 0.0))
             dest_pos = Position3D(dest_x, dest_y, dest_z)
             dest = Destination3D(dest_pos, dest_speed, dest_error)
         else:
@@ -50,9 +54,12 @@ def read_csv(filepath: str) -> list:
     # Vehicles section
     vehicles: list = []
     for row in rows:
+        if row.get("is_destination", "true").strip().lower() == "true":
+            continue
         vehicle_id = int(row["vehicle_id"])  # required
         vehicle_type = row["vehicle_type"]
         is_3d = _parse_bool(row.get("is_3d", "false"))
+        action = row.get("action", "none")
         dq = dest_queues_by_id.get(vehicle_id, queue.Queue())
 
         if is_3d:
@@ -62,19 +69,17 @@ def read_csv(filepath: str) -> list:
             position = Position3D(pos_x, pos_y, pos_z)
 
             vehicle = Vehicle3D(
-                current_elevation=int(row.get("current_elevation", pos_z)),
-                max_elevation=int(row.get("max_elevation", 1000)),
-                pitch_angle=float(row.get("pitch_angle", 0.0)),
+                max_altitude=int(row.get("max_altitude", 1000)),
+                action=action,
+
                 position=position,
-                current_velocity=float(row.get("current_velocity", 0.0)),
-                max_velocity=float(row.get("max_velocity", 100.0)),
-                max_acceleration=float(row.get("max_acceleration", 200.0)),
-                heading=float(row.get("heading", 0.0)),
-                max_heading_delta=float(row.get("max_heading_delta", 3.14159)),
+                max_speed=float(row.get("max_speed", 100.0)),
+                max_force=float(row.get("max_force", 200.0)),
+                max_turn_rate=float(row.get("max_turn_rate", 3.14159)),
                 vehicle_type=vehicle_type,
                 vehicle_id=vehicle_id,
                 destination_queue=dq,
-                time_step=int(row.get("time_step", 1)),
+                time_step=float(row.get("time_step", 1)),
             )
         else:
             pos_x = float(row["position_x"])  # required
@@ -86,7 +91,7 @@ def read_csv(filepath: str) -> list:
                 vehicle_type=vehicle_type,
                 vehicle_id=vehicle_id,
                 destination_queue=dq,
-                time_step=int(row.get("time_step", 1)),
+                time_step=float(row.get("time_step", 1)),
                 velocity_x=float(row.get("velocity_x", 0.0)),
                 velocity_y=float(row.get("velocity_y", 0.0)),
                 mass=float(row.get("mass", 1.0)),
@@ -94,6 +99,7 @@ def read_csv(filepath: str) -> list:
                 max_force=float(row.get("max_force", 200.0)),
                 scale=float(row.get("scale", 10.0)),
                 max_turn_rate=float(row.get("max_turn_rate", 3.14159)),
+                action=action,
             )
 
         vehicles.append(vehicle)
@@ -105,4 +111,9 @@ if __name__ == "__main__":
     vehicles = read_csv("simulation_data.csv")
     print(f"Loaded {len(vehicles)} vehicles")
     for v in vehicles:
-        print(f"Vehicle {v.vehicle_id}: {v.vehicle_type} at {v.position}")
+        for i in range(150):
+            if i % 5 == 0:
+                print(f"Vehicle {v.vehicle_id}: {v.vehicle_type} at {v.position} with destination: {v.next_destination.position if v.next_destination else 'None'}")
+            v.update(1, 10000, 10000)
+        print(f"Vehicle {v.vehicle_id}'s action: {v.action}")
+
