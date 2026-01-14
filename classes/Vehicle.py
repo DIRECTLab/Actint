@@ -7,7 +7,7 @@ class Vehicle:
                  vehicle_id: int,
                  destination_queue: queue.Queue,
                  time_step: float,
-                 action: str = 'none',
+                 action: str = 'done',
                  ):
         self.vehicle_type = vehicle_type
         self.vehicle_id = vehicle_id

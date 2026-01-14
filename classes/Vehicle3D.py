@@ -33,16 +33,12 @@ class Vehicle3D(Vehicle):
             time_step: float,
 
             position: Position3D = Position3D(0,0,0),
-            velocity_x: float = 0,
-            velocity_y: float = 0,
-            velocity_z: float = 0,
-            mass: float = 1,
             max_speed: float = 100,
             max_force: float = 200,
             max_altitude: int = 10000,
             max_turn_rate: float = math.pi,
             scale: float = 10.0,
-            action: str = 'none',
+            action: str = 'done',
             ):
         super().__init__(
             vehicle_type,
@@ -52,9 +48,8 @@ class Vehicle3D(Vehicle):
             action,
             )
         self._position: Position3D = position
-        self._velocity: Position3D = Position3D(velocity_x, velocity_y, velocity_z)
+        self._velocity: Position3D = Position3D(0.0, 0.0, 0.0)
         self._acceleration: Position3D = Position3D(0,0,0)
-        self.mass : np.float64 = np.float64(mass)
         self.max_speed: np.float64 = np.float64(max_speed)
         self.max_force: np.float64 = np.float64(max_force)
         self.max_turn_rate: np.float64 = np.float64(max_turn_rate)
@@ -65,7 +60,7 @@ class Vehicle3D(Vehicle):
         self.target: Position3D = Position3D(0,0,0)
         # Inherited from Vehicle:
         # self.next_destination: Destination = None
-        # self.action : str = 'none'
+        # self.action : str = 'done'
 
     @property
     def pos_x(self) -> float:
