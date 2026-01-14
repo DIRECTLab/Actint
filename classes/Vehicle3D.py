@@ -193,7 +193,7 @@ class Vehicle3D(Vehicle):
         """Update vehicle position and state."""
         if self.next_destination is None:
             if not self._has_next_destination():
-                return
+                self.action = 'done'
             self._assign_next_destination()
         elif self.next_destination.has_reached(self.position):
             self._assign_next_destination()
@@ -209,6 +209,7 @@ class Vehicle3D(Vehicle):
             self.acceleration = self.arrive()
         else:
             self.acceleration = Position3D(0.0, 0.0, 0.0)
+            self.action = 'done'
         self._velocity = truncate(self._velocity + scale_position(self._acceleration, dt), self.max_speed)
         self.position += scale_position(self._velocity, dt)
         if self._velocity.distance_to(Position3D(0, 0, 0)) > 1e-6:

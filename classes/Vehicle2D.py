@@ -180,7 +180,7 @@ class Vehicle2D(Vehicle):
         """
         if self.next_destination is None:
             if not self._has_next_destination():
-                return
+                self.action = 'done'
             self._assign_next_destination()
         elif self.next_destination.has_reached(self.position):
             self._assign_next_destination()
@@ -194,6 +194,7 @@ class Vehicle2D(Vehicle):
         elif self.action == 'arrive':
             self._acceleration = self.arrive()
         else:
+            self.action = 'done'
             self._acceleration = Position2D(0.0, 0.0)
 
         self._velocity = truncate(self._velocity + scale_position(self._acceleration, dt), self.max_speed)

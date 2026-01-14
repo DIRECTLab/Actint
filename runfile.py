@@ -111,7 +111,7 @@ if __name__ == "__main__":
     vehicles = read_csv("simulation_data.csv")
     print(f"Loaded {len(vehicles)} vehicles")
     for v in vehicles:
-        for i in range(150):
+        for i in range(200):
             if i % 5 == 0:
                 print(f"Vehicle {v.vehicle_id}: {v.vehicle_type} at {v.position} with destination: {v.next_destination.position if v.next_destination else 'None'}")
             v.update(1, 10000, 10000)
