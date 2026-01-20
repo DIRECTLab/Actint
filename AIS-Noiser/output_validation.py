@@ -3,16 +3,32 @@ import numpy as np
 from pathlib import Path
 import sys
 
+def count_gaps(df: pd.DataFrame, gap_threshold_seconds: int = 30) -> int:
+    """
+    Identifies gaps in time-series data per MMSI.
+    A gap is defined as the time difference between consecutive rows exceeding the threshold.
+    """
+    # Ensure data is sorted by vessel and then time for accurate diffing
+    df = df.sort_values(by=["MMSI", "BaseDateTime"])
+    
+    # Group by MMSI and calculate the time difference between consecutive rows
+    # .diff() returns a Timedelta object
+    time_deltas = df.groupby("MMSI")["BaseDateTime"].diff()
+    
+    # Identify where the delta is greater than the threshold
+    # Note: The first row of every group will be NaT (Not a Time), which is handled
+    gaps = time_deltas > pd.Timedelta(seconds=gap_threshold_seconds)
+    
+    return int(gaps.sum())
+
 def validate_noise_application(original_csv: str, output_csv: str):
     """
     Validates that noise and filtering were applied correctly.
-    Compares record counts and coordinate drift per MMSI.
+    Compares record counts, coordinate drift, and temporal gaps.
     """
-    # Load datasets
     df_orig = pd.read_csv(original_csv)
     df_noised = pd.read_csv(output_csv)
 
-    # Convert timestamps to ensure matching logic is consistent
     df_orig["BaseDateTime"] = pd.to_datetime(df_orig["BaseDateTime"])
     df_noised["BaseDateTime"] = pd.to_datetime(df_noised["BaseDateTime"])
 
@@ -27,7 +43,18 @@ def validate_noise_application(original_csv: str, output_csv: str):
     print(stats)
     print("\n")
 
-    # 2. Positional Difference Analysis
+    # 2. Gap Analysis (New Feature)
+    gap_size_secs = 10
+    orig_gaps = count_gaps(df_orig, gap_size_secs)
+    noised_gaps = count_gaps(df_noised, gap_size_secs)
+
+    print(f"--- Temporal Gap Analysis (>{gap_size_secs}s) ---")
+    print(f"Gaps in original data: {orig_gaps}")
+    print(f"Gaps in noised data:   {noised_gaps}")
+    print(f"Additional gaps introduced: {noised_gaps - orig_gaps}")
+    print("\n")
+
+    # 3. Positional Difference Analysis
     merged = pd.merge(
         df_orig,
         df_noised,
@@ -54,10 +81,6 @@ def validate_noise_application(original_csv: str, output_csv: str):
     print(f"Mean Longitude Offset: {avg_lon_drift:.6f}")
 
 def main():
-    """
-    Handles terminal arguments for validation.
-    Usage: python validator.py <original_file> <noised_file>
-    """
     if len(sys.argv) < 3:
         print("Usage: python validator.py <original_file> <noised_file>")
         sys.exit(1)
@@ -65,7 +88,6 @@ def main():
     original_path = sys.argv[1]
     noised_path = sys.argv[2]
 
-    # Verify files exist before processing to prevent pandas errors
     if not Path(original_path).is_file():
         print(f"Error: Original file not found at {original_path}")
         sys.exit(1)
