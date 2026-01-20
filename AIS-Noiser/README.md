@@ -20,7 +20,7 @@ For each MMSI (vessel) in the input CSV:
 
 Filename collisions are handled by [Next_available_filename.py](Next_available_filename.py): it will create `name (1).csv`, `name (2).csv`, etc.
 
-## Requirements
+## Dependencies
 
 - Python 3.10+ recommended
 - Python packages:
