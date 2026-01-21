@@ -43,12 +43,12 @@ def main():
   groups = data.groupby(by='MMSI')
 
   input_path = Path(file)
-  sorted_outfile = next_available_filename(input_path.with_name(f"{input_path.stem}_sorted{input_path.suffix}"))
+  sorted_outfile = next_available_filename(input_path.with_name(f"{input_path.stem}_noised{input_path.suffix}"))
   data[0:0].to_csv(sorted_outfile, index=False)
 
 
   for name, group in groups:
-    outfile = next_available_filename(f"{name}_sorted.csv")
+    outfile = next_available_filename(f"{name}_noised.csv")
 
     # 1) Write only the header to a fresh output file.
     group.iloc[0:0].to_csv(outfile, index=False)
