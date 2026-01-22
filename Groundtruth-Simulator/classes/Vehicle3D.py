@@ -182,16 +182,19 @@ class Vehicle3D(Vehicle):
     
     def update(self, dt: float, window_w: int, window_h: int) -> None:
         """Update vehicle position and state."""
+        if self.done:
+            return
         if self.next_destination is None:
-            if not self._has_next_destination():
+            if self._has_next_destination():
+                self._assign_next_destination()
+            else:
                 self.done = True
-            self._assign_next_destination()
-        elif self.next_destination.has_reached(self.position):
-            self._assign_next_destination()
-        distance_to_target = self.position.distance_to(self.target)
+                return
+
         if self.next_destination.action == 'seek':
             self.acceleration = self.seek()
         elif self.next_destination.action == 'flee':
+            distance_to_target = self.position.distance_to(self.target)
             if distance_to_target < 300:
                 self.acceleration = self.flee()
             else:
@@ -199,13 +202,23 @@ class Vehicle3D(Vehicle):
         elif self.next_destination.action == 'arrive':
             self.acceleration = self.arrive()
         else:
-            self.acceleration = Position3D(0.0, 0.0, 0.0)
             self.done = True
+            self.acceleration = Position3D(0.0, 0.0, 0.0)
+
         self._velocity = truncate(self._velocity + scale_position(self._acceleration, dt), self.max_speed)
         self.position += scale_position(self._velocity, dt)
+
         if self._velocity.distance_to(Position3D(0, 0, 0)) > 1e-6:
             direction = normalize(self._velocity)
             self.heading = math.atan2(direction.y, direction.x)
+
         self.pos_x = self.position.x % window_w
         self.pos_y = self.position.y % window_h
         self.pos_z = max(0, min(self.position.z, self.max_altitude))
+
+        if self.next_destination.has_reached(self.position):
+            if self._has_next_destination():
+                self._assign_next_destination()
+            else:
+                self.done = True
+                return

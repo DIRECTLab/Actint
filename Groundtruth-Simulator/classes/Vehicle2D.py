@@ -179,12 +179,14 @@ class Vehicle2D(Vehicle):
                 self.done = True
                 return
 
-        distance_to_target = self.position.distance_to(self.target)
-
         if self.next_destination.action == 'seek':
             self._acceleration = self.seek()
         elif self.next_destination.action == 'flee':
-            self._acceleration = self.flee() if distance_to_target < 300 else Position2D(0.0, 0.0)
+            distance_to_target = self.position.distance_to(self.target)
+            if distance_to_target < 300:
+                self.acceleration = self.flee()
+            else:
+                self.acceleration = Position2D(0.0, 0.0)
         elif self.next_destination.action == 'arrive':
             self._acceleration = self.arrive()
         else:
@@ -197,8 +199,8 @@ class Vehicle2D(Vehicle):
         if self._velocity.distance_to(Position2D(0, 0)) > 1e-6:
             self.heading = math.atan2(self._velocity.y, self._velocity.x)
 
-        self.position.x = self.position.x % window_w
-        self.position.y = self.position.y % window_h
+        self.pos_x = self.pos_x % window_w
+        self.pos_y = self.pos_y % window_h
 
         if self.next_destination.has_reached(self.position):
             if self._has_next_destination():
