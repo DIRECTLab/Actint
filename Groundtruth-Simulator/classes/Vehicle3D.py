@@ -27,8 +27,8 @@ def scale_position(pos: Position3D, scalar: float) -> Position3D:
 class Vehicle3D(Vehicle):
     def __init__(
             self,
-            vehicle_type: str,
             vehicle_id: int,
+            vehicle_type: str,
             destination_queue: queue.Queue,
             time_step: float,
 
@@ -36,23 +36,19 @@ class Vehicle3D(Vehicle):
             max_speed: float = 100,
             max_force: float = 200,
             max_altitude: int = 10000,
-            max_turn_rate: float = math.pi,
             scale: float = 10.0,
-            action: str = 'done',
             ):
         super().__init__(
-            vehicle_type,
             vehicle_id,
+            vehicle_type,
             destination_queue,
             time_step,
-            action,
             )
         self._position: Position3D = position
         self._velocity: Position3D = Position3D(0.0, 0.0, 0.0)
         self._acceleration: Position3D = Position3D(0,0,0)
         self.max_speed: np.float64 = np.float64(max_speed)
         self.max_force: np.float64 = np.float64(max_force)
-        self.max_turn_rate: np.float64 = np.float64(max_turn_rate)
         self.heading: np.float64 = np.float64(0)
         self.scale: float = scale
         self.max_altitude: int = max_altitude
@@ -60,7 +56,7 @@ class Vehicle3D(Vehicle):
         self.target: Position3D = Position3D(0,0,0)
         # Inherited from Vehicle:
         # self.next_destination: Destination = None
-        # self.action : str = 'done'
+        # self.done : bool = False
 
     @property
     def pos_x(self) -> float:
@@ -188,23 +184,23 @@ class Vehicle3D(Vehicle):
         """Update vehicle position and state."""
         if self.next_destination is None:
             if not self._has_next_destination():
-                self.action = 'done'
+                self.done = True
             self._assign_next_destination()
         elif self.next_destination.has_reached(self.position):
             self._assign_next_destination()
         distance_to_target = self.position.distance_to(self.target)
-        if self.action == 'seek':
+        if self.next_destination.action == 'seek':
             self.acceleration = self.seek()
-        elif self.action == 'flee':
+        elif self.next_destination.action == 'flee':
             if distance_to_target < 300:
                 self.acceleration = self.flee()
             else:
                 self.acceleration = Position3D(0.0, 0.0, 0.0)
-        elif self.action == 'arrive':
+        elif self.next_destination.action == 'arrive':
             self.acceleration = self.arrive()
         else:
             self.acceleration = Position3D(0.0, 0.0, 0.0)
-            self.action = 'done'
+            self.done = True
         self._velocity = truncate(self._velocity + scale_position(self._acceleration, dt), self.max_speed)
         self.position += scale_position(self._velocity, dt)
         if self._velocity.distance_to(Position3D(0, 0, 0)) > 1e-6:
