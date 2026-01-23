@@ -3,18 +3,17 @@ from .Destination import Destination
 
 class Vehicle:
     def __init__(self,
-                 vehicle_type: str,
                  vehicle_id: int,
+                 vehicle_type: str,
                  destination_queue: queue.Queue,
                  time_step: float,
-                 action: str = 'done',
                  ):
-        self.vehicle_type = vehicle_type
         self.vehicle_id = vehicle_id
+        self.vehicle_type = vehicle_type
         self.time_step = time_step
         self.destination_queue = destination_queue
         self.next_destination: Destination = None
-        self.action = action
+        self.done = False
 
     def update(self):
         raise NotImplementedError("This method should be overridden by subclasses")
