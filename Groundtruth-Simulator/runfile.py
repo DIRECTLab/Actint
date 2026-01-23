@@ -1,4 +1,3 @@
-from fileinput import filename
 import json
 import queue
 from classes import Vehicle2D, Vehicle3D, Position, Position2D, Position3D
@@ -12,8 +11,9 @@ def read_json(filename: str) -> tuple[list[Vehicle2D | Vehicle3D], Settings]:
 
 
         settings: Settings = Settings(
-        default_time_step=data['sim_settings']['default_time_step'],
+        time_step=data['sim_settings']['time_step'],
         latlon_origin=data['sim_settings']['latlon_origin'],
+        output_file=data['sim_settings']['output_file']
     )
         for v in data['vehicles']:
             id = v['id']
@@ -36,7 +36,7 @@ def read_json(filename: str) -> tuple[list[Vehicle2D | Vehicle3D], Settings]:
                     vehicle_id=id,
                     vehicle_type=type,
                     destination_queue=destinations,
-                    time_step=settings.default_time_step,
+                    time_step=settings.time_step,
                     position=position,
                     max_speed=max_speed,
                     max_force=max_force,
@@ -56,7 +56,7 @@ def read_json(filename: str) -> tuple[list[Vehicle2D | Vehicle3D], Settings]:
                     vehicle_id=id,
                     vehicle_type=type,
                     destination_queue=destinations,
-                    time_step=data['sim_settings']['default_time_step'],
+                    time_step=settings.time_step,
                     position=position,
                     max_speed=max_speed,
                     max_force=max_force,
@@ -71,6 +71,6 @@ if __name__ == "__main__":
         for i in range(200):
             if not v.done:
                 print(f"Vehicle {v.vehicle_id}: {v.vehicle_type} at {v.position} with destination: {v.next_destination.position if v.next_destination else 'None'} and action: {v.next_destination.action if v.next_destination else 'None'}")
-            v.update(settings.default_time_step, settings.world_bounds[0], settings.world_bounds[1])
+            v.update(settings.time_step)
 
 
