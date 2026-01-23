@@ -166,7 +166,7 @@ class Vehicle2D(Vehicle):
         desired_velocity = scale_position(desired_direction, desired_speed)
         return truncate(desired_velocity - self.velocity, self.max_force)
 
-    def update(self, dt: float, window_w: int, window_h: int) -> None:
+    def update(self, dt: float) -> None:
         """
         Update the vehicle's position and state. Does nothing if there is no current or next destination.
         """
@@ -198,9 +198,6 @@ class Vehicle2D(Vehicle):
 
         if self._velocity.distance_to(Position2D(0, 0)) > 1e-6:
             self.heading = math.atan2(self._velocity.y, self._velocity.x)
-
-        self.pos_x = self.pos_x % window_w
-        self.pos_y = self.pos_y % window_h
 
         if self.next_destination.has_reached(self.position):
             if self._has_next_destination():
