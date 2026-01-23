@@ -1,3 +1,7 @@
+# Project specific ignores
+*_result*.csv
+*_sorted*.csv
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
