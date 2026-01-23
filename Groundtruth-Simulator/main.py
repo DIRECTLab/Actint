@@ -19,7 +19,7 @@ def main():
         """
         for v in vehicles:
             v.update(settings.default_time_step)
-        csv_print_data(vehicles, filename)
+        csv_print_data(vehicles, filename, settings)
 
         all_done = all(v.done == True for v in vehicles)
 

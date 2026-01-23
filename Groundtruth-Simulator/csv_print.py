@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import datetime
 from pathlib import Path
-from classes import Vehicle2D, Vehicle3D
+from classes import Settings
 
 # WGS‑84 ellipsoid constants
 a = 6378137.0            # semi-major axis (meters)
@@ -101,9 +101,9 @@ def ecef_to_geodetic(X, Y, Z):
 ORIGIN_LAT = np.radians(20.590305)   # ~20.59°N latitude
 ORIGIN_LON = np.radians(-157.697742)   # ~157.70°W longitude  
 ORIGIN_HEIGHT = 0.0              # Sea level
+  
 
-
-def local_to_geodetic(x, y, z=0.0):
+def local_to_geodetic(x, y, z=0.0, settings: Settings = Settings(0, {"latitude": ORIGIN_LAT, "longitude": ORIGIN_LON, "height": ORIGIN_HEIGHT})) -> tuple:
   """
   Convert local ENU coordinates (meters) to geodetic coordinates (degrees).
   
@@ -119,7 +119,7 @@ def local_to_geodetic(x, y, z=0.0):
   enu = np.array([x, y, z])
   
   # Convert to ECEF
-  ecef = enu_to_ecef(enu, ORIGIN_LAT, ORIGIN_LON, ORIGIN_HEIGHT)
+  ecef = enu_to_ecef(enu, np.radians(settings.latlon_origin["latitude"]), np.radians(settings.latlon_origin["longitude"]), settings.latlon_origin["height"])
   
   # Convert to geodetic
   lat_rad, lon_rad, h = ecef_to_geodetic(ecef[0], ecef[1], ecef[2])
@@ -187,7 +187,7 @@ def csv_print_header(file: str) -> str:
 
   return filename
 
-def csv_print_data(vehicles: list, filename: str) -> None:
+def csv_print_data(vehicles: list, filename: str, settings: Settings) -> None:
   """Append vehicle data to an existing CSV file in AIS format.
   
   Extracts vehicle data and writes it in AIS-like format.
@@ -196,6 +196,7 @@ def csv_print_data(vehicles: list, filename: str) -> None:
   Args:
     vehicles: List of vehicle objects.
     filename: Path to the CSV file where data should be appended.
+    settings: Settings object containing simulation settings.
     """
 
   # Convert local coordinates to geodetic and create data rows
@@ -205,7 +206,7 @@ def csv_print_data(vehicles: list, filename: str) -> None:
     z = getattr(v, 'pos_z', 0.0)
     
     # Convert local ENU coordinates to geodetic (lat/lon in degrees)
-    lat, lon, height = local_to_geodetic(v.pos_x, v.pos_y, z)
+    lat, lon, height = local_to_geodetic(v.pos_x, v.pos_y, z, settings)
     
     data_rows.append({
       "MMSI": v.vehicle_id,
