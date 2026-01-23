@@ -1,5 +1,5 @@
-import math
-import random
+import math, random
+from datetime import datetime, timedelta
 
 def noise_coordinate(lat: float, lon: float, distance_m_lat: float, distance_m_lon: float) -> tuple[float, float]:
     """
@@ -33,6 +33,23 @@ def noise_coordinate(lat: float, lon: float, distance_m_lat: float, distance_m_l
     noised_lon = lon + math.degrees(d_lon)
 
     return noised_lat, noised_lon
+
+def noise_time(timestamp: str, max_noise_seconds: float = 20.0) -> str:
+    """
+    Adds random noise to a timestamp in seconds.
+
+    Args:
+        timestamp: Original timestamp as a string in ISO 8601 format.
+        max_noise_seconds: Maximum noise to add or subtract in seconds. Defaults to 300 seconds (5 minutes).
+    Returns:
+        Noised timestamp as an ISO 8601 formatted string.
+    """
+    noise = random.uniform(-max_noise_seconds, max_noise_seconds)
+    time = datetime.fromisoformat(timestamp) - timedelta(seconds=noise)
+    return time.isoformat(sep=' ', timespec='seconds')
+
+
+
 
 if __name__ == "__main__":
   # Example usage

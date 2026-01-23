@@ -4,6 +4,40 @@ import datetime
 from pathlib import Path
 from classes import Vehicle2D, Vehicle3D
 
+
+def _ais_fieldnames() -> list[str]:
+  # Matches the header row in AIS-Noiser/2023-09-03_ais_top10.csv
+  return [
+    "Unnamed: 0",
+    "MMSI",
+    "BaseDateTime",
+    "LAT",
+    "LON",
+    "SOG",
+    "COG",
+    "Heading",
+    "VesselName",
+    "IMO",
+    "CallSign",
+    "VesselType",
+    "Status",
+    "Length",
+    "Width",
+    "Draft",
+    "Cargo",
+    "TransceiverClass",
+  ]
+
+
+def _existing_data_row_count(filename: str) -> int:
+  """Return how many data rows exist (excludes the header)."""
+  try:
+    with open(filename, mode="r", newline="") as f:
+      # -1 to discount the header line.
+      return max(sum(1 for _ in f) - 1, 0)
+  except FileNotFoundError:
+    return 0
+
 # Helper function to generate unique filenames for the csv_print_header function.
 def _name_file(file: str) -> Path:
   """Generate a unique filename by appending a counter if the file already exists.
