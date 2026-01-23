@@ -187,7 +187,7 @@ def csv_print_header(file: str) -> str:
 
   return filename
 
-def csv_print_data(vehicles: list, filename: str, settings: Settings) -> None:
+def csv_print_data(vehicles: list, filename: str, settings: Settings, time:datetime.datetime) -> None:
   """Append vehicle data to an existing CSV file in AIS format.
   
   Extracts vehicle data and writes it in AIS-like format.
@@ -210,7 +210,7 @@ def csv_print_data(vehicles: list, filename: str, settings: Settings) -> None:
     
     data_rows.append({
       "MMSI": v.vehicle_id,
-      "BaseDateTime": datetime.datetime.now().isoformat(sep=' ', timespec='seconds'),
+      "BaseDateTime": time.isoformat(sep=' ', timespec='seconds'),
       "LAT": round(lat, 6),  # Latitude in degrees (~0.1m precision)
       "LON": round(lon, 6),  # Longitude in degrees (~0.1m precision)
       "SOG": round(np.linalg.norm(v.velocity.vector), 3),  # Speed over ground from velocity magnitude
