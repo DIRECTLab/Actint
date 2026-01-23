@@ -4,39 +4,132 @@ import datetime
 from pathlib import Path
 from classes import Vehicle2D, Vehicle3D
 
-
-def _ais_fieldnames() -> list[str]:
-  # Matches the header row in AIS-Noiser/2023-09-03_ais_top10.csv
-  return [
-    "Unnamed: 0",
-    "MMSI",
-    "BaseDateTime",
-    "LAT",
-    "LON",
-    "SOG",
-    "COG",
-    "Heading",
-    "VesselName",
-    "IMO",
-    "CallSign",
-    "VesselType",
-    "Status",
-    "Length",
-    "Width",
-    "Draft",
-    "Cargo",
-    "TransceiverClass",
-  ]
+# WGS‑84 ellipsoid constants
+a = 6378137.0            # semi-major axis (meters)
+f = 1 / 298.257223563    # flattening
+e2 = 2*f - f**2          # eccentricity squared
 
 
-def _existing_data_row_count(filename: str) -> int:
-  """Return how many data rows exist (excludes the header)."""
-  try:
-    with open(filename, mode="r", newline="") as f:
-      # -1 to discount the header line.
-      return max(sum(1 for _ in f) - 1, 0)
-  except FileNotFoundError:
-    return 0
+def geodetic_to_ecef(lat, lon, h):
+  """
+  Convert geodetic coordinates (radians, radians, meters)
+  to ECEF (meters).
+  """
+  sin_lat = np.sin(lat)
+  cos_lat = np.cos(lat)
+  sin_lon = np.sin(lon)
+  cos_lon = np.cos(lon)
+
+  N = a / np.sqrt(1 - e2 * sin_lat**2)
+
+  X = (N + h) * cos_lat * cos_lon
+  Y = (N + h) * cos_lat * sin_lon
+  Z = (N * (1 - e2) + h) * sin_lat
+
+  return np.array([X, Y, Z])
+
+
+def enu_to_ecef_matrix(lat, lon):
+  """
+  Rotation matrix from local ENU frame to ECEF.
+  """
+  sin_lat = np.sin(lat)
+  cos_lat = np.cos(lat)
+  sin_lon = np.sin(lon)
+  cos_lon = np.cos(lon)
+
+  # Columns are East, North, Up unit vectors in ECEF
+  R = np.array([
+    [-sin_lon,              -sin_lat*cos_lon,   cos_lat*cos_lon],
+    [ cos_lon,              -sin_lat*sin_lon,   cos_lat*sin_lon],
+    [       0,                       cos_lat,            sin_lat]
+  ])
+
+  return R
+
+
+def enu_to_ecef(enu, lat0, lon0, h0):
+  """
+  Convert a local ENU vector to global ECEF coordinates.
+  enu: np.array([e, n, u])
+  lat0, lon0 in radians
+  h0 in meters
+  """
+  # ECEF of the ENU origin
+  origin_ecef = geodetic_to_ecef(lat0, lon0, h0)
+
+  # Rotation matrix
+  R = enu_to_ecef_matrix(lat0, lon0)
+
+  # Apply transform
+  return origin_ecef + R @ enu
+
+
+def ecef_to_geodetic(X, Y, Z):
+  """
+  Convert ECEF coordinates (meters) to geodetic coordinates.
+  Returns (latitude, longitude, height) in (radians, radians, meters).
+  Uses iterative algorithm for latitude calculation.
+  """
+  # Longitude is straightforward
+  lon = np.arctan2(Y, X)
+  
+  # Latitude requires iteration
+  p = np.sqrt(X**2 + Y**2)
+  lat = np.arctan2(Z, p * (1 - e2))
+  
+  # Iterate to refine latitude
+  for _ in range(5):
+    N = a / np.sqrt(1 - e2 * np.sin(lat)**2)
+    lat = np.arctan2(Z + e2 * N * np.sin(lat), p)
+  
+  # Calculate height
+  N = a / np.sqrt(1 - e2 * np.sin(lat)**2)
+  h = p / np.cos(lat) - N
+  
+  return lat, lon, h
+
+
+# Simulation reference point (origin) - Just east of Hawaii
+# Change these to match your simulation area
+# Accuracy by Distance. If the origin is too far from the area of interest, accuracy degrades:
+# 0-10 km: Sub-meter errors - excellent for harbor/port simulations
+# 10-50 km: 1-10 meter errors - good for coastal areas
+# 50-100 km: 10-50 meter errors - acceptable for regional simulations
+# 100-200 km: 50-200 meter errors - marginal accuracy
+# 200+ km: 200+ meter errors - significant distortion
+ORIGIN_LAT = np.radians(20.590305)   # ~20.59°N latitude
+ORIGIN_LON = np.radians(-157.697742)   # ~157.70°W longitude  
+ORIGIN_HEIGHT = 0.0              # Sea level
+
+
+def local_to_geodetic(x, y, z=0.0):
+  """
+  Convert local ENU coordinates (meters) to geodetic coordinates (degrees).
+  
+  Args:
+    x: East coordinate in meters
+    y: North coordinate in meters
+    z: Up coordinate in meters (default 0.0 for sea level)
+  
+  Returns:
+    Tuple of (latitude_deg, longitude_deg, height_m)
+  """
+  # Create ENU vector
+  enu = np.array([x, y, z])
+  
+  # Convert to ECEF
+  ecef = enu_to_ecef(enu, ORIGIN_LAT, ORIGIN_LON, ORIGIN_HEIGHT)
+  
+  # Convert to geodetic
+  lat_rad, lon_rad, h = ecef_to_geodetic(ecef[0], ecef[1], ecef[2])
+  
+  # Convert to degrees
+  lat_deg = np.degrees(lat_rad)
+  lon_deg = np.degrees(lon_rad)
+  
+  return lat_deg, lon_deg, h
+
 
 # Helper function to generate unique filenames for the csv_print_header function.
 def _name_file(file: str) -> Path:
@@ -103,20 +196,22 @@ def csv_print_data(vehicles: list, filename: str) -> None:
   Args:
     vehicles: List of vehicle objects.
     filename: Path to the CSV file where data should be appended.
-  
-  Note:
-    The file must already exist with proper headers (use csv_print_header first).
-  """
+    """
 
-  epoch_time = datetime.datetime.now().isoformat(sep=' ', timespec='seconds')
-
-  # Calculate speed and convert heading to degrees
-  data_rows = [
-    {
+  # Convert local coordinates to geodetic and create data rows
+  data_rows = []
+  for v in vehicles:
+    # Get altitude for 3D vehicles, default to 0 for 2D
+    z = getattr(v, 'pos_z', 0.0)
+    
+    # Convert local ENU coordinates to geodetic (lat/lon in degrees)
+    lat, lon, height = local_to_geodetic(v.pos_x, v.pos_y, z)
+    
+    data_rows.append({
       "MMSI": v.vehicle_id,
-      "BaseDateTime": epoch_time,
-      "LAT": float(v.pos_y),  # Using y as latitude
-      "LON": float(v.pos_x),  # Using x as longitude
+      "BaseDateTime": datetime.datetime.now().isoformat(sep=' ', timespec='seconds'),
+      "LAT": round(lat, 6),  # Latitude in degrees (~0.1m precision)
+      "LON": round(lon, 6),  # Longitude in degrees (~0.1m precision)
       "SOG": round(np.linalg.norm(v.velocity.vector), 3),  # Speed over ground from velocity magnitude
       "COG": round(np.degrees(v.heading) % 360, 3),  # Course over ground in degrees
       "Heading": round(np.degrees(v.heading) % 360, 3),  # Heading in degrees
@@ -124,9 +219,7 @@ def csv_print_data(vehicles: list, filename: str) -> None:
       "VesselType": v.vehicle_type,  # Vehicle type
       "Length": round(getattr(v, 'scale', 0.0), 3),  # Using scale as length approximation
       "Width": round(getattr(v, 'scale', 0.0) / 3, 3),  # Approximate width as 1/3 of length
-    }
-    for v in vehicles
-  ]
+    })
   
   # Create DataFrame and append with row index
   df = pd.DataFrame(data_rows)
