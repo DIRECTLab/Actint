@@ -1,6 +1,6 @@
 # Project specific ignores
 *_result*.csv
-*_sorted*.csv
+*_noised*.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
