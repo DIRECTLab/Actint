@@ -60,7 +60,7 @@ def read_json(filename: str) -> list[Vehicle2D | Vehicle3D]:
     return vehicles
 
 if __name__ == "__main__":
-    vehicles = read_json("simulation_data.json")
+    vehicles = read_json("example_ground_truth_runfile.json")
     print(f"Loaded {len(vehicles)} vehicles")
     for v in vehicles:
         for i in range(200):

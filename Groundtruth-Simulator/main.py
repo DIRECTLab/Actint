@@ -8,7 +8,7 @@ def main():
     try:
         vehicles:list = read_json(sys.argv[1])  # Get filename from system arguments
     except IndexError:
-        vehicles:list = read_json("simulation_data.json")  # Get filename from default arguments
+        vehicles:list = read_json("example_ground_truth_runfile.json")  # Get filename from default arguments
 
 
     all_done=False
