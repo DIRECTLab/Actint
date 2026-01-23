@@ -1,5 +1,6 @@
-import csv
-import time
+import pandas as pd
+import numpy as np
+import datetime
 from pathlib import Path
 from classes import Vehicle2D, Vehicle3D
 
@@ -32,73 +33,75 @@ def _name_file(file: str) -> Path:
 def csv_print_header(file: str) -> str:
   """Create a new CSV file with headers for vehicle simulation data.
   
-  Creates a CSV file named "JFN-Groudtruth-Simulator_result.csv" (or an
-  incremented version if the file exists). The file contains headers for:
-  vehicle_id, time_stamp, and position (x/y/z).
+  Creates a CSV file matching AIS data format with available simulation fields.
   
   Returns:
     The name of the created CSV file as a string.
   """
-  filename =_name_file(file).name
-  with open(filename, mode="w", newline="") as f:
-    writer = csv.DictWriter(
-      f,
-      fieldnames=[
-        "vehicle_id",
-        "time_stamp",
-        "position_x",
-        "position_y",
-        "position_z",
-      ],
-    )
-    writer.writeheader()
+  filename = _name_file(file).name
+  
+  # Create an empty DataFrame with AIS-like column headers
+  df = pd.DataFrame(columns=[
+    "MMSI",           # Maritime Mobile Service Identity (using vehicle_id)
+    "BaseDateTime",   # Timestamp
+    "LAT",            # Latitude (using position_y)
+    "LON",            # Longitude (using position_x)
+    "SOG",            # Speed Over Ground (calculated from velocity)
+    "COG",            # Course Over Ground (using heading in degrees)
+    "Heading",        # Vessel heading (using heading in degrees)
+    "VesselName",     # Vessel name (using vehicle_type)
+    "VesselType",     # Type of vessel (using vehicle_type)
+    "Length",         # Vessel length (using scale)
+    "Width",          # Vessel width (using scale)
+  ])
+  
+  # Write the DataFrame to CSV with index as row number
+  df.to_csv(filename, index=True, index_label="Unnamed: 0")
 
   return filename
 
 def csv_print_data(vehicles: list, filename: str) -> None:
-  """Append vehicle data to an existing CSV file.
+  """Append vehicle data to an existing CSV file in AIS format.
   
-  Extracts position from each vehicle and writes it as rows in the specified CSV file.
+  Extracts vehicle data and writes it in AIS-like format.
   Supports Vehicle2D and Vehicle3D.
-  For 2D vehicles, z-axis values are set to 0.0.
   
   Args:
-    vehicles: List of vehicle objects (currently supports Vehicle2D instances).
+    vehicles: List of vehicle objects.
     filename: Path to the CSV file where data should be appended.
   
   Note:
-    The file must already exist with the proper headers (use csv_print_header first).
+    The file must already exist with proper headers (use csv_print_header first).
   """
 
-  # Unix epoch timestamp (seconds) for this batch write.
-  epoch_time = time.time()
+  epoch_time = datetime.datetime.now().isoformat(sep=' ', timespec='seconds')
 
-  with open(filename, mode="a", newline="") as file:
-    writer = csv.DictWriter(
-      file,
-      fieldnames=[
-        "vehicle_id",
-        "time_stamp",
-        "position_x",
-        "position_y",
-        "position_z",
-      ],
-    )
-    
-    for vehicle in vehicles:
-      if isinstance(vehicle, Vehicle2D):
-        writer.writerow({
-          "vehicle_id": vehicle.vehicle_id,
-          "time_stamp": epoch_time,
-          "position_x": vehicle.pos_x,
-          "position_y": vehicle.pos_y,
-          "position_z": 0.0,
-        })
-      elif isinstance(vehicle, Vehicle3D):
-        writer.writerow({
-          "vehicle_id": vehicle.vehicle_id,
-          "time_stamp": epoch_time,
-          "position_x": vehicle.pos_x,
-          "position_y": vehicle.pos_y,
-          "position_z": vehicle.pos_z,
-        })
+  # Calculate speed and convert heading to degrees
+  data_rows = [
+    {
+      "MMSI": v.vehicle_id,
+      "BaseDateTime": epoch_time,
+      "LAT": float(v.pos_y),  # Using y as latitude
+      "LON": float(v.pos_x),  # Using x as longitude
+      "SOG": round(np.linalg.norm(v.velocity.vector), 3),  # Speed over ground from velocity magnitude
+      "COG": round(np.degrees(v.heading) % 360, 3),  # Course over ground in degrees
+      "Heading": round(np.degrees(v.heading) % 360, 3),  # Heading in degrees
+      "VesselName": v.vehicle_type.upper(),  # Vehicle type as vessel name
+      "VesselType": v.vehicle_type,  # Vehicle type
+      "Length": round(getattr(v, 'scale', 0.0), 3),  # Using scale as length approximation
+      "Width": round(getattr(v, 'scale', 0.0) / 3, 3),  # Approximate width as 1/3 of length
+    }
+    for v in vehicles
+  ]
+  
+  # Create DataFrame and append with row index
+  df = pd.DataFrame(data_rows)
+  # Get the current number of rows in the file to continue indexing
+  try:
+    existing_df = pd.read_csv(filename)
+    start_index = len(existing_df) + 1
+  except (FileNotFoundError, pd.errors.EmptyDataError):
+    start_index = 1
+  
+  df.index = range(start_index, start_index + len(df))
+  df.to_csv(filename, mode='a', header=False, index=True)
