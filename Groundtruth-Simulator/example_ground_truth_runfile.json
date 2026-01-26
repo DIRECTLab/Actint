@@ -1,6 +1,7 @@
 {
   "sim_settings": {
-    "output_file": "JFN-Groundtruth-Simulator_result.csv",
+    "output_file_2d": "JFN-Groundtruth-Simulator_result_2D.csv",
+    "output_file_3d": "JFN-Groundtruth-Simulator_result_3D.csv",
     "time_step": 0.4,
     "latlon_origin": {
       "latitude": 20.590305,
