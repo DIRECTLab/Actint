@@ -40,7 +40,8 @@ def noise_time(timestamp: str, max_noise_seconds: float = 20.0) -> str:
 
     Args:
         timestamp: Original timestamp as a string in ISO 8601 format.
-        max_noise_seconds: Maximum noise to add or subtract in seconds. Defaults to 300 seconds (5 minutes).
+        max_noise_seconds: Maximum noise to add or subtract in seconds. 
+        Defaults to 20 seconds.
     Returns:
         Noised timestamp as an ISO 8601 formatted string.
     """
