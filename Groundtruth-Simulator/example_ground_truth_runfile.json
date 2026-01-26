@@ -1,6 +1,12 @@
 {
   "sim_settings": {
-    "default_time_step": 0.4
+    "output_file": "JFN-Groundtruth-Simulator_result.csv",
+    "time_step": 0.4,
+    "latlon_origin": {
+      "latitude": 20.590305,
+      "longitude": -157.697742,
+      "height": 0.0
+    }
   },
   "vehicles": [
     {

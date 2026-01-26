@@ -3,13 +3,13 @@ from runfile import read_json
 import sys
 
 def main():
-    default_filename: str = "JFN-Groudtruth-Simulator_result.csv"
-    filename: str = csv_print_header(default_filename)
     try:
-        vehicles:list = read_json(sys.argv[1])  # Get filename from system arguments
+        vehicles, settings = read_json(sys.argv[1])  # Get filename from system arguments
     except IndexError:
-        vehicles:list = read_json("example_ground_truth_runfile.json")  # Get filename from default arguments
+        print("No runfile specified, using default 'example_ground_truth_runfile.json'")
+        vehicles, settings = read_json("example_ground_truth_runfile.json")  # Get filename from default arguments
 
+    filename: str = csv_print_header(settings.output_file)
 
     all_done=False
     while not all_done:
@@ -17,11 +17,11 @@ def main():
         iterate through a list of vehicle objects and call their update methods
         """
         for v in vehicles:
-            v.update(1, 10000, 10000)
-        csv_print_data(vehicles, filename)
+            v.update(settings.time_step)
+        csv_print_data(vehicles, filename, settings, settings.current_simulation_time)
 
         all_done = all(v.done == True for v in vehicles)
-
+        settings.advance_time(settings.time_step)
 
 
 

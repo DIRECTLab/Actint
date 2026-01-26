@@ -180,7 +180,7 @@ class Vehicle3D(Vehicle):
         desired_velocity = scale_position(desired_direction, speed)
         return truncate(desired_velocity - self.velocity, self.max_force)
     
-    def update(self, dt: float, window_w: int, window_h: int) -> None:
+    def update(self, dt: float) -> None:
         """Update vehicle position and state."""
         if self.done:
             return
@@ -212,8 +212,6 @@ class Vehicle3D(Vehicle):
             direction = normalize(self._velocity)
             self.heading = math.atan2(direction.y, direction.x)
 
-        self.pos_x = self.position.x % window_w
-        self.pos_y = self.position.y % window_h
         self.pos_z = max(0, min(self.position.z, self.max_altitude))
 
         if self.next_destination.has_reached(self.position):
