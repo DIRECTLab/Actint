@@ -14,7 +14,8 @@ def read_json(filename: str) -> tuple[list[Vehicle2D | Vehicle3D], Settings]:
         time_step=data['sim_settings']['time_step'],
         latlon_origin=data['sim_settings']['latlon_origin'],
         output_file_2d=data['sim_settings']['output_file_2d'],
-        output_file_3d=data['sim_settings']['output_file_3d']
+        output_file_3d=data['sim_settings']['output_file_3d'],
+        start_time=data['sim_settings']['start_time']
     )
         for v in data['vehicles']:
             id = v['id']
@@ -24,6 +25,7 @@ def read_json(filename: str) -> tuple[list[Vehicle2D | Vehicle3D], Settings]:
             max_force = v['properties']['max_force']
             destinations = queue.Queue()
             if is_3d:
+                settings.has_vehicle3d = True
                 for d in v['destinations']:
                     position = Position3D(float(d['position']['x']), float(d['position']['y']), float(d['position']['z']))
                     action = d['action']
@@ -45,6 +47,7 @@ def read_json(filename: str) -> tuple[list[Vehicle2D | Vehicle3D], Settings]:
                     )
                 vehicles.append(vehicle)
             else:
+                settings.has_vehicle2d = True
                 for d in v['destinations']:
                     position = Position2D(float(d['position']['x']), float(d['position']['y']))
                     action = d['action']

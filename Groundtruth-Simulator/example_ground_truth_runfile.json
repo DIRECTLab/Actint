@@ -3,6 +3,8 @@
     "output_file_2d": "JFN-Groundtruth-Simulator_result_2D.csv",
     "output_file_3d": "JFN-Groundtruth-Simulator_result_3D.csv",
     "time_step": 0.4,
+    "start_time": "2025-01-27 02:58:45",
+    "time_format": "%Y-%m-%d %H:%M:%S",
     "latlon_origin": {
       "latitude": 20.590305,
       "longitude": -157.697742,

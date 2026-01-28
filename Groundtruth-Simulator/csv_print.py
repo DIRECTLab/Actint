@@ -157,7 +157,7 @@ def _name_file(file: str) -> Path:
 
   return new_path
 
-def csv_print_header(file_2d: str, file_3d: str) -> tuple:
+def csv_print_header(settings: Settings) -> tuple:
   """Create a new CSV file with headers for vehicle simulation data.
   
   Creates a CSV file matching AIS data format with available simulation fields.
@@ -165,8 +165,8 @@ def csv_print_header(file_2d: str, file_3d: str) -> tuple:
   Returns:
     The names of the created CSV files as a tuple of strings (2D filename, 3D filename).
   """
-  filename2D = _name_file(file_2d).name
-  filename3D = _name_file(file_3d).name
+  filename2D = _name_file(settings.output_file_2d).name
+  filename3D = _name_file(settings.output_file_3d).name
   
   # Create an empty DataFrame with AIS-like column headers
   df2D = pd.DataFrame(columns=[
@@ -183,6 +183,7 @@ def csv_print_header(file_2d: str, file_3d: str) -> tuple:
     "Width",          # Vessel width (using scale)
   ])
 
+  # Create an empty DataFrame with ADS-B-like column headers
   df3D = pd.DataFrame(columns=[
     "date",                 # date
     "time",                 # time
@@ -195,13 +196,15 @@ def csv_print_header(file_2d: str, file_3d: str) -> tuple:
     "vertical_rate_unit",   # Vertical rate unit (e.g., meters per minute)
   ])
   
-  # Write the DataFrame to CSV with index as row number
-  df2D.to_csv(filename2D, index=True, index_label="Unnamed: 0")
-  df3D.to_csv(filename3D, index=True, index_label="Unnamed: 0")
+  # Write the DataFrame to CSV without index
+  if settings.has_vehicle2d:
+    df2D.to_csv(filename2D, index=False)
+  if settings.has_vehicle3d:
+    df3D.to_csv(filename3D, index=False)
 
   return filename2D, filename3D
 
-def csv_print_data(vehicles: list, filename2D: str, filename3D: str, settings: Settings, time:datetime.datetime) -> None:
+def csv_print_data(vehicles: list, filename2D: str, filename3D: str, settings: Settings) -> None:
   """Append vehicle data to an existing CSV file in AIS format.
   
   Extracts vehicle data and writes it in AIS-like format.
@@ -227,7 +230,7 @@ def csv_print_data(vehicles: list, filename2D: str, filename3D: str, settings: S
     if v.__class__.__name__ == 'Vehicle2D':
       data_rows_2d.append({
         "MMSI": v.vehicle_id,
-        "BaseDateTime": time.isoformat(sep=' ', timespec='seconds'),
+        "BaseDateTime": settings.current_simulation_time.isoformat(sep=' ', timespec='seconds'),
         "LAT": round(lat, 6),  # Latitude in degrees (~0.1m precision)
         "LON": round(lon, 6),  # Longitude in degrees (~0.1m precision)
         "SOG": round(np.linalg.norm(v.velocity.vector), 3),  # Speed over ground from velocity magnitude
@@ -240,8 +243,8 @@ def csv_print_data(vehicles: list, filename2D: str, filename3D: str, settings: S
       })
     elif v.__class__.__name__ == 'Vehicle3D':
       data_rows_3d.append({
-        "date": time.isoformat(sep=",", timespec="seconds").split(",")[0],
-        "time": time.isoformat(sep=",", timespec="seconds").split(",")[1],
+        "date": settings.current_simulation_time.isoformat(sep=",", timespec="seconds").split(",")[0],
+        "time": settings.current_simulation_time.isoformat(sep=",", timespec="seconds").split(",")[1],
         "icao_hex": f"{v.vehicle_id:06X}",  # ICAO hex from vehicle_id
         "latitude": round(lat, 6),  # Latitude in degrees (~0.1m precision)
         "longitude": round(lon, 6),  # Longitude in degrees (~0.1m precision)
@@ -251,20 +254,11 @@ def csv_print_data(vehicles: list, filename2D: str, filename3D: str, settings: S
         "vertical_rate_unit": "meters/minute",
       })
   
-  # Create DataFrame and append with row index
+  # Create DataFrame and append without index
   df_2d = pd.DataFrame(data_rows_2d)
   df_3d = pd.DataFrame(data_rows_3d)
-  # Get the current number of rows in the file to continue indexing
-  try:
-    existing_df_2d = pd.read_csv(filename2D)
-    start_index_2d = len(existing_df_2d) + 1
-    existing_df_3d = pd.read_csv(filename3D)
-    start_index_3d = len(existing_df_3d) + 1
-  except (FileNotFoundError, pd.errors.EmptyDataError):
-    start_index_2d = 1
-    start_index_3d = 1
   
-  df_2d.index = range(start_index_2d, start_index_2d + len(df_2d))
-  df_2d.to_csv(filename2D, mode='a', header=False, index=True)
-  df_3d.index = range(start_index_3d, start_index_3d + len(df_3d))
-  df_3d.to_csv(filename3D, mode='a', header=False, index=True)
+  if settings.has_vehicle2d:
+    df_2d.to_csv(filename2D, mode='a', header=False, index=False)
+  if settings.has_vehicle3d:
+    df_3d.to_csv(filename3D, mode='a', header=False, index=False)

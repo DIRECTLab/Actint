@@ -9,7 +9,7 @@ def main():
         print("No runfile specified, using default 'example_ground_truth_runfile.json'")
         vehicles, settings = read_json("example_ground_truth_runfile.json")  # Get filename from default arguments
 
-    filename2D, filename3D = csv_print_header(settings.output_file_2d, settings.output_file_3d)
+    filename2D, filename3D = csv_print_header(settings)
 
     all_done=False
     while not all_done:
@@ -18,7 +18,7 @@ def main():
         """
         for v in vehicles:
             v.update(settings.time_step)
-        csv_print_data(vehicles, filename2D, filename3D, settings, settings.current_simulation_time)
+        csv_print_data(vehicles, filename2D, filename3D, settings)
         all_done = all(v.done == True for v in vehicles)
         settings.advance_time(settings.time_step)
 
