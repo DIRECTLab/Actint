@@ -1,121 +1,361 @@
+# AIS-Noiser
 
-# JFN AIS Groundtruth Noiser
+A Python tool for adding realistic noise and simulating data loss to AIS (Automatic Identification System) and ADS-B (Automatic Dependent Surveillance-Broadcast) tracking data. This tool is designed to create realistic test scenarios by simulating real-world sensor imperfections, signal dropouts, and measurement inaccuracies.
 
-This project takes AIS position data in CSV form, simulates intermittent “visibility” (dropping some rows), applies random coordinate noise to the remaining latitude/longitude, and writes the resulting data back to CSV.
+## Table of Contents
 
-It is designed for quickly generating “noised” AIS tracks for experimentation.
+- [Overview](#overview)
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Basic Usage](#basic-usage)
+  - [Command-Line Arguments](#command-line-arguments)
+  - [Examples](#examples)
+- [Input Data Formats](#input-data-formats)
+  - [AIS (2D) Format](#ais-2d-format)
+  - [ADS-B (3D) Format](#ads-b-3d-format)
+- [Output Files](#output-files)
+- [How It Works](#how-it-works)
+  - [Coordinate Noise](#coordinate-noise)
+  - [Time Noise](#time-noise)
+  - [Visibility Simulation](#visibility-simulation)
+- [File Descriptions](#file-descriptions)
+- [Validation](#validation)
+- [Technical Details](#technical-details)
 
-## What it does
+## Overview
 
-For each MMSI (vessel) in the input CSV:
+AIS-Noiser processes tracking data from maritime vessels (AIS) or aircraft (ADS-B) and applies configurable noise patterns to simulate real-world sensor behavior. The tool can:
 
-1. Groups rows by `MMSI`.
-2. Randomly decides whether each row is “visible” using the stateful process in [visible.py](visible.py).
-3. Keeps only visible rows.
-4. Sorts kept rows by `MMSI` then `BaseDateTime`.
-5. Adds random noise (in meters) to `LAT` / `LON` using [noiser.py](noiser.py).
-6. Writes outputs:
-	 - One file per MMSI: `<MMSI>_sorted.csv`
-	 - One combined file: `<input>_sorted.csv` (e.g. `2023-09-03_ais_top10_sorted.csv`)
+- Add random positional noise to coordinates (latitude, longitude, and altitude)
+- Introduce temporal noise to timestamps
+- Simulate intermittent signal loss and data dropout
+- Process both 2D (maritime) and 3D (aviation) datasets
+- Generate separate output files per vehicle/aircraft while maintaining a consolidated output
 
-Filename collisions are handled by [Next_available_filename.py](Next_available_filename.py): it will create `name (1).csv`, `name (2).csv`, etc.
+## Features
 
-## Dependencies
+- **Dual Mode Operation**: Supports both 2D AIS data (ships) and 3D ADS-B data (aircraft)
+- **Configurable Noise Models**: Separate noise parameters for latitude, longitude, altitude, and time
+- **Realistic Visibility Modeling**: Statistical model for simulating intermittent signal reception
+- **Batch Processing**: Automatically groups data by vehicle identifier (MMSI for ships, ICAO hex for aircraft)
+- **Automatic File Management**: Prevents file overwrites with automatic numbering
+- **Data Integrity**: Preserves column structure and formats while applying transformations
 
-- Python 3.10+ recommended
-- Python packages:
-	- `pandas`
-	- `numpy`
+## Installation
+
+### Requirements
+
+- Python 3.7 or higher
+- pandas
+- numpy
+
+### Setup
+
+1. Clone or download this repository
+2. Install required dependencies:
+3. Ensure your input CSV files are in the AIS-Noiser directory or provide the full path
 
 ## Usage
 
-The main entry point is [main.py](main.py).
+### Basic Usage
 
-```powershell
-python main.py [file] [noise_meter_lat] [noise_meter_lon] [visible_chance] [invisible_chance] [stay_visible_chance]
+The program is run from the command line using Python:
+
+```bash
+python main.py [OPTIONS]
 ```
 
-Example (use a larger noise radius):
+To view help information:
 
-```powershell
-python main.py 2023-09-03_ais_top10.csv 250 250 0.95 0.80 0.80
+```bash
+python main.py --help
 ```
 
-### Arguments
+or
 
-All arguments are optional and are parsed independently: if one is missing or invalid, only that value falls back to its default.
+```bash
+python main.py -h
+```
 
-| Position | Name | Type | Default | Meaning |
-|---:|---|---|---:|---|
-| 1 | `file` | string | `2023-09-03_ais_top10.csv` | Input AIS CSV path |
-| 2 | `noise_meter_lat` | float | `100.0` | Max noise in meters applied to latitude |
-| 3 | `noise_meter_lon` | float | `100.0` | Max noise in meters applied to longitude |
-| 4 | `visible_chance` | float | `0.95` | If currently visible: probability it remains visible |
-| 5 | `invisible_chance` | float | `0.80` | If currently invisible: probability it remains invisible |
-| 6 | `stay_visible_chance` | float | `0.80` | Immediately after becoming visible again: probability it stays visible |
+### Command-Line Arguments
 
-The script prints the parameter values it actually used on startup.
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `--file` | string | `2023-09-03_ais_top10.csv` | Path to the input CSV file |
+| `--latnoise` | float | `100.0` | Maximum noise distance in meters for latitude |
+| `--lonnoise` | float | `100.0` | Maximum noise distance in meters for longitude |
+| `--altnoise` | float | `50.0` | Maximum noise distance in meters for altitude (3D mode only) |
+| `--timenoise` | float | `20.0` | Maximum time noise in seconds |
+| `--visible` | float | `0.95` | Probability (0-1) that a visible object remains visible |
+| `--invisible` | float | `0.80` | Probability (0-1) that an invisible object remains invisible |
+| `--stayvisible` | float | `0.80` | Probability (0-1) that a newly visible object stays visible |
+| `-2d` | flag | enabled | Process data as 2D AIS format (maritime) |
+| `-3d` | flag | disabled | Process data as 3D ADS-B format (aviation) |
+| `-t` | flag | disabled | Allow time noise to be applied both forward and backward |
 
-## Input CSV format
+**Note**: By default, time noise is only added forward (future direction). Use the `-t` flag to allow negative time shifts as well.
 
-The script expects at minimum these columns:
+### Examples
 
-- `MMSI`
-- `BaseDateTime`
-- `LAT`
-- `LON`
+#### Example 1: Basic AIS Processing with Default Settings
 
-It will carry through any other columns unchanged.
+```bash
+python main.py -2d --file 2023-09-03_ais_top10.csv
+```
 
-## Output files
+This processes the AIS file with:
+- 100m positional noise in both lat/lon
+- 20 seconds forward-only time noise
+- 95% chance visible objects stay visible
+- 80% chance invisible objects stay invisible
 
-Running the script will create:
+#### Example 2: Custom Noise Parameters for AIS
 
-- A combined file next to the input file: `<input_stem>_sorted<input_suffix>`
-	- Example: `2023-09-03_ais_top10.csv` → `2023-09-03_ais_top10_sorted.csv`
-- One file per MMSI in the repo root directory: `<MMSI>_sorted.csv`
+```bash
+python main.py -2d --file my_ais_data.csv --latnoise 150.0 --lonnoise 150.0 --timenoise 30.0 --visible 0.90 --invisible 0.85
+```
 
-All output rows have **noised** `LAT` and `LON`.
+This applies:
+- 150m of positional noise
+- 30 seconds of forward-only time noise
+- 90% visibility retention rate
+- 85% invisibility retention rate
 
-## How the noise works
+#### Example 3: ADS-B Processing with 3D Data
 
-The function `noise_coordinate(lat, lon, distance_m_lat, distance_m_lon)` in [noiser.py](noiser.py) adds a random offset in meters (uniformly sampled from `[-distance, +distance]`) and converts that offset into degree changes using a WGS84 earth radius approximation.
+```bash
+python main.py -3d --file adsb_flights.csv --latnoise 100.0 --lonnoise 100.0 --altnoise 50.0 --timenoise 20.0 --visible 0.95 --invisible 0.80 --stayvisible 0.80 -t
+```
 
-## How visibility works (important)
+This processes aircraft data with:
+- 100m horizontal noise
+- 50m altitude noise
+- 20 seconds of bidirectional time noise (forward and backward)
+- Standard visibility parameters
 
-The `visible(...)` function in [visible.py](visible.py) uses module-level global state (`VISIBLE`, `FIRST_BACK`) to create “bursty” visibility/invisibility.
+#### Example 4: High Noise Scenario
 
-That means:
+```bash
+python main.py -2d --file test_data.csv --latnoise 500.0 --lonnoise 500.0 --timenoise 60.0 --visible 0.70 --invisible 0.60 -t
+```
 
-- Visibility is **stateful across calls**.
-- In the current implementation, the same global state is used across *all* rows processed in a run (and across MMSI groups).
+This creates a challenging scenario with:
+- 500m positional errors
+- ±60 seconds temporal uncertainty
+- Significant signal dropout (30% chance of losing visible signals)
 
-If you want visibility to be independent per vessel, you’d need to reset the state at the start of each `for name, group in groups:` loop (or refactor the logic into a per-vessel state object).
+#### Example 5: Minimal Noise for Testing
 
-## Reproducibility (optional)
+```bash
+python main.py -2d --file clean_data.csv --latnoise 10.0 --lonnoise 10.0 --timenoise 1.0 --visible 0.99 --invisible 0.95
+```
 
-Both the visibility process and the noise use randomness.
+Light noise for validation purposes:
+- Only 10m positional noise
+- 1 second time noise
+- Minimal data loss
 
-If you want repeatable output, set both RNG seeds at the top of [main.py](main.py) before processing:
+## Input Data Formats
+
+### AIS (2D) Format
+
+AIS CSV files must contain the following columns:
+
+- `MMSI`: Maritime Mobile Service Identity (unique vessel identifier)
+- `LAT`: Latitude in decimal degrees
+- `LON`: Longitude in decimal degrees
+- `BaseDateTime`: Timestamp in ISO 8601 format (YYYY-MM-DD HH:MM:SS)
+
+Additional columns are preserved but not modified.
+
+**Example AIS CSV:**
+```csv
+MMSI,LAT,LON,BaseDateTime,SOG,COG,Heading
+123456789,35.6895,139.6917,2023-09-03 12:00:00,12.5,180.0,182
+123456789,35.6896,139.6918,2023-09-03 12:01:00,12.6,180.5,182
+```
+
+### ADS-B (3D) Format
+
+ADS-B CSV files must contain the following columns:
+
+- `icao_hex`: ICAO 24-bit address (unique aircraft identifier)
+- `latitude`: Latitude in decimal degrees
+- `longitude`: Longitude in decimal degrees
+- `altitude`: Altitude in meters
+- `date`: Date in YYYY-MM-DD format
+- `time`: Time in HH:MM:SS format
+
+Additional columns are preserved but not modified.
+
+**Example ADS-B CSV:**
+```csv
+icao_hex,latitude,longitude,altitude,date,time,callsign
+a12345,35.6895,139.6917,10000,2023-09-03,12:00:00,UAL123
+a12345,35.6896,139.6918,10050,2023-09-03,12:01:00,UAL123
+```
+
+## Output Files
+
+The program generates two types of output files:
+
+### 1. Per-Vehicle Files
+
+Each unique vessel (MMSI) or aircraft (ICAO hex) gets its own output file:
+
+- **AIS Mode**: `<MMSI>_noised.csv` (e.g., `123456789_noised.csv`)
+- **ADS-B Mode**: `<icao_hex>_noised.csv` (e.g., `a12345_noised.csv`)
+
+These files contain only the records for that specific vehicle that passed the visibility filter, with noise applied.
+
+### 2. Consolidated File
+
+A single combined file containing all vehicles:
+
+- Format: `<original_filename>_noised.csv`
+- Example: `2023-09-03_ais_top10_noised.csv`
+
+### File Naming Collision Handling
+
+If output files already exist, the program automatically appends a number:
+- First duplicate: `filename (1).csv`
+- Second duplicate: `filename (2).csv`
+- And so on...
+
+## How It Works
+
+### Coordinate Noise
+
+The noise model adds random offsets to each coordinate independently:
+
+1. **Latitude/Longitude**: Random offset within ±N meters (configurable)
+2. **Calculation Method**: 
+   - Uses WGS84 Earth radius (6,356,752.314245 meters)
+   - Converts meter offsets to angular displacement
+   - Accounts for longitude convergence at different latitudes
+   - Applies uniform random distribution within specified bounds
+
+3. **Altitude** (3D mode only): Random offset within ±N meters
+
+**Formula**:
+```
+Δlat (radians) = offset_meters / earth_radius
+Δlon (radians) = offset_meters / (earth_radius × cos(latitude))
+new_coordinate = original_coordinate + Δ (converted to degrees)
+```
+
+### Time Noise
+
+Temporal noise simulates clock drift and synchronization errors:
+
+- **Forward-only mode** (default): Adds random delay between 0 and +N seconds
+- **Bidirectional mode** (`-t` flag): Adds random offset between -N and +N seconds
+- Uses uniform random distribution
+- Preserves ISO 8601 timestamp format
+
+### Visibility Simulation
+
+The visibility model simulates intermittent signal reception using a state machine:
+
+**States:**
+- **Visible**: Object is currently being tracked
+- **Invisible**: Object signal is lost
+
+**Transitions:**
+1. **Visible → Visible**: Probability = `visible_chance` (default 95%)
+2. **Visible → Invisible**: Probability = 1 - `visible_chance` (default 5%)
+3. **Invisible → Visible**: Probability = 1 - `invisible_chance` (default 20%)
+4. **Invisible → Invisible**: Probability = `invisible_chance` (default 80%)
+5. **First visibility after dropout**: Uses `stay_visible_chance` (default 80%) to model gradual signal reacquisition
+
+**Behavior**:
+- Records are only written when the object is "visible"
+- Each vehicle/aircraft has independent visibility state
+- State persists across consecutive records for the same vehicle
+
+![Visibility State Machine Diagram](readme_images/stochastic_signal_visibility.png)
+
+The diagram above illustrates the state transitions for the visibility simulation model, showing how objects transition between visible and invisible states based on the configured probabilities.
+
+## File Descriptions
+
+### Core Files
+
+- **[main.py](main.py)**: Entry point; orchestrates data loading, processing, and output generation
+- **[noiser.py](noiser.py)**: Implements coordinate and time noise functions
+- **[visible.py](visible.py)**: Contains visibility state machine logic
+- **[helper_functions.py](helper_functions.py)**: Utility functions for file naming and argument parsing
+- **[Settings.py](Settings.py)**: Configuration data class for storing program parameters
+- **[output_validation.py](output_validation.py)**: Tools for validating output quality and statistics
+
+## Validation
+
+The `output_validation.py` script provides tools to analyze the quality of noised data:
 
 ```python
-import random
-import numpy as np
+from output_validation import validate_noise_application
 
-random.seed(123)
-np.random.seed(123)
+validate_noise_application(
+    original_csv='original_data.csv',
+    output_csv='original_data_noised.csv'
+)
 ```
+
+**Validation Metrics**:
+- Record retention rates per vehicle
+- Temporal gap analysis
+- Coordinate drift statistics
+- Signal dropout patterns
+
+## Technical Details
+
+### Data Processing Pipeline
+
+1. **Load CSV**: Read input file with pandas
+2. **Group by Vehicle**: Separate records by MMSI or ICAO hex
+3. **Per-Vehicle Processing**:
+   - Apply visibility filter (stateful per vehicle)
+   - Sort remaining records by time
+   - Apply coordinate noise to each record
+   - Apply time noise to each timestamp
+   - Write to vehicle-specific output file
+   - Append to consolidated output file
+4. **File Management**: Handle naming conflicts automatically
+
+### Performance Considerations
+
+- Processing is done per-vehicle sequentially
+- Each record is processed individually for noise application
+- Memory efficient: uses iterative row processing
+- File I/O: incremental appending to avoid large memory footprint
+
+### Data Type Handling
+
+- **ICAO Hex Codes**: Explicitly treated as strings to preserve leading zeros
+- **Timestamps**: Converted to datetime objects for accurate arithmetic
+- **Coordinates**: Processed as floating-point values
+- **All other columns**: Preserved as-is without type conversion
+
+### Coordinate System
+
+- **Reference**: WGS84 geodetic datum
+- **Units**: Decimal degrees for lat/lon, meters for altitude
+- **Earth Model**: Spherical approximation using polar radius
 
 ## Troubleshooting
 
-- **`ModuleNotFoundError: No module named 'pandas'`**
-	- Activate your venv and install dependencies: `pip install pandas numpy` for windows.
-- **Outputs are being overwritten / clobbered**
-	- They shouldn’t be: output naming goes through `next_available_filename(...)` which creates `(...).csv` variants when needed.
+### Common Issues
 
-## Project layout
+**Problem**: Time noise going negative before epoch
+- **Solution**: Ensure your timestamps are reasonable and reduce `--timenoise` value
 
-- [main.py](main.py): CLI script; reads input, filters by visibility, applies noise, writes output
-- [visible.py](visible.py): stateful visibility/invisibility process
-- [noiser.py](noiser.py): coordinate noising function
-- [Next_available_filename.py](Next_available_filename.py): avoids overwriting existing outputs
+**Problem**: All records filtered out
+- **Solution**: Increase `--visible` and `--stayvisible` parameters, or reduce `--invisible`
+
+**Problem**: No altitude column in 2D mode
+- **Solution**: Use `-2d` flag for AIS data; altitude is only processed in `-3d` mode
+
+## License
+
+This software is part of the JFN Groundtruth Simulator project.
