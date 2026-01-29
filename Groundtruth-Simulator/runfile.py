@@ -23,15 +23,15 @@ def read_json(filename: str) -> tuple[list[Vehicle2D | Vehicle3D], Settings]:
             is_3d = v['is_3d']
             max_speed = v['properties']['max_speed']
             max_force = v['properties']['max_force']
+            action = v['action']
             destinations = queue.Queue()
             if is_3d:
                 settings.has_vehicle3d = True
                 for d in v['destinations']:
                     position = Position3D(float(d['position']['x']), float(d['position']['y']), float(d['position']['z']))
-                    action = d['action']
                     error = d['error']
                     speed = d['speed']
-                    destinations.put(Destination3D(position, speed, error, action))
+                    destinations.put(Destination3D(position, speed, error))
                 max_altitude = v['properties']['max_altitude']
                 
                 position = Position3D(float(v['properties']['position']['x']), float(v['properties']['position']['y']), float(v['properties']['position']['z']))
@@ -44,16 +44,16 @@ def read_json(filename: str) -> tuple[list[Vehicle2D | Vehicle3D], Settings]:
                     max_speed=max_speed,
                     max_force=max_force,
                     max_altitude=max_altitude,
+                    action=action,
                     )
                 vehicles.append(vehicle)
             else:
                 settings.has_vehicle2d = True
                 for d in v['destinations']:
                     position = Position2D(float(d['position']['x']), float(d['position']['y']))
-                    action = d['action']
                     error = d['error']
                     speed = d['speed']
-                    destinations.put(Destination2D(position, speed, error, action))
+                    destinations.put(Destination2D(position, speed, error))
                 
                 position = Position2D(float(v['properties']['position']['x']), float(v['properties']['position']['y']))
                 vehicle = Vehicle2D(
@@ -64,6 +64,7 @@ def read_json(filename: str) -> tuple[list[Vehicle2D | Vehicle3D], Settings]:
                     position=position,
                     max_speed=max_speed,
                     max_force=max_force,
+                    action=action,
                     )
                 vehicles.append(vehicle)
     return vehicles, settings

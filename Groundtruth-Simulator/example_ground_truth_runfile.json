@@ -16,6 +16,7 @@
       "id": 1,
       "type": "car",
       "is_3d": false,
+      "action": "seek",
       "properties": {
         "max_speed": 100.0,
         "max_force": 200.0,
@@ -25,32 +26,27 @@
         {
           "position": { "x": 500.000, "y": 500.000 },
           "speed": 50.0,
-          "error": 30.0,
-          "action": "seek"
+          "error": 30.0
         },
         {
           "position": { "x": 1000.000, "y": 500.000 },
           "speed": 50.0,
-          "error": 30.0,
-          "action": "seek"
+          "error": 30.0
         },
         {
           "position": { "x": 1000.000, "y": 1000.000 },
           "speed": 50.0,
-          "error": 30.0,
-          "action": "seek"
+          "error": 30.0
         },
         {
           "position": { "x": 500.000, "y": 1000.000 },
           "speed": 50.0,
-          "error": 30.0,
-          "action": "seek"
+          "error": 30.0
         },
         {
           "position": { "x": 500.000, "y": 500.000 },
           "speed": 50.0,
-          "error": 30.0,
-          "action": "arrive"
+          "error": 30.0
         }
       ]
     },
@@ -58,6 +54,7 @@
       "id": 2,
       "type": "drone",
       "is_3d": true,
+      "action": "seek",
       "properties": {
         "max_speed": 100.0,
         "max_force": 200.0,
@@ -68,32 +65,27 @@
         {
           "position": { "x": 500.000, "y": 500.000, "z": 500.000 },
           "speed": 50.0,
-          "error": 30.0,
-          "action": "seek"
+          "error": 30.0
         },
         {
           "position": { "x": 1000.000, "y": 500.000, "z": 1000.000 },
           "speed": 50.0,
-          "error": 30.0,
-          "action": "seek"
+          "error": 30.0
         },
         {
           "position": { "x": 1000.000, "y": 1000.000, "z": 500.000 },
           "speed": 50.0,
-          "error": 30.0,
-          "action": "seek"
+          "error": 30.0
         },
         {
           "position": { "x": 500.000, "y": 1000.000, "z": 1000.000 },
           "speed": 50.0,
-          "error": 30.0,
-          "action": "seek"
+          "error": 30.0
         },
         {
           "position": { "x": 500.000, "y": 500.000, "z": 500.000 },
           "speed": 50.0,
-          "error": 30.0,
-          "action": "arrive"
+          "error": 30.0
         }
       ]
     }

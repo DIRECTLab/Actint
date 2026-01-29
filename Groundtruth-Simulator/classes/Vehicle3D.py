@@ -37,12 +37,14 @@ class Vehicle3D(Vehicle):
             max_force: float = 200,
             max_altitude: int = 10000,
             scale: float = 10.0,
+            action: str = 'seek',
             ):
         super().__init__(
             vehicle_id,
             vehicle_type,
             destination_queue,
             time_step,
+            action
             )
         self._position: Position3D = position
         self._velocity: Position3D = Position3D(0.0, 0.0, 0.0)
@@ -191,15 +193,15 @@ class Vehicle3D(Vehicle):
                 self.done = True
                 return
 
-        if self.next_destination.action == 'seek':
+        if self.action == 'seek':
             self.acceleration = self.seek()
-        elif self.next_destination.action == 'flee':
+        elif self.action == 'flee':
             distance_to_target = self.position.distance_to(self.target)
             if distance_to_target < 300:
                 self.acceleration = self.flee()
             else:
                 self.acceleration = Position3D(0.0, 0.0, 0.0)
-        elif self.next_destination.action == 'arrive':
+        elif self.action == 'arrive':
             self.acceleration = self.arrive()
         else:
             self.done = True

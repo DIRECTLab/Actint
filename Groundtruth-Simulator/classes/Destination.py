@@ -19,7 +19,6 @@ class Destination(ABC):
                  position: Position,
                  speed: float,
                  error: float,
-                 action: str = 'done',
                  ):
         """
         Initialize a Destination instance.
@@ -28,13 +27,11 @@ class Destination(ABC):
             position (Position): The geometric position of the destination
             speed (float): Target speed to reach the next destination
             error (float): Acceptable error margin for determining if destination is reached
-            action (str): Action to perform upon reaching the destination
         """
         self.position = position
         self._target_speed_to_next_destination = speed
         self.error = error
         self.heading_error: float = 0.174533 # ~10 degrees in radians
-        self.action: str = action
     @property
     def target_speed_to_next_destination(self) -> float:
         speed = self._target_speed_to_next_destination
@@ -74,7 +71,6 @@ class Destination2D(Destination):
                  position: Position2D,
                  target_speed_to_next_destination: float,
                  error: float,
-                 action: str = 'done',
                  ):
         """
         Initialize a 2D Destination instance.
@@ -83,9 +79,8 @@ class Destination2D(Destination):
             position (Position2D): The 2D geometric position of the destination
             target_speed_to_next_destination (float): Target speed to reach the next destination
             error (float): Acceptable error margin for determining if destination is reached
-            action (str): Action to perform upon reaching the destination
         """
-        super().__init__(position, target_speed_to_next_destination, error, action)
+        super().__init__(position, target_speed_to_next_destination, error)
 
 class Destination3D(Destination):
     """
@@ -105,7 +100,6 @@ class Destination3D(Destination):
                  position: Position3D,
                  target_speed_to_next_destination: float,
                  error: float,
-                 action: str = 'done',
                  ):
         """
         Initialize a 3D Destination instance.
@@ -114,6 +108,5 @@ class Destination3D(Destination):
             position (Position3D): The 3D geometric position of the destination
             target_speed_to_next_destination (int): Target speed to reach the next destination
             error (float): Acceptable error margin for determining if destination is reached
-            action (str): Action to perform upon reaching the destination
         """
-        super().__init__(position, target_speed_to_next_destination, error, action)
+        super().__init__(position, target_speed_to_next_destination, error)

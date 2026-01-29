@@ -222,6 +222,8 @@ def csv_print_data(vehicles: list, filename2D: str, filename3D: str, settings: S
   data_rows_2d = []
   data_rows_3d = []
   for v in vehicles:
+    if v.done:
+      continue  # Skip completed vehicles
     # Get altitude for 3D vehicles, default to 0 for 2D
     z = getattr(v, 'pos_z', 0.0)
     

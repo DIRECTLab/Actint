@@ -7,6 +7,7 @@ class Vehicle:
                  vehicle_type: str,
                  destination_queue: queue.Queue,
                  time_step: float,
+                 action: str = 'seek',
                  ):
         self.vehicle_id = vehicle_id
         self.vehicle_type = vehicle_type
@@ -14,6 +15,7 @@ class Vehicle:
         self.destination_queue = destination_queue
         self.next_destination: Destination = None
         self.done = False
+        self.action: str = action  # Default action
 
     def update(self):
         raise NotImplementedError("This method should be overridden by subclasses")
