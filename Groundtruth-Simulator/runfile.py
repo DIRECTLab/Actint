@@ -75,7 +75,7 @@ if __name__ == "__main__":
     for v in vehicles:
         for i in range(200):
             if not v.done:
-                print(f"Vehicle {v.vehicle_id}: {v.vehicle_type} at {v.position} with destination: {v.next_destination.position if v.next_destination else 'None'} and action: {v.next_destination.action if v.next_destination else 'None'}")
+                print(f"Vehicle {v.vehicle_id}: {v.vehicle_type} at {v.position} with destination: {v.next_destination.position if v.next_destination else 'None'} and action: {v.action if v.next_destination else 'None'}")
             v.update(settings.time_step)
 
 

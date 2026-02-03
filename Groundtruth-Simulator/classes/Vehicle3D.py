@@ -3,26 +3,33 @@ import numpy as np
 from numpy.typing import NDArray
 from .Vehicle import Vehicle
 from .Position import Position3D
+from .Vectors import Vector3D
+
+# Helper functions adapted to use Vector3D (positions are Position3D)
+def _as_vector3d(pos: Position3D) -> Vector3D:
+    return Vector3D(float(pos.x), float(pos.y), float(pos.z))
 
 
-# Helper functions adapted to use Position3D
-def normalize(v: Position3D) -> Position3D:
-    v_vec = v.vector
-    norm = np.linalg.norm(v_vec)
+def normalize(v: Vector3D) -> Vector3D:
+    vec = v.vector
+    norm = np.linalg.norm(vec)
     if norm > 1e-9:
-        return Position3D(*[float(x) for x in v_vec / norm])
-    return Position3D(0.0, 0.0, 0.0)
+        scaled = vec / norm
+        return Vector3D(float(scaled[0]), float(scaled[1]), float(scaled[2]))
+    return Vector3D(0.0, 0.0, 0.0)
 
-def truncate(v: Position3D, limit: float) -> Position3D:
-    v_vec = v.vector
-    norm = np.linalg.norm(v_vec)
+
+def truncate(v: Vector3D, limit: float) -> Vector3D:
+    vec = v.vector
+    norm = np.linalg.norm(vec)
     if norm > limit:
-        return Position3D(*[float(x) for x in v_vec * (limit / norm)])
+        scaled = vec * (limit / norm)
+        return Vector3D(float(scaled[0]), float(scaled[1]), float(scaled[2]))
     return v
 
-def scale_position(pos: Position3D, scalar: float) -> Position3D:
-    """Scale a position vector by a scalar."""
-    return Position3D(pos.x * scalar, pos.y * scalar, pos.z * scalar)
+
+def scale_vector(vec: Vector3D, scalar: float) -> Vector3D:
+    return Vector3D(vec.x * scalar, vec.y * scalar, vec.z * scalar)
 
 class Vehicle3D(Vehicle):
     def __init__(
@@ -47,8 +54,8 @@ class Vehicle3D(Vehicle):
             action
             )
         self._position: Position3D = position
-        self._velocity: Position3D = Position3D(0.0, 0.0, 0.0)
-        self._acceleration: Position3D = Position3D(0,0,0)
+        self._velocity: Vector3D = Vector3D(0.0, 0.0, 0.0)
+        self._acceleration: Vector3D = Vector3D(0.0, 0.0, 0.0)
         self.max_speed: np.float64 = np.float64(max_speed)
         self.max_force: np.float64 = np.float64(max_force)
         self.heading: np.float64 = np.float64(0)
@@ -66,7 +73,7 @@ class Vehicle3D(Vehicle):
 
     @pos_x.setter
     def pos_x(self, value: float) -> None:
-        self.position.x = value
+        self._position.x = value
 
     @property
     def pos_y(self) -> float:
@@ -74,7 +81,7 @@ class Vehicle3D(Vehicle):
 
     @pos_y.setter
     def pos_y(self, value: float) -> None:
-        self.position.y = value
+        self._position.y = value
 
     @property
     def pos_z(self) -> float:
@@ -82,7 +89,7 @@ class Vehicle3D(Vehicle):
     
     @pos_z.setter
     def pos_z(self, value: float) -> None:
-        self.position.z = value
+        self._position.z = value
 
     @property
     def position(self) -> Position3D:
@@ -117,12 +124,12 @@ class Vehicle3D(Vehicle):
         self._velocity.z = value
 
     @property
-    def velocity(self) -> Position3D:
-        return Position3D(self._velocity.x, self._velocity.y, self._velocity.z)
+    def velocity(self) -> Vector3D:
+        return Vector3D(self._velocity.x, self._velocity.y, self._velocity.z)
 
     @velocity.setter
-    def velocity(self, velocity: Position3D) -> None:
-        self._velocity = Position3D(velocity.x, velocity.y, velocity.z)    
+    def velocity(self, velocity: Vector3D) -> None:
+        self._velocity = Vector3D(velocity.x, velocity.y, velocity.z)
 
     @property
     def acceleration_x(self) -> float:
@@ -137,12 +144,12 @@ class Vehicle3D(Vehicle):
         return self._acceleration.z
 
     @property
-    def acceleration(self) -> Position3D:
-        return Position3D(self._acceleration.x, self._acceleration.y, self._acceleration.z)
+    def acceleration(self) -> Vector3D:
+        return Vector3D(self._acceleration.x, self._acceleration.y, self._acceleration.z)
 
     @acceleration.setter
-    def acceleration(self, acceleration: Position3D) -> None:
-        self._acceleration = Position3D(acceleration.x, acceleration.y, acceleration.z)
+    def acceleration(self, acceleration: Vector3D) -> None:
+        self._acceleration = Vector3D(acceleration.x, acceleration.y, acceleration.z)
         
     def _build_arrow(self) -> NDArray[np.float64]:
         return np.array([
@@ -159,28 +166,32 @@ class Vehicle3D(Vehicle):
             self.target = self.next_destination.position
         return success
 
-    def seek(self) -> Position3D:
+    def seek(self) -> Vector3D:
         """Calculate steering force towards target in 3D space."""
-        desired_direction = normalize(self.target - self.position)
-        desired_velocity = scale_position(desired_direction, min(self.max_speed, self.target_speed()))
-        return truncate(desired_velocity - self.velocity, self.max_force)
+        to_target = self.target - self.position
+        desired_direction = normalize(_as_vector3d(to_target))
+        desired_speed = float(min(self.max_speed, self.target_speed()))
+        desired_velocity = scale_vector(desired_direction, desired_speed)
+        return truncate(desired_velocity - self.velocity, float(self.max_force))
     
-    def flee(self) -> Position3D:
+    def flee(self) -> Vector3D:
         """Calculate steering force away from target in 3D space."""
-        desired_direction = normalize(self.position - self.target)
-        desired_velocity = scale_position(desired_direction, -min(self.max_speed, self.target_speed()))
-        return truncate(desired_velocity - self.velocity, self.max_force)
+        to_target = self.target - self.position
+        desired_direction = normalize(_as_vector3d(to_target))
+        desired_speed = float(min(self.max_speed, self.target_speed()))
+        desired_velocity = scale_vector(desired_direction, -desired_speed)
+        return truncate(desired_velocity - self.velocity, float(self.max_force))
     
-    def arrive(self) -> Position3D:
+    def arrive(self) -> Vector3D:
         """Calculate steering force to arrive smoothly at target in 3D space."""
         to_target = self.target - self.position
         distance = np.linalg.norm(to_target.vector)
         if distance < 1:
-            return Position3D(0.0, 0.0, 0.0)
-        desired_direction = normalize(to_target)
+            return Vector3D(0.0, 0.0, 0.0)
+        desired_direction = normalize(_as_vector3d(to_target))
         speed = min(distance / 0.3, min(self.max_speed, self.target_speed()))
-        desired_velocity = scale_position(desired_direction, speed)
-        return truncate(desired_velocity - self.velocity, self.max_force)
+        desired_velocity = scale_vector(desired_direction, float(speed))
+        return truncate(desired_velocity - self.velocity, float(self.max_force))
     
     def update(self, dt: float) -> None:
         """Update vehicle position and state."""
@@ -200,17 +211,20 @@ class Vehicle3D(Vehicle):
             if distance_to_target < 300:
                 self.acceleration = self.flee()
             else:
-                self.acceleration = Position3D(0.0, 0.0, 0.0)
+                self.acceleration = Vector3D(0.0, 0.0, 0.0)
         elif self.action == 'arrive':
             self.acceleration = self.arrive()
         else:
             self.done = True
-            self.acceleration = Position3D(0.0, 0.0, 0.0)
+            self.acceleration = Vector3D(0.0, 0.0, 0.0)
 
-        self._velocity = truncate(self._velocity + scale_position(self._acceleration, dt), self.max_speed)
-        self.position += scale_position(self._velocity, dt)
+        self._velocity = truncate(
+            self._velocity + scale_vector(self._acceleration, float(dt)),
+            float(self.max_speed),
+        )
+        self.position = self.position + scale_vector(self._velocity, float(dt))
 
-        if self._velocity.distance_to(Position3D(0, 0, 0)) > 1e-6:
+        if np.linalg.norm(self._velocity.vector) > 1e-6:
             direction = normalize(self._velocity)
             self.heading = math.atan2(direction.y, direction.x)
 
