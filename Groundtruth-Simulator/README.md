@@ -7,9 +7,8 @@ A Python-based vehicle movement simulator that generates groundtruth position da
 - **2D and 3D Vehicle Simulation**: Support for both ground-based (2D) and aerial (3D) vehicles
 - **Flexible Configuration**: JSON-based runfile configuration for simulation parameters
 - **Geodetic Coordinate Output**: Converts local ENU coordinates to WGS-84 latitude/longitude
-- **Multiple Vehicles**: Simulate multiple vehicles simultaneously with different properties
 - **Destination-Based Movement**: Vehicles follow a queue of destinations with configurable speed and error tolerance
-- **Time-Stepped Simulation**: Configurable time step for simulation accuracy
+- **Time-Stepped Simulation**: Configurable time step and timestamp for simulation accuracy and flexibility
 
 ## Requirements
 
@@ -131,17 +130,17 @@ Each vehicle in the `vehicles` array has the following structure:
 
 ### Vehicle Parameters
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `id` | integer | Yes | Unique vehicle identifier |
-| `type` | string | Yes | Vehicle type (e.g., "car", "drone", "ship") |
-| `is_3d` | boolean | Yes | Whether vehicle operates in 3D space |
-| `action` | string | Yes | Movement behavior (typically "seek") |
-| `properties.max_speed` | float | Yes | Maximum speed in meters per second |
-| `properties.max_force` | float | Yes | Maximum acceleration force |
-| `properties.max_altitude` | float | 3D only | Maximum altitude in meters |
-| `properties.position` | object | Yes | Starting position (x, y for 2D; x, y, z for 3D) |
-| `destinations` | array | Yes | Array of destination waypoints |
+| Parameter | Type | Description |
+|-----------|-------------------|-------------|
+| `id` | integer | Unique vehicle identifier |
+| `type` | string | Vehicle type (e.g., "car", "drone", "ship") |
+| `is_3d` | boolean | Whether vehicle operates in 3D space |
+| `action` | string | Movement behavior (typically "seek") |
+| `properties.max_speed` | float | Maximum speed in meters per second |
+| `properties.max_force` | float | Maximum acceleration force |
+| `properties.max_altitude` | float | Maximum altitude in meters |
+| `properties.position` | object | Starting position (x, y for 2D; x, y, z for 3D) |
+| `destinations` | array | Array of destination waypoints |
 
 ### Destination Parameters
 
@@ -150,6 +149,16 @@ Each vehicle in the `vehicles` array has the following structure:
 | `position` | object | Target position (x, y for 2D; x, y, z for 3D) in meters |
 | `speed` | float | Desired speed to this destination in meters per second |
 | `error` | float | Distance tolerance in meters (vehicle reaches destination when within this distance) |
+
+### Vehicle Behavior
+Vehicles can be configured to behave in different ways to reach their destination. Here is a list of supported behaviors and their necessary parameters:
+| Behavior | Description | Required Parameters |
+|----------|-------------|---------------------|
+| `seek` | Vehicle moves directly towards the destination at the specified speed. | A `destinations` queue |
+| `flee` | Vehicle moves directly away from the destination at the specified spee. The destination is "reached" when the vehicle is 1000 meters away from the destination. | A `destinations` queue |
+| `arrive` | Vehicle moves towards the destination and slows down as it approaches, coming to a stop within the specified error distance. | A `destinations` queue |
+| `follow` | Vehicle follows a target vehicle (specified by `target_id` parameter) at a specified distance. The destination is "reached" when the target vehicle is marked as done and the following vehicle has been at the follow destination for at least 5 simulation seconds. | A `target_id` parameter specifying the target vehicle ID, a `follow_distance` that specifies how many meters behind the target vehicle the following vehicle should be. |
+| `stay` | Vehicle stays at its specified position for a certain amount of time. The destination is "reached" when the vehicle has been within the specified error distance of the destination for at least the specified stay time or until the specified stay time has passed. | A `stay_time` parameter in the form of how many seconds or a string in ISO format (e.g., "2025-01-27 02:58:45") specifying that the vehicle should stay until that time has passed. |
 
 ## Output Format
 
@@ -186,7 +195,7 @@ The simulator generates two CSV files (if both 2D and 3D vehicles are present):
    - Each vehicle updates its position based on its current destination
    - Positions are logged to CSV files with geodetic coordinates
    - Time advances by the configured time step
-   - Loop continues until all vehicles reach their final destinations
+   - Loop continues until all vehicles are marked as done (i.e., they have reached all their destinations, awaited time, followed target vehicle marked done)
 3. **Coordinate Conversion**: Local ENU (East-North-Up) coordinates are converted to WGS-84 latitude/longitude using the specified origin point
 
 ## File Structure
@@ -200,6 +209,8 @@ The simulator generates two CSV files (if both 2D and 3D vehicles are present):
   - `Position.py`: Position data structures
   - `Destination.py`: Destination data structures
   - `Settings.py`: Simulation settings class
+  - `Vectors.py`: Vector math utilities
+- `vehicle-behavior-test-files/`: Example runfiles for testing different vehicle behaviors
 
 ## Tips
 

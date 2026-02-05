@@ -17,7 +17,7 @@ def main():
         iterate through a list of vehicle objects and call their update methods
         """
         for v in vehicles:
-            v.update(settings.time_step)
+            v.update(settings, vehicles)
         csv_print_data(vehicles, filename2D, filename3D, settings)
         all_done = all(v.done == True for v in vehicles)
         settings.advance_time(settings.time_step)

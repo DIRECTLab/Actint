@@ -155,16 +155,6 @@ def _ais_fieldnames() -> list[str]:
     "TransceiverClass",
   ]
 
-
-def _existing_data_row_count(filename: str) -> int:
-  """Return how many data rows exist (excludes the header)."""
-  try:
-    with open(filename, mode="r", newline="") as f:
-      # -1 to discount the header line.
-      return max(sum(1 for _ in f) - 1, 0)
-  except FileNotFoundError:
-    return 0
-
 # Helper function to generate unique filenames for the csv_print_header function.
 def _name_file(file: str) -> Path:
   """Generate a unique filename by appending a counter if the file already exists.
@@ -269,6 +259,8 @@ def csv_print_data(vehicles: list, filename2D: str, filename3D: str, settings: S
         "BaseDateTime": settings.current_simulation_time.isoformat(sep=' ', timespec='seconds'),
         "LAT": round(lat, 6),  # Latitude in degrees (~0.1m precision)
         "LON": round(lon, 6),  # Longitude in degrees (~0.1m precision)
+        # "LAT": v.pos_y,
+        # "LON": v.pos_x,
         "SOG": round(np.linalg.norm(v.velocity.vector), 3),  # Speed over ground from velocity magnitude
         "COG": round(np.degrees(v.heading) % 360, 3),  # Course over ground in degrees
         "Heading": round(np.degrees(v.heading) % 360, 3),  # Heading in degrees

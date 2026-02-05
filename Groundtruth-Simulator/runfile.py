@@ -19,22 +19,27 @@ def read_json(filename: str) -> tuple[list[Vehicle2D | Vehicle3D], Settings]:
     )
         for v in data['vehicles']:
             id = v['id']
-            type = v['type']
-            is_3d = v['is_3d']
-            max_speed = v['properties']['max_speed']
-            max_force = v['properties']['max_force']
-            action = v['action']
+            type = v.get('type', 'default')
+            is_3d = v.get('is_3d', False)
+            max_speed = v['properties'].get('max_speed', 100.0)
+            max_force = v['properties'].get('max_force', 200.0)
+            action = v.get('action', 'seek')
+            target_vehicle = v.get('target_id', None)
+            follow_distance = v.get('follow_distance', 0.0)
+            stay_time = v.get('stay_time', 50.0)
+
+
             destinations = queue.Queue()
             if is_3d:
                 settings.has_vehicle3d = True
-                for d in v['destinations']:
-                    position = Position3D(float(d['position']['x']), float(d['position']['y']), float(d['position']['z']))
-                    error = d['error']
-                    speed = d['speed']
+                for d in v.get('destinations', []):
+                    position = Position3D(float(d['position'].get('x', 100)), float(d['position'].get('y', 100)), float(d['position'].get('z', 100)))
+                    error = d.get('error', 5.0)
+                    speed = d.get('speed', 50.0)
                     destinations.put(Destination3D(position, speed, error))
-                max_altitude = v['properties']['max_altitude']
+                max_altitude = v['properties'].get('max_altitude', 1200)
                 
-                position = Position3D(float(v['properties']['position']['x']), float(v['properties']['position']['y']), float(v['properties']['position']['z']))
+                position = Position3D(float(v['properties']['position'].get('x', 0)), float(v['properties']['position'].get('y', 0)), float(v['properties']['position'].get('z', 0)))
                 vehicle = Vehicle3D(
                     vehicle_id=id,
                     vehicle_type=type,
@@ -45,17 +50,20 @@ def read_json(filename: str) -> tuple[list[Vehicle2D | Vehicle3D], Settings]:
                     max_force=max_force,
                     max_altitude=max_altitude,
                     action=action,
+                    target_id=target_vehicle,
+                    follow_distance=follow_distance,
+                    stay_time=stay_time,
                     )
                 vehicles.append(vehicle)
             else:
                 settings.has_vehicle2d = True
-                for d in v['destinations']:
-                    position = Position2D(float(d['position']['x']), float(d['position']['y']))
-                    error = d['error']
-                    speed = d['speed']
+                for d in v.get('destinations', []):
+                    position = Position2D(float(d['position'].get('x', 100)), float(d['position'].get('y', 100)))
+                    error = d.get('error', 30.0)
+                    speed = d.get('speed', 50.0)
                     destinations.put(Destination2D(position, speed, error))
                 
-                position = Position2D(float(v['properties']['position']['x']), float(v['properties']['position']['y']))
+                position = Position2D(float(v['properties']['position'].get('x', 0)), float(v['properties']['position'].get('y', 0)))
                 vehicle = Vehicle2D(
                     vehicle_id=id,
                     vehicle_type=type,
@@ -65,6 +73,9 @@ def read_json(filename: str) -> tuple[list[Vehicle2D | Vehicle3D], Settings]:
                     max_speed=max_speed,
                     max_force=max_force,
                     action=action,
+                    target_id=target_vehicle,
+                    follow_distance=follow_distance,
+                    stay_time=stay_time,
                     )
                 vehicles.append(vehicle)
     return vehicles, settings
@@ -77,5 +88,3 @@ if __name__ == "__main__":
             if not v.done:
                 print(f"Vehicle {v.vehicle_id}: {v.vehicle_type} at {v.position} with destination: {v.next_destination.position if v.next_destination else 'None'} and action: {v.action if v.next_destination else 'None'}")
             v.update(settings.time_step)
-
-

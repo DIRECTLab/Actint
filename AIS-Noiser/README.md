@@ -6,7 +6,7 @@ A Python tool for adding realistic noise and simulating data loss to AIS (Automa
 
 - [Overview](#overview)
 - [Features](#features)
-- [Installation](#installation)
+- [Requirements](#requirements)
 - [Usage](#usage)
   - [Basic Usage](#basic-usage)
   - [Command-Line Arguments](#command-line-arguments)
@@ -21,7 +21,6 @@ A Python tool for adding realistic noise and simulating data loss to AIS (Automa
   - [Visibility Simulation](#visibility-simulation)
 - [File Descriptions](#file-descriptions)
 - [Validation](#validation)
-- [Technical Details](#technical-details)
 
 ## Overview
 
@@ -39,22 +38,13 @@ AIS-Noiser processes tracking data from maritime vessels (AIS) or aircraft (ADS-
 - **Configurable Noise Models**: Separate noise parameters for latitude, longitude, altitude, and time
 - **Realistic Visibility Modeling**: Statistical model for simulating intermittent signal reception
 - **Batch Processing**: Automatically groups data by vehicle identifier (MMSI for ships, ICAO hex for aircraft)
-- **Automatic File Management**: Prevents file overwrites with automatic numbering
 - **Data Integrity**: Preserves column structure and formats while applying transformations
 
-## Installation
-
-### Requirements
+## Requirements
 
 - Python 3.7 or higher
 - pandas
 - numpy
-
-### Setup
-
-1. Clone or download this repository
-2. Install required dependencies:
-3. Ensure your input CSV files are in the AIS-Noiser directory or provide the full path
 
 ## Usage
 
@@ -105,10 +95,10 @@ python main.py -2d --file 2023-09-03_ais_top10.csv
 ```
 
 This processes the AIS file with:
-- 100m positional noise in both lat/lon
-- 20 seconds forward-only time noise
-- 95% chance visible objects stay visible
-- 80% chance invisible objects stay invisible
+- 100m default positional noise in both lat/lon
+- 20 default seconds forward-only time noise
+- 95% default chance visible objects stay visible
+- 80% default chance invisible objects stay invisible
 
 #### Example 2: Custom Noise Parameters for AIS
 
@@ -252,7 +242,6 @@ Temporal noise simulates clock drift and synchronization errors:
 - **Forward-only mode** (default): Adds random delay between 0 and +N seconds
 - **Bidirectional mode** (`-t` flag): Adds random offset between -N and +N seconds
 - Uses uniform random distribution
-- Preserves ISO 8601 timestamp format
 
 ### Visibility Simulation
 
@@ -265,8 +254,8 @@ The visibility model simulates intermittent signal reception using a state machi
 **Transitions:**
 1. **Visible → Visible**: Probability = `visible_chance` (default 95%)
 2. **Visible → Invisible**: Probability = 1 - `visible_chance` (default 5%)
-3. **Invisible → Visible**: Probability = 1 - `invisible_chance` (default 20%)
 4. **Invisible → Invisible**: Probability = `invisible_chance` (default 80%)
+3. **Invisible → Visible**: Probability = 1 - `invisible_chance` (default 20%)
 5. **First visibility after dropout**: Uses `stay_visible_chance` (default 80%) to model gradual signal reacquisition
 
 **Behavior**:
@@ -307,41 +296,6 @@ validate_noise_application(
 - Temporal gap analysis
 - Coordinate drift statistics
 - Signal dropout patterns
-
-## Technical Details
-
-### Data Processing Pipeline
-
-1. **Load CSV**: Read input file with pandas
-2. **Group by Vehicle**: Separate records by MMSI or ICAO hex
-3. **Per-Vehicle Processing**:
-   - Apply visibility filter (stateful per vehicle)
-   - Sort remaining records by time
-   - Apply coordinate noise to each record
-   - Apply time noise to each timestamp
-   - Write to vehicle-specific output file
-   - Append to consolidated output file
-4. **File Management**: Handle naming conflicts automatically
-
-### Performance Considerations
-
-- Processing is done per-vehicle sequentially
-- Each record is processed individually for noise application
-- Memory efficient: uses iterative row processing
-- File I/O: incremental appending to avoid large memory footprint
-
-### Data Type Handling
-
-- **ICAO Hex Codes**: Explicitly treated as strings to preserve leading zeros
-- **Timestamps**: Converted to datetime objects for accurate arithmetic
-- **Coordinates**: Processed as floating-point values
-- **All other columns**: Preserved as-is without type conversion
-
-### Coordinate System
-
-- **Reference**: WGS84 geodetic datum
-- **Units**: Decimal degrees for lat/lon, meters for altitude
-- **Earth Model**: Spherical approximation using polar radius
 
 ## Troubleshooting
 

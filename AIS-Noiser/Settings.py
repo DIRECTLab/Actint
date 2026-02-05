@@ -23,7 +23,7 @@ class Settings ():
     string += f"Time Noise: {self.noise_time}s, "
     string += f"Visible Chance: {self.visible_chance}, Invisible Chance: {self.invisible_chance}, Stay Visible Chance: {self.stay_visible_chance}, "
     if self.noise_time_backward:
-      string += "Time noise can be both forward and backward."
+      string += "Time noise can be both forward and backward,"
     else:
       string += "Time noise is only forward, "
 
