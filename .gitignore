@@ -1,6 +1,8 @@
 # Project specific ignores
 *_result*.csv
+*_result*.json
 *_noised*.csv
+*_noised*.json
 *_sorted.csv
 
 # Byte-compiled / optimized / DLL files

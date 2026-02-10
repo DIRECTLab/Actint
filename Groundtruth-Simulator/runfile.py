@@ -15,7 +15,8 @@ def read_json(filename: str) -> tuple[list[Vehicle2D | Vehicle3D], Settings]:
         latlon_origin=data['sim_settings']['latlon_origin'],
         output_file_2d=data['sim_settings']['output_file_2d'],
         output_file_3d=data['sim_settings']['output_file_3d'],
-        start_time=data['sim_settings']['start_time']
+        start_time=data['sim_settings']['start_time'],
+        print_format=data['sim_settings'].get('print_format', 'json')
     )
         for v in data['vehicles']:
             id = v['id']

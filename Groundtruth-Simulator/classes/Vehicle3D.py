@@ -48,7 +48,7 @@ class Vehicle3D(Vehicle):
             max_altitude: int = 10000,
             scale: float = 10.0,
             action: str = 'seek',
-            follow: int | None = None,
+            target_id: int | None = None,
             follow_distance: float = 0.0,
             stay_time: str | float = 0.0,
             ):
@@ -69,7 +69,7 @@ class Vehicle3D(Vehicle):
         self.max_altitude: int = max_altitude
         self.vertices = self._build_arrow()
         self.target: Position3D = Position3D(0,0,0)
-        self.follow_id: int | None = follow
+        self.target_id: int | None = target_id
         self.follow_distance: float = follow_distance
         self.follow_ticks: int = 0
         self.stay_time: dt | float = stay_time if isinstance(stay_time, float | int) else dt.fromisoformat(stay_time)

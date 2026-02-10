@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import datetime
+import json
 from pathlib import Path
 from classes import Settings
 
@@ -156,7 +157,7 @@ def _ais_fieldnames() -> list[str]:
   ]
 
 # Helper function to generate unique filenames for the csv_print_header function.
-def _name_file(file: str) -> Path:
+def _name_file(settings: Settings) -> Path:
   """Generate a unique filename by appending a counter if the file already exists.
   
   Args:
@@ -164,22 +165,40 @@ def _name_file(file: str) -> Path:
   
   Returns:
     A Path object with a unique filename. If the original file exists,
-    appends "_N" before the extension (e.g., "file.csv" -> "file_1.csv").
+    appends "_N" before the extension (e.g., "file.json" -> "file_1.json").
   
   Example:
     If "output.csv" exists, returns Path("output_1.csv").
   """
-  path = Path(file)
-  stem = path.stem
-  suffix = path.suffix
+  if settings.has_vehicle2d:
+    path2d = Path(f"{settings.output_file_2d}.{settings.print_format}")
+    stem2d = path2d.stem
+    suffix2d = path2d.suffix
 
-  counter = 0
-  new_path = path
-  while new_path.exists():
-    counter += 1
-    new_path = path.with_name(f"{stem}_{counter}{suffix}")
+    counter = 0
+    new_path2d = path2d
+    while new_path2d.exists():
+      counter += 1
+      new_path2d = path2d.with_name(f"{stem2d}_{counter}{suffix2d}")
+  else:
+    new_path2d = None
 
-  return new_path
+  if settings.has_vehicle3d:
+    path3d = Path(f"{settings.output_file_3d}.{settings.print_format}")
+    stem3d = path3d.stem
+    suffix3d = path3d.suffix
+
+    counter = 0
+    new_path3d = path3d
+    while new_path3d.exists():
+      counter += 1
+      new_path3d = path3d.with_name(f"{stem3d}_{counter}{suffix3d}")
+  else:
+    new_path3d = None
+
+  return new_path2d, new_path3d
+
+
 
 def csv_print_header(settings: Settings) -> tuple:
   """Create a new CSV file with headers for vehicle simulation data.
@@ -189,8 +208,8 @@ def csv_print_header(settings: Settings) -> tuple:
   Returns:
     The names of the created CSV files as a tuple of strings (2D filename, 3D filename).
   """
-  filename2D = _name_file(settings.output_file_2d).name
-  filename3D = _name_file(settings.output_file_3d).name
+  filename2D, filename3D = _name_file(settings)
+  
   
   # Create an empty DataFrame with AIS-like column headers
   df2D = pd.DataFrame(columns=[
@@ -228,6 +247,143 @@ def csv_print_header(settings: Settings) -> tuple:
 
   return filename2D, filename3D
 
+def json_print_header(settings: Settings) -> tuple:
+  """Create a new JSON file with headers for vehicle simulation data.
+  
+  Creates a JSON file matching AIS data format with available simulation fields.
+  
+  Returns:
+    The names of the created JSON files as a tuple of strings (2D filename, 3D filename).
+  """
+  filename2D, filename3D = _name_file(settings)
+
+  # Initialize files as JSON arrays so json_print_data can append items.
+  if settings.has_vehicle2d and filename2D is not None:
+    Path(filename2D).write_text("[\n]\n", encoding="utf-8")
+  if settings.has_vehicle3d and filename3D is not None:
+    Path(filename3D).write_text("[\n]\n", encoding="utf-8")
+
+  return filename2D, filename3D
+
+def json_print_data(vehicles: list, filename2D: str, filename3D: str, settings: Settings) -> None:
+  """Append vehicle data to JSON files as a single list of dictionaries.
+
+  Each output file remains valid JSON containing one top-level array of objects.
+  This mirrors `csv_print_data`, but uses JSON objects instead of CSV rows.
+  """
+
+  def _append_json_array(path: str | Path, new_items: list[dict]) -> None:
+    if not new_items:
+      return
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    indent = 4
+    if not path.exists() or path.stat().st_size == 0:
+      path.write_text("[\n]\n", encoding="utf-8")
+
+    # Append new items inside the closing bracket without loading the whole file.
+    with path.open("r+", encoding="utf-8", newline="\n") as f:
+      f.seek(0, 2)
+      end_pos = f.tell()
+      if end_pos == 0:
+        f.write("[]\n")
+        end_pos = f.tell()
+
+      # Find the closing ']' ignoring trailing whitespace.
+      pos = end_pos - 1
+      while pos >= 0:
+        f.seek(pos)
+        ch = f.read(1)
+        if ch.isspace():
+          pos -= 1
+          continue
+        if ch != "]":
+          raise ValueError(f"Output file {path} is not a JSON array (expected closing ']')")
+        break
+      if pos < 0:
+        raise ValueError(f"Output file {path} is empty/corrupt")
+
+      # Find the last non-whitespace char before the closing ']'.
+      last_token_pos = pos - 1
+      while last_token_pos >= 0:
+        f.seek(last_token_pos)
+        ch = f.read(1)
+        if ch.isspace():
+          last_token_pos -= 1
+          continue
+        break
+      if last_token_pos < 0:
+        raise ValueError(f"Output file {path} is empty/corrupt")
+
+      is_empty_array = (ch == "[")
+
+      # Truncate to *after* the last token so we can place the comma right after '}'.
+      write_pos = last_token_pos + 1
+      f.truncate(write_pos)
+      f.seek(write_pos)
+
+      if is_empty_array:
+        f.write("\n")
+      else:
+        f.write(",\n")
+
+      for idx, item in enumerate(new_items):
+        item_json = json.dumps(item, ensure_ascii=False, indent=indent)
+        item_lines = [(" " * indent) + line for line in item_json.splitlines()]
+        if idx < len(new_items) - 1:
+          item_lines[-1] = item_lines[-1] + ","
+        f.write("\n".join(item_lines))
+        f.write("\n")
+
+      f.write("]\n")
+
+  data_rows_2d = []
+  data_rows_3d = []
+  for v in vehicles:
+    if v.done:
+      continue  # Skip completed vehicles
+    # Get altitude for 3D vehicles, default to 0 for 2D
+    z = getattr(v, 'pos_z', 0.0)
+    
+    # Convert local ENU coordinates to geodetic (lat/lon in degrees)
+    lat, lon, height = local_to_geodetic(v.pos_x, v.pos_y, z, settings)
+    if v.__class__.__name__ == 'Vehicle2D':
+      data_rows_2d.append({
+        "MMSI": v.vehicle_id,
+        "BaseDateTime": settings.current_simulation_time.isoformat(sep=' ', timespec='seconds'),
+        # "LAT": round(lat, 6),  # Latitude in degrees (~0.1m precision)
+        # "LON": round(lon, 6),  # Longitude in degrees (~0.1m precision)
+        "LAT": v.pos_y,
+        "LON": v.pos_x,
+        "SOG": round(np.linalg.norm(v.velocity.vector), 3),  # Speed over ground from velocity magnitude
+        "COG": round(np.degrees(v.heading) % 360, 3),  # Course over ground in degrees
+        "Heading": round(np.degrees(v.heading) % 360, 3),  # Heading in degrees
+        "VesselName": v.vehicle_type.upper(),  # Vehicle type as vessel name
+        "VesselType": v.vehicle_type,  # Vehicle type
+        "Length": round(getattr(v, 'scale', 0.0), 3),  # Using scale as length approximation
+        "Width": round(getattr(v, 'scale', 0.0) / 3, 3),  # Approximate width as 1/3 of length
+      })
+    elif v.__class__.__name__ == 'Vehicle3D':
+      data_rows_3d.append({
+        "date": settings.current_simulation_time.isoformat(sep=",", timespec="seconds").split(",")[0],
+        "time": settings.current_simulation_time.isoformat(sep=",", timespec="seconds").split(",")[1],
+        "icao_hex": f"{v.vehicle_id:06X}",  # ICAO hex from vehicle_id
+        "latitude": round(lat, 6),  # Latitude in degrees (~0.1m precision)
+        "longitude": round(lon, 6),  # Longitude in degrees (~0.1m precision)
+        "altitude": round(height, 3),  # Altitude in meters
+        "altitude_unit": "meters",
+        "vertical_rate": round(v.velocity.z * 60, 3),  # Vertical rate in meters per minute
+        "vertical_rate_unit": "meters/minute",
+      })
+  
+  # Create DataFrame and append without index
+  if settings.has_vehicle2d and filename2D is not None:
+    _append_json_array(filename2D, data_rows_2d)
+  if settings.has_vehicle3d and filename3D is not None:
+    _append_json_array(filename3D, data_rows_3d)
+
 def csv_print_data(vehicles: list, filename2D: str, filename3D: str, settings: Settings) -> None:
   """Append vehicle data to an existing CSV file in AIS format.
   
@@ -257,10 +413,10 @@ def csv_print_data(vehicles: list, filename2D: str, filename3D: str, settings: S
       data_rows_2d.append({
         "MMSI": v.vehicle_id,
         "BaseDateTime": settings.current_simulation_time.isoformat(sep=' ', timespec='seconds'),
-        "LAT": round(lat, 6),  # Latitude in degrees (~0.1m precision)
-        "LON": round(lon, 6),  # Longitude in degrees (~0.1m precision)
-        # "LAT": v.pos_y,
-        # "LON": v.pos_x,
+        # "LAT": round(lat, 6),  # Latitude in degrees (~0.1m precision)
+        # "LON": round(lon, 6),  # Longitude in degrees (~0.1m precision)
+        "LAT": v.pos_y,
+        "LON": v.pos_x,
         "SOG": round(np.linalg.norm(v.velocity.vector), 3),  # Speed over ground from velocity magnitude
         "COG": round(np.degrees(v.heading) % 360, 3),  # Course over ground in degrees
         "Heading": round(np.degrees(v.heading) % 360, 3),  # Heading in degrees
