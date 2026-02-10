@@ -1,0 +1,249 @@
+{
+  "sim_settings": {
+    "output_file_2d": "JFN-Groundtruth-Simulator_result_2D.csv",
+    "output_file_3d": "JFN-Groundtruth-Simulator_result_3D.csv",
+    "time_step": 0.4,
+    "start_time": "2026-01-29T17:45",
+    "time_format": "%Y-%m-%d %H:%M:%S"
+  },
+  "vehicles": [
+    {
+      "vehicle_id": 1,
+      "vehicle_type": "ship",
+      "is_3D": false,
+      "action": "stay",
+      "properties": {
+        "max_speed": 50,
+        "max_force": 50,
+        "max_altitude": 1200,
+        "position": {
+          "LatLng": {
+            "lat": 0,
+            "lng": 0
+          }
+        }
+      },
+      "destinations": [
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 51.50947349869495,
+              "lng": 0.20286976461385556
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 51.518982663925826,
+              "lng": 0.03979842977571035
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 51.45366067042652,
+              "lng": 0.033962192528869124
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 51.44799003068136,
+              "lng": 0.09129464077721307
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 51.44906001661759,
+              "lng": 0.1515452076490176
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 51.478795588740184,
+              "lng": 0.13626799838521556
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 51.496007690319004,
+              "lng": 0.0894064463738209
+            }
+          }
+        }
+      ]
+    },
+    {
+      "vehicle_id": 2,
+      "vehicle_type": "ship",
+      "is_3D": false,
+      "action": "stay",
+      "properties": {
+        "max_speed": 50,
+        "max_force": 50,
+        "max_altitude": 1200,
+        "position": {
+          "LatLng": {
+            "lat": 0,
+            "lng": 0
+          }
+        }
+      },
+      "destinations": [
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 51.50947349869495,
+              "lng": 0.20286976461385556
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 51.518982663925826,
+              "lng": 0.03979842977571035
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 51.45366067042652,
+              "lng": 0.033962192528869124
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 51.44799003068136,
+              "lng": 0.09129464077721307
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 51.44906001661759,
+              "lng": 0.1515452076490176
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 51.478795588740184,
+              "lng": 0.13626799838521556
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 51.496007690319004,
+              "lng": 0.0894064463738209
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 51.525071760698125,
+              "lng": 0.3161614288172255
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 51.469812733731345,
+              "lng": 0.24337999982392058
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 51.46510674823922,
+              "lng": 0.23634218432034618
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 51.46104209743746,
+              "lng": 0.206474381939481
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 51.507763726726374,
+              "lng": 0.2499028532174208
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 51.5360727520024,
+              "lng": 0.22604294212006165
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
