@@ -352,7 +352,7 @@ def json_print_data(vehicles: list, filename2D: str, filename3D: str, settings: 
     if v.__class__.__name__ == 'Vehicle2D':
       data_rows_2d.append({
         "MMSI": v.vehicle_id,
-        "BaseDateTime": settings.current_simulation_time.isoformat(sep=' ', timespec='seconds'),
+        "BaseDateTime": settings.current_simulation_time.timestamp() if settings.print_time_as == "unix" else settings.current_simulation_time.isoformat(sep=' ', timespec='seconds'),
         # "LAT": round(lat, 6),  # Latitude in degrees (~0.1m precision)
         # "LON": round(lon, 6),  # Longitude in degrees (~0.1m precision)
         "LAT": v.pos_y,
@@ -367,8 +367,8 @@ def json_print_data(vehicles: list, filename2D: str, filename3D: str, settings: 
       })
     elif v.__class__.__name__ == 'Vehicle3D':
       data_rows_3d.append({
-        "date": settings.current_simulation_time.isoformat(sep=",", timespec="seconds").split(",")[0],
-        "time": settings.current_simulation_time.isoformat(sep=",", timespec="seconds").split(",")[1],
+        "date": settings.current_simulation_time.isoformat(sep=",", timespec="seconds").split(",")[0] if settings.print_time_as == "iso" else "",  # Date part of ISO timestamp
+        "time": settings.current_simulation_time.isoformat(sep=",", timespec="seconds").split(",")[1] if settings.print_time_as == "iso" else settings.current_simulation_time.timestamp(),
         "icao_hex": f"{v.vehicle_id:06X}",  # ICAO hex from vehicle_id
         "latitude": round(lat, 6),  # Latitude in degrees (~0.1m precision)
         "longitude": round(lon, 6),  # Longitude in degrees (~0.1m precision)
@@ -412,7 +412,7 @@ def csv_print_data(vehicles: list, filename2D: str, filename3D: str, settings: S
     if v.__class__.__name__ == 'Vehicle2D':
       data_rows_2d.append({
         "MMSI": v.vehicle_id,
-        "BaseDateTime": settings.current_simulation_time.isoformat(sep=' ', timespec='seconds'),
+        "BaseDateTime": settings.current_simulation_time.timestamp() if settings.print_time_as == "unix" else settings.current_simulation_time.isoformat(sep=' ', timespec='seconds'),
         # "LAT": round(lat, 6),  # Latitude in degrees (~0.1m precision)
         # "LON": round(lon, 6),  # Longitude in degrees (~0.1m precision)
         "LAT": v.pos_y,
@@ -427,8 +427,8 @@ def csv_print_data(vehicles: list, filename2D: str, filename3D: str, settings: S
       })
     elif v.__class__.__name__ == 'Vehicle3D':
       data_rows_3d.append({
-        "date": settings.current_simulation_time.isoformat(sep=",", timespec="seconds").split(",")[0],
-        "time": settings.current_simulation_time.isoformat(sep=",", timespec="seconds").split(",")[1],
+        "date": settings.current_simulation_time.isoformat(sep=",", timespec="seconds").split(",")[0] if settings.print_time_as == "iso" else "",
+        "time": settings.current_simulation_time.isoformat(sep=",", timespec="seconds").split(",")[1] if settings.print_time_as == "iso" else settings.current_simulation_time.timestamp(),
         "icao_hex": f"{v.vehicle_id:06X}",  # ICAO hex from vehicle_id
         "latitude": round(lat, 6),  # Latitude in degrees (~0.1m precision)
         "longitude": round(lon, 6),  # Longitude in degrees (~0.1m precision)

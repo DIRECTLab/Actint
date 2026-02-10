@@ -5,6 +5,7 @@
     "time_step": 0.4,
     "start_time": "2025-01-27 02:58:45",
     "time_format": "%Y-%m-%d %H:%M:%S",
+    "print_time_as": "unix",
     "print_format": "json",
     "latlon_origin": {
       "latitude": 20.590305,

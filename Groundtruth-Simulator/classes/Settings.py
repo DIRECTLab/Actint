@@ -2,7 +2,7 @@ from datetime import datetime as dt, timedelta
 
 
 class Settings:
-    def __init__(self, time_step: float = 0.4, latlon_origin: dict = None, output_file_2d: str = "JFN-Groundtruth-Simulator_result_2D.csv", output_file_3d: str = "JFN-Groundtruth-Simulator_result_3D.csv", start_time: str = "2000-01-01 00:00:00", time_format: str = "%Y-%m-%d %H:%M:%S", print_format: str = "csv"):
+    def __init__(self, time_step: float = 0.4, latlon_origin: dict = None, output_file_2d: str = "JFN-Groundtruth-Simulator_result_2D.csv", output_file_3d: str = "JFN-Groundtruth-Simulator_result_3D.csv", start_time: str = "2000-01-01 00:00:00", time_format: str = "%Y-%m-%d %H:%M:%S", print_format: str = "csv", print_time_as: str = "unix"):
         self.current_simulation_time = dt.strptime(start_time, time_format)
         self.time_step = time_step  # Default time step in seconds
         self.latlon_origin = latlon_origin or {
@@ -15,6 +15,7 @@ class Settings:
         self.print_format = print_format  # Default print format
         self.has_vehicle2d = False
         self.has_vehicle3d = False
+        self.print_time_as = print_time_as  # Default time format for printing (iso or unix)
 
     @property
     def has_vehicle2d(self) -> bool:
