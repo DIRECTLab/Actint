@@ -21,11 +21,13 @@ const icon = L.icon({
 
 type Props = {
   markers: DestinationTyp[],
-  setMarkers: React.Dispatch<React.SetStateAction<DestinationTyp[]>>
+  setMarkers: React.Dispatch<React.SetStateAction<DestinationTyp[]>>,
+  vehicles_3d: boolean,
+  is_3D: boolean,
 };
 
 
-export function HandleMarkers({ markers, setMarkers }: Props) {
+export function HandleMarkers({ markers, setMarkers, vehicles_3d, is_3D }: Props) {
     const [values, setValues] = useState<previousValsTyp>({
         speed: 30,
         error: 30,
@@ -56,6 +58,46 @@ export function HandleMarkers({ markers, setMarkers }: Props) {
         }  
     })
 
+
+    useEffect(() => {
+      
+      if(is_3D) {
+        let height = NaN
+        while(true){
+            let h = prompt("Please enter a default height")
+            if (h) {
+                console.log(h)
+                height = parseFloat(h)
+                if(!isNaN(height)) {
+                    break;
+                }
+            }
+        }
+        if(!vehicles_3d) {
+            setMarkers(prevMarkers => 
+                prevMarkers.map(marker => ({
+                    ...marker,
+                    position: { 
+                        ...marker.position, 
+                        height: height
+                    }
+                }))
+            );
+        }
+        
+        console.log(height)
+        setValues((prev: previousValsTyp) => ({
+            ...prev, height: height
+        }));
+      } else {
+        setValues((prev: previousValsTyp) => ({
+            ...prev, height: undefined
+        }))
+      }
+
+
+    }, [is_3D]);
+
     
 
     return (
@@ -75,7 +117,7 @@ export function HandleMarkers({ markers, setMarkers }: Props) {
                 >
                     <Popup>
                         <PopupInputs
-                          is_3D={false}
+                          is_3D={is_3D}
                           previousValues={values}
                           setPreviousValues={setValues}
                           updateMarker={updateMarker}

@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import "leaflet/dist/leaflet.css";
 
 
@@ -51,6 +51,16 @@ export default function Home() {
     setVehicleSettings(DEFAULT_VEHICLE)
     
   }
+  
+  function vehiclesAre3D () {
+    if(!markers[0]) {
+      return false
+    }
+    if (!markers[0].position.Z){
+      return false
+    }
+    return true
+  }
 
   const save_simulation = (simulationSettings: SimulationSettingsTyp, vehiclesList: VehicleTyp[]): void => {
     
@@ -89,13 +99,15 @@ export default function Home() {
           simulation_settings={simulationSettings}
           set_simulation_settings={setSimulationSettings}
           vehiclesList={vehiclesList}
+          setVehiclesList={setVehiclesList}
           saveSimulation={save_simulation}
         />
 
         <Map 
           markers={markers}
           setMarkers={setMarkers}
-        
+          vehicles_3d={vehiclesAre3D()}
+          is_3D={vehicleSettings.is_3D}
         />
 
       </div>

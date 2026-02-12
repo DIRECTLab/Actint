@@ -25,9 +25,11 @@ const icon = L.icon({
 
 type Props = {
   markers: DestinationTyp[]
-  setMarkers: React.Dispatch<React.SetStateAction<DestinationTyp[]>>
+  setMarkers: React.Dispatch<React.SetStateAction<DestinationTyp[]>>,
+  vehicles_3d: boolean,
+  is_3D: boolean,
 }
-export default function Map({ markers, setMarkers }: Props) {
+export default function Map({ markers, setMarkers, vehicles_3d, is_3D }: Props) {
 
   return (
     <div style={{ height: '100vh', width: '100%' }}>
@@ -44,6 +46,8 @@ export default function Map({ markers, setMarkers }: Props) {
         <HandleMarkers
           markers={markers}
           setMarkers={setMarkers}
+          vehicles_3d={vehicles_3d}
+          is_3D={is_3D}
         ></HandleMarkers>
         
 

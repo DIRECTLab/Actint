@@ -19,7 +19,6 @@ export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, 
     
   // const [vehicleName, setVehicleName] = useState("name")
   
-  const [currentVehicle, setCurrentVehicle] = useState<VehicleTyp>(DEFAULT_VEHICLE)
     
     return(<>
             <div id="vehicle_settings">

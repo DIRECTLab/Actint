@@ -74,7 +74,7 @@ export default function PopupInputs({ is_3D, previousValues, setPreviousValues, 
             <div className="flex flex-col gap-1 col-span-2">
               <label htmlFor="Z" className="text-xs font-semibold uppercase text-slate-500">Height (meters)</label>
               <input 
-                type="number" id="Z" name="Z" autoFocus defaultValue={previousValues.height}
+                type="number" id="Z" name="Z" autoFocus value={marker.position.Z} defaultValue={previousValues.height} onChange={(e) => {setPreviousValues( prev => ({...prev, height: parseFloat(e.target.value)})); updateMarker(index, marker.position.LatLng, marker.position.Z, parseInt(e.target.value), marker.error)}}
                 className="rounded border border-slate-300 p-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
               />
             </div>
