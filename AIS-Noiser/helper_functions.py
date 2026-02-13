@@ -1,6 +1,18 @@
 from pathlib import Path
 from Settings import Settings
 import sys
+import os
+
+
+def _output_dir() -> Path:
+  if Path("/.dockerenv").exists() and Path("/app/output").exists():
+    outdir = Path("/app/output")
+  else:
+    repo_root = Path(__file__).resolve().parents[1]
+    outdir = repo_root / "output" / "ais-noiser"
+
+  outdir.mkdir(parents=True, exist_ok=True)
+  return outdir
 
 def next_available_filename(base):
   """
@@ -8,20 +20,18 @@ def next_available_filename(base):
   
   :param base: file path to start from
   """
-  base = Path(base)
-  if not base.exists():
-    return base
+  outdir = _output_dir()
+  target = outdir / Path(base).name
 
-  stem = base.stem
-  suffix = base.suffix
-  parent = base.parent
+  if not target.exists():
+    return str(target)
 
-  i = 1
-  while True:
-    candidate = parent / f"{stem} ({i}){suffix}"
+  for i in range(1, 10_000):
+    candidate = target.with_name(f"{target.stem} ({i}){target.suffix}")
     if not candidate.exists():
-      return candidate
-    i += 1
+      return str(candidate)
+
+  raise RuntimeError(f"Could not find a free filename for {target}")
 
 def parse_input() -> Settings:
   if '--help' in sys.argv or '-h' in sys.argv:

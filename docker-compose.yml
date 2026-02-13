@@ -1,0 +1,53 @@
+x-interactive: &interactive
+  stdin_open: true
+  tty: true
+
+services:
+  config-generator-backend:
+    container_name: config-generator-backend
+    build:
+      context: .
+      dockerfile: docker/json_backend.dockerfile
+    volumes:
+      - ./output/config-generator:/output
+    expose:
+      - "5000"
+
+  config-generator-frontend:
+    container_name: config-generator-frontend
+    build:
+      context: .
+      dockerfile: docker/config_frontend.dockerfile
+    depends_on:
+      - config-generator-backend
+    environment:
+      - BACKEND_URL=http://config-generator-backend:5000
+    ports:
+      - "3000:3000"
+
+  ais-noiser:
+    container_name: noiser
+    <<: *interactive
+    build:
+      context: .
+      dockerfile: docker/ais_noiser.dockerfile
+    volumes:
+      - ./output/ais-noiser:/app/output
+
+  groundtruth-simulator:
+    container_name: simulator
+    <<: *interactive
+    build:
+      context: .
+      dockerfile: docker/groundtruth_simulator.dockerfile
+    volumes:
+      - ./output/groundtruth-simulator:/app/output
+
+  simulation-plotter:
+    container_name: plotter
+    <<: *interactive
+    build:
+      context: .
+      dockerfile: docker/simulation_plotter.dockerfile
+    volumes:
+      - ./output/simulation-plotter:/app/output

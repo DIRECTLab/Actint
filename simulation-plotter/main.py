@@ -13,6 +13,11 @@ def non_clobber_png_path(output_path: str) -> str:
   Example: plot.png -> plot_1.png -> plot_2.png ...
   """
   path = Path(output_path)
+
+  # If caller provided only a filename, force it into ./output
+  if path.parent == Path("."):
+    path = Path("output") / path
+
   if path.suffix.lower() != ".png":
     path = path.with_suffix(".png")
 
@@ -60,6 +65,7 @@ def main():
   ax.legend(title="MMSI", loc="best")
   fig.tight_layout()
   output_path = non_clobber_png_path("plot.png")
+  Path(output_path).parent.mkdir(parents=True, exist_ok=True)
   fig.savefig(output_path, dpi=300, bbox_inches="tight")
   plt.close(fig)
   print(f"Saved plot to: {output_path}")

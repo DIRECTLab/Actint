@@ -157,42 +157,50 @@ def _ais_fieldnames() -> list[str]:
   ]
 
 # Helper function to generate unique filenames for the csv_print_header function.
-def _name_file(settings: Settings) -> Path:
-  """Generate a unique filename by appending a counter if the file already exists.
-  
-  Args:
-    file: The desired filename as a string.
-  
-  Returns:
-    A Path object with a unique filename. If the original file exists,
-    appends "_N" before the extension (e.g., "file.json" -> "file_1.json").
-  
-  Example:
-    If "output.csv" exists, returns Path("output_1.csv").
-  """
-  if settings.has_vehicle2d:
-    path2d = Path(f"{settings.output_file_2d}.{settings.print_format}")
-    stem2d = path2d.stem
-    suffix2d = path2d.suffix
+def _name_file(settings: Settings) -> tuple[Path | None, Path | None]:
+  """Generate unique output filenames (2D/3D) under an `output/` directory.
 
+  - If `settings.output_file_*` is just a filename (no directory), it will be
+    written into `output/<name>.<print_format>`.
+  - If `settings.output_file_*` already includes a directory, that directory is
+    respected.
+  - If `settings.output_file_*` already has an extension, it is not duplicated.
+  """
+
+  def _build_path(raw_name: str) -> Path:
+    base = Path(raw_name)
+    if base.suffix:
+      filename = base.name
+    else:
+      filename = f"{base.name}.{settings.print_format}"
+
+    # If caller provided only a filename, force it into ./output
+    if base.parent == Path("."):
+      return Path("output") / filename
+
+    # Otherwise respect the provided directory.
+    return base.parent / filename
+
+  def _unique_path(path: Path) -> Path:
+    stem = path.stem
+    suffix = path.suffix
     counter = 0
-    new_path2d = path2d
-    while new_path2d.exists():
+    candidate = path
+    while candidate.exists():
       counter += 1
-      new_path2d = path2d.with_name(f"{stem2d}_{counter}{suffix2d}")
+      candidate = path.with_name(f"{stem}_{counter}{suffix}")
+    return candidate
+
+  new_path2d: Path | None
+  new_path3d: Path | None
+
+  if settings.has_vehicle2d:
+    new_path2d = _unique_path(_build_path(settings.output_file_2d))
   else:
     new_path2d = None
 
   if settings.has_vehicle3d:
-    path3d = Path(f"{settings.output_file_3d}.{settings.print_format}")
-    stem3d = path3d.stem
-    suffix3d = path3d.suffix
-
-    counter = 0
-    new_path3d = path3d
-    while new_path3d.exists():
-      counter += 1
-      new_path3d = path3d.with_name(f"{stem3d}_{counter}{suffix3d}")
+    new_path3d = _unique_path(_build_path(settings.output_file_3d))
   else:
     new_path3d = None
 
@@ -240,9 +248,11 @@ def csv_print_header(settings: Settings) -> tuple:
   ])
   
   # Write the DataFrame to CSV without index
-  if settings.has_vehicle2d:
+  if settings.has_vehicle2d and filename2D is not None:
+    Path(filename2D).parent.mkdir(parents=True, exist_ok=True)
     df2D.to_csv(filename2D, index=False)
-  if settings.has_vehicle3d:
+  if settings.has_vehicle3d and filename3D is not None:
+    Path(filename3D).parent.mkdir(parents=True, exist_ok=True)
     df3D.to_csv(filename3D, index=False)
 
   return filename2D, filename3D
@@ -259,8 +269,10 @@ def json_print_header(settings: Settings) -> tuple:
 
   # Initialize files as JSON arrays so json_print_data can append items.
   if settings.has_vehicle2d and filename2D is not None:
+    Path(filename2D).parent.mkdir(parents=True, exist_ok=True)
     Path(filename2D).write_text("[\n]\n", encoding="utf-8")
   if settings.has_vehicle3d and filename3D is not None:
+    Path(filename3D).parent.mkdir(parents=True, exist_ok=True)
     Path(filename3D).write_text("[\n]\n", encoding="utf-8")
 
   return filename2D, filename3D
