@@ -33,6 +33,7 @@ services:
       dockerfile: docker/ais_noiser.dockerfile
     volumes:
       - ./output/ais-noiser:/app/output
+      - ./output/groundtruth-simulator:/app/simulator_output
 
   groundtruth-simulator:
     container_name: simulator
@@ -42,6 +43,8 @@ services:
       dockerfile: docker/groundtruth_simulator.dockerfile
     volumes:
       - ./output/groundtruth-simulator:/app/output
+      - ./output/config-generator:/app/configs
+
 
   simulation-plotter:
     container_name: plotter
@@ -51,3 +54,5 @@ services:
       dockerfile: docker/simulation_plotter.dockerfile
     volumes:
       - ./output/simulation-plotter:/app/output
+      - ./output/groundtruth-simulator:/app/simulator_output
+      - ./output/ais-noiser:/app/noiser_output
