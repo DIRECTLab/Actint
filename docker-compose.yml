@@ -9,7 +9,7 @@ services:
       context: .
       dockerfile: docker/json_backend.dockerfile
     volumes:
-      - ./output/config-generator:/output
+      - ./output/config-generator:/app/output
     expose:
       - "5000"
 

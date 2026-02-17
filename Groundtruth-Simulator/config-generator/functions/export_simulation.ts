@@ -44,7 +44,7 @@ const data = {
 }
 
 alert("Saving Data")
-fetch("http://localhost:5000/points", {
+fetch("api/points", {
     method: "POST",
     headers: {
     "Content-Type": "application/json"
