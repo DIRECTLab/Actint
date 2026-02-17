@@ -1,7 +1,7 @@
 import { SimulationSettingsTyp } from "./simulationSettings"
-import { VehicleSettingsTyp } from './vehicleSettings'
+import { VehicleTyp } from './vehicleSettings'
 
 export type CompleteExport = {
     sim_settings: SimulationSettingsTyp;
-    vehicles: [VehicleSettingsTyp]
+    vehicles: [VehicleTyp]
 }

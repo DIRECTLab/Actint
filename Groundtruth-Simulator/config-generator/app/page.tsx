@@ -6,9 +6,7 @@ import "leaflet/dist/leaflet.css";
 
 
 // ********************************************** Components *********************************************//
-// import VehicleSidebar from '@/components/vehicle_sidebar';
 import SimSettings from '../components/sim_settings';
-
 import dynamic from "next/dynamic";
 
 const Map = dynamic(() => import('../components/Map'), { 
@@ -21,38 +19,35 @@ const VehicleSidebar = dynamic(() => import('../components/vehicle_sidebar'), {
   loading: () => <p>Loading Map...</p>
 })
 
-// ********************************************** Types **************************************************//
 
-  // all types end in Typ
+// ********************************************** Types **************************************************//
+// all types end in Typ
 import { PositionTyp, PointTyp, PropertiesTyp, VehicleTyp, DestinationTyp } from '@/types/vehicleSettings'
 import { SimulationSettingsTyp } from '@/types/simulationSettings'
-import { CompleteExport } from '@/types/completeExport'
 
 
+// ********************************************** Functions **********************************************//
+import export_simulation from "@/functions/export_simulation";
+import { createNewVehicle } from "@/functions/vehicle_functions";
 
-
-// ********************************************** Simulation Setting Vars *********************************//
+// ********************************************** Defaults ***********************************************//
 import DEFAULT_VEHICLE from "@/defaults/vehicle_defaults";
 import DEFAULT_SIM_SETTIINGS from "@/defaults/sim_settings_defauluts";
 
+
+
 export default function Home() {
 
+
+// ********************************************** Variable Definitions ************************************//
   const [vehicleSettings, setVehicleSettings] = useState<VehicleTyp>(DEFAULT_VEHICLE)
   const [simulationSettings, setSimulationSettings] = useState<SimulationSettingsTyp>(DEFAULT_SIM_SETTIINGS)
-  
   const [markers, setMarkers] = useState<DestinationTyp[]>([])
-  
   const [vehiclesList, setVehiclesList] = useState<VehicleTyp[]>([]);
 
-  const createNewVehicle = (vehicleSettings: VehicleTyp, setVehicleSettings: React.Dispatch<React.SetStateAction<VehicleTyp>>, setVehiclesList: React.Dispatch<React.SetStateAction<VehicleTyp[]>>, markers: DestinationTyp[]): void => {
-    var newVehicle: VehicleTyp = {...vehicleSettings, destinations: markers }
-    
-    setVehiclesList((prev) => [...prev, newVehicle]);
-    setVehicleSettings(DEFAULT_VEHICLE)
-    
-  }
+
   
-  function vehiclesAre3D () {
+  function vehicleIs3D () {
     if(!markers[0]) {
       return false
     }
@@ -61,33 +56,6 @@ export default function Home() {
     }
     return true
   }
-
-  const save_simulation = (simulationSettings: SimulationSettingsTyp, vehiclesList: VehicleTyp[]): void => {
-    
-    const data = {
-      "sim_settings": simulationSettings,
-      "vehicles": vehiclesList,
-    }
-
-    alert("Saving Data")
-    fetch("/api/points", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(data)
-    })
-    .then(res => res.json())
-    .then(data => {
-      alert("Saved by Python!");
-    })
-    .catch(err => {
-      alert("Python server not running");
-      console.error(err);
-    });
-  }
-  
-  
 
   return (<>
     <div id="main">
@@ -100,13 +68,13 @@ export default function Home() {
           set_simulation_settings={setSimulationSettings}
           vehiclesList={vehiclesList}
           setVehiclesList={setVehiclesList}
-          saveSimulation={save_simulation}
+          saveSimulation={export_simulation}
         />
 
         <Map 
           markers={markers}
           setMarkers={setMarkers}
-          vehicles_3d={vehiclesAre3D()}
+          vehicles_3d={vehicleIs3D()}
           is_3D={vehicleSettings.is_3D}
         />
 

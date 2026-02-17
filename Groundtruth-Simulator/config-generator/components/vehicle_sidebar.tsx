@@ -174,10 +174,6 @@ export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, 
                         properties: vehicle_settings.properties,
                         destinations: markers
                       }
-
-
-
-
                       // const selectedVehicle = vehiclesList.find(vehicle => vehicle.vehicle_id === targetId);
                       setVehiclesList(prevList => 
                           prevList.map(vehicle => 
@@ -187,17 +183,6 @@ export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, 
                                   : vehicle                        // 3. Return others unchanged
                           )
                       );
-                      
-
-
-
-
-
-
-
-
-
-
                     } 
                   } else {
                     var newVehicle: VehicleTyp = {...vehicle_settings, destinations: markers}
@@ -253,11 +238,7 @@ export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, 
           >Clear Markers</button>
             
             </div>
-            
-
-            
           </div>
-        
             </>);
 }
 
