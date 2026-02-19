@@ -12,6 +12,7 @@ def receive_points():
     data = request.json
     print(data)
 
+
     current_datetime = datetime.now()
     openString = "./output/simulation_settings_" + current_datetime.strftime("%Y-%m-%d_%H:%M:%S") + ".json"
 
