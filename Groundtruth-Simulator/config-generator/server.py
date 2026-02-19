@@ -17,6 +17,7 @@ def receive_points():
 
     os.makedirs(os.path.dirname(openString), exist_ok=True)
 
+
     with open(openString, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
