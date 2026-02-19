@@ -163,7 +163,7 @@ export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, 
                     <input
                       id="lat_offset"
                       type="number"
-                      value={vehicle_settings.action_properties.target_offset.LatLng.lat}
+                      value={vehicle_settings.action_properties.target_offset.LatLng.lng}
                       onChange={(e) => {set_vehicle_settings(prev => ({...prev, action_properties: {...prev.action_properties, target_offset: {...prev.action_properties.target_offset, LatLng: {...prev.action_properties.target_offset.LatLng, lng: parseInt(e.target.value)}}}}))}}
                     ></input>
                   </div>
@@ -173,7 +173,7 @@ export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, 
                     <input
                       id="lat_offset"
                       type="number"
-                      value={vehicle_settings.action_properties.target_offset.LatLng.lat}
+                      value={vehicle_settings.action_properties.target_offset.Z}
                       onChange={(e) => {set_vehicle_settings(prev => ({...prev, action_properties: {...prev.action_properties, target_offset: {...prev.action_properties.target_offset, Z: parseInt(e.target.value)}}}))}}
                     ></input>
                   </div>
