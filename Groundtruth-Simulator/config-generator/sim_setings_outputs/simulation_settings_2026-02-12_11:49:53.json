@@ -1,0 +1,307 @@
+{
+  "sim_settings": {
+    "output_file_2d": "Weed Simulator",
+    "output_file_3d": "Shrek is dank",
+    "time_step": 0.4,
+    "start_time": "1969-04-20T16:20",
+    "time_format": "%Y-%m-%d %H:%M:%S",
+    "time_inputstep": -0.6
+  },
+  "vehicles": [
+    {
+      "vehicle_id": 1,
+      "vehicle_type": "ship",
+      "is_3D": true,
+      "action": "stay",
+      "properties": {
+        "max_speed": 50,
+        "max_force": 50,
+        "max_altitude": 1200,
+        "position": {
+          "LatLng": {
+            "lat": 0,
+            "lng": 0
+          }
+        }
+      },
+      "Z": 10,
+      "destinations": [
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "Z": 203,
+            "LatLng": {
+              "lat": 51.54258672618536,
+              "lng": 0.02168254577060047
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "Z": 203,
+            "LatLng": {
+              "lat": 51.55849387058979,
+              "lng": -0.17763469770249565
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "Z": 203,
+            "LatLng": {
+              "lat": 51.472593185497054,
+              "lng": -0.005442517113165569
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "Z": 203,
+            "LatLng": {
+              "lat": 51.511824085373455,
+              "lng": 0.16623469518065817
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "Z": 203,
+            "LatLng": {
+              "lat": 51.55956108699768,
+              "lng": 0.10271412663193759
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "Z": 203,
+            "LatLng": {
+              "lat": 51.57930336522326,
+              "lng": -0.05213871885708211
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "Z": 203,
+            "LatLng": {
+              "lat": 58.39180699618662,
+              "lng": 111.29892975001646
+            }
+          }
+        }
+      ]
+    },
+    {
+      "vehicle_id": 2,
+      "vehicle_type": "ship",
+      "is_3D": false,
+      "action": "stay",
+      "properties": {
+        "max_speed": 50,
+        "max_force": 50,
+        "max_altitude": 1200,
+        "position": {
+          "LatLng": {
+            "lat": 0,
+            "lng": 0
+          }
+        }
+      },
+      "destinations": [
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 35.01841374325929,
+              "lng": 33.63654015193388
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 47.982221079155984,
+              "lng": 149.4870698431975
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 62.346063320663085,
+              "lng": 68.79603322970733
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 12.021733408632231,
+              "lng": -46.52710406538961
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": -40.06468936536448,
+              "lng": 32.05436296343411
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": -10.508873732429548,
+              "lng": 92.8802859879821
+            }
+          }
+        }
+      ]
+    },
+    {
+      "vehicle_id": 3,
+      "vehicle_type": "drone",
+      "is_3D": false,
+      "action": "Persue",
+      "properties": {
+        "max_speed": 42,
+        "max_force": 58,
+        "max_altitude": 1200,
+        "position": {
+          "LatLng": {
+            "lat": -4,
+            "lng": 4
+          }
+        }
+      },
+      "destinations": [
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 35.01841374325929,
+              "lng": 33.63654015193388
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 47.982221079155984,
+              "lng": 149.4870698431975
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 62.346063320663085,
+              "lng": 68.79603322970733
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 12.021733408632231,
+              "lng": -46.52710406538961
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": -40.06468936536448,
+              "lng": 32.05436296343411
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": -10.508873732429548,
+              "lng": 92.8802859879821
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": 15.436861369841093,
+              "lng": 167.77000624363967
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": -34.03721977239023,
+              "lng": 173.39552513608342
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": -34.76794907734912,
+              "lng": 65.98311162959682
+            }
+          }
+        },
+        {
+          "speed": 30,
+          "error": 30,
+          "position": {
+            "LatLng": {
+              "lat": -5.468156465168083,
+              "lng": 54.028883983153804
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
