@@ -8,6 +8,11 @@ const DEFAULT_VEHICLE: VehicleTyp = {
     vehicle_type: "ship",
     is_3D: false,
     action: "stay",
+    action_properties: {
+      target_id: 0,
+      target_offset: {LatLng: {lat: 0, lng: 0}, Z: 0},
+      stay_time: 0,
+    },
     properties: {
       max_speed: 50,
       max_force: 50,

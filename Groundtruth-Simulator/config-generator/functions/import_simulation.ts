@@ -54,6 +54,33 @@ export const handleImport = async (event: any, set_simulation_settings: React.Di
             saveVehicles.push(saveVehicle)
 
             json_config_files.vehicles = saveVehicles
+
+
+            let defaultActionProperties = {
+                target_id: 0,
+                target_offset: {LatLng: {lat: 0, lng: 0}, Z:0},
+                stay_time: 0,
+            }
+
+            switch(vehicle.action){
+                case "stay":
+                    defaultActionProperties.stay_time = vehicle.action_properties.stay_time;
+                    break;
+
+                case "Persue":
+                case "Evade":
+                    defaultActionProperties.target_id = vehicle.action_properties.target_id;
+                    break;
+                
+                case "OffsetPersue":
+                    let offset = vehicle.action_properties.target_offset;
+                    console.log(offset)
+                    defaultActionProperties.target_id = vehicle.action_properties.target_id;
+                    defaultActionProperties.target_offset.LatLng = {lat: offset.lat, lng: offset.lng};
+                    defaultActionProperties.target_offset.Z = offset.Z;
+            }
+
+            vehicle.action_properties = defaultActionProperties;
         }
     }
     } catch {

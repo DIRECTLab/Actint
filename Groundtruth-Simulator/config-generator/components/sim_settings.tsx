@@ -120,6 +120,7 @@ export default function SimSettings({ simulation_settings, set_simulation_settin
                   id="export_settings"
                   onClick={() => {
                     saveSimulation(simulation_settings, vehiclesList)
+                    console.log(vehiclesList)
                   }} 
                   
                 >Export Settings</button>

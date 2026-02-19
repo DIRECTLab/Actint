@@ -1,7 +1,7 @@
 import { VehicleTyp, DestinationTyp } from '@/types/vehicleSettings'
 import { VehiclesOptionsList } from './VehiclesOptionsList';
 import DEFAULT_VEHICLE from '@/defaults/vehicle_defaults';
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import L from 'leaflet'
 
 
@@ -18,6 +18,27 @@ type Props = {
 export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, markers, setMarkers, vehiclesList, setVehiclesList, createNewVehicle}: Props) {
     
   // const [vehicleName, setVehicleName] = useState("name")
+
+  let show_vehicle_persue_evade = vehicle_settings.action == "Persue" || vehicle_settings.action == "Evade";
+  let show_vehicle_persue_offset = vehicle_settings.action == "OffsetPersue";
+  let show_vehicle_stay = vehicle_settings.action == "stay";
+
+  useEffect(() => {
+  if (
+    vehicle_settings.action_properties.target_id == vehicle_settings.vehicle_id
+  ) {
+    set_vehicle_settings(prev => ({
+      ...prev,
+      action_properties: {
+        ...prev.action_properties,
+        target_id: prev.action_properties.target_id + 1
+      }
+    }));
+  }
+}, [
+  vehicle_settings.action_properties.target_id,
+]);
+
   
     
     return(<>
@@ -90,6 +111,7 @@ export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, 
                 <label htmlFor="select_behavior">Select Behavior</label>
                 <select 
                   id="select_behavior"
+                  value={vehicle_settings.action}
                   onChange={(e) => set_vehicle_settings( prev => ({...prev, action: e.target.value}))}
                 >
                     <option value="seek">Seek</option>
@@ -99,6 +121,78 @@ export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, 
                     <option value="OffsetPersue">Offset Persue</option>
                     <option value="stay">Stay</option>
                 </select>
+
+                {show_vehicle_persue_evade && (
+                  <>
+                  <div>
+                    <label htmlFor="targetID">Target ID</label>
+                    <input
+                      id="targetID"
+                      type="number"
+                      value={vehicle_settings.action_properties.target_id}
+                      onChange={(e) => {set_vehicle_settings(prev => ({...prev, action_properties: {...prev.action_properties, target_id: parseInt(e.target.value)}}))}}
+                    ></input>
+                  </div>
+                  </>
+                )}
+
+                {show_vehicle_persue_offset && (
+                  <>
+                  <div>
+                    <label htmlFor="targetID">Target ID</label>
+                    <input
+                      id="targetID"
+                      type="number"
+                      value={vehicle_settings.action_properties.target_id}
+                      onChange={(e) => {set_vehicle_settings(prev => ({...prev, action_properties: {...prev.action_properties, target_id: parseInt(e.target.value)}}))}}
+                    ></input>
+                  </div>
+
+                  <div>
+                    <label htmlFor="lat_offset">Lattitude offset</label>
+                    <input
+                      id="lat_offset"
+                      type="number"
+                      value={vehicle_settings.action_properties.target_offset.LatLng.lat}
+                      onChange={(e) => {set_vehicle_settings(prev => ({...prev, action_properties: {...prev.action_properties, target_offset: {...prev.action_properties.target_offset, LatLng: {...prev.action_properties.target_offset.LatLng, lat: parseInt(e.target.value)}}}}))}}
+                    ></input>
+                  </div>
+
+                  <div>
+                    <label htmlFor="lat_offset">Longitude offset</label>
+                    <input
+                      id="lat_offset"
+                      type="number"
+                      value={vehicle_settings.action_properties.target_offset.LatLng.lng}
+                      onChange={(e) => {set_vehicle_settings(prev => ({...prev, action_properties: {...prev.action_properties, target_offset: {...prev.action_properties.target_offset, LatLng: {...prev.action_properties.target_offset.LatLng, lng: parseInt(e.target.value)}}}}))}}
+                    ></input>
+                  </div>
+
+                  <div>
+                    <label htmlFor="lat_offset">Height offset</label>
+                    <input
+                      id="lat_offset"
+                      type="number"
+                      value={vehicle_settings.action_properties.target_offset.Z}
+                      onChange={(e) => {set_vehicle_settings(prev => ({...prev, action_properties: {...prev.action_properties, target_offset: {...prev.action_properties.target_offset, Z: parseInt(e.target.value)}}}))}}
+                    ></input>
+                  </div>
+                  </>
+                )}
+
+                {show_vehicle_stay && (
+                  <>
+                  <div>
+                    <label htmlFor="stay_time">Stay time:</label>
+                    <input 
+                      id="stay_time"
+                      type="number"
+                      value={vehicle_settings.action_properties.stay_time}
+                      onChange={(e) => {set_vehicle_settings(prev => ({...prev, action_properties: {...prev.action_properties, stay_time: parseFloat(e.target.value)}}))}}
+                    ></input>
+                  </div>
+                  </>
+                )}
 
                 <label htmlFor="positionX">Position X: </label>
                 <input 
@@ -171,6 +265,7 @@ export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, 
                         vehicle_type: vehicle_settings.vehicle_type,
                         is_3D: vehicle_settings.is_3D,
                         action: vehicle_settings.action,
+                        action_properties: vehicle_settings.action_properties,
                         properties: vehicle_settings.properties,
                         destinations: markers
                       }

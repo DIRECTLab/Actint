@@ -31,11 +31,19 @@ export type PropertiesTyp = {
 }
 
 
+export type ActionPropertiesTyp = {
+  target_id: number;
+  target_offset: PositionTyp;
+  stay_time: number;
+}
+
+
 export type VehicleTyp = {
   vehicle_id: number;
   vehicle_type: string;
   is_3D: boolean;
   action: string;
+  action_properties: ActionPropertiesTyp;
   properties: PropertiesTyp;
   destinations?: DestinationTyp[]
 };
