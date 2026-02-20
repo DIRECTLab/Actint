@@ -50,18 +50,22 @@ export function HandleMarkers({ markers, setMarkers, vehicles_3d, is_3D }: Props
     // };
 
 
-    const updateMarker = (index: number, newMarker: DestinationTyp) => {
+    const updateMarker = (index: number, LatLng: {lat: number, lng: number}, height: any, speed: number, error: number) => {
+        if (height) {
+            var newMarker: DestinationTyp = {error: error, speed: speed, position: {LatLng: LatLng, Z: height}}
+        } else {
+            var newMarker: DestinationTyp = {error: error, speed: speed, position: {LatLng: LatLng}}
+        }
 
-        var newMarker: DestinationTyp = structuredClone(newMarker)
-
+        console.log(markers)
         setMarkers((prev) => {
             const newMarkers = [...prev];
             newMarkers[index] = newMarker;
             return newMarkers;
         });
+        console.log(markers)
     };
-
-
+    
 
     const deleteMarker = (index: number) => {
         setMarkers((prev) => prev.filter((_, i) => i !== index));
@@ -126,9 +130,8 @@ export function HandleMarkers({ markers, setMarkers, vehicles_3d, is_3D }: Props
                     draggable={true}
                     eventHandlers={{
                         dragend: (e) => {
-                            let newMarker = structuredClone(mark)
-                            newMarker.position.LatLng = e.target.getLatLng();
-                            updateMarker(index, newMarker);
+                            const LatLng = e.target.getLatLng();
+                            updateMarker(index, LatLng, mark.position.Z, mark.speed, mark.error);
                         },
                     }}
                 >

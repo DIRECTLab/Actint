@@ -11,7 +11,7 @@ interface PopupProps {
   is_3D: boolean,
   previousValues: previousValsTyp,
   setPreviousValues: React.Dispatch<React.SetStateAction<previousValsTyp>>,
-  updateMarker: (index: number, newMarker: DestinationTyp) => void;
+  updateMarker: (index: number, LatLng: {lat: number, lng: number}, height: any, speed: number,  error: number) => void;
   deleteMarker: (index: number) => void,
   index: number,
   marker: DestinationTyp,
@@ -50,11 +50,7 @@ export default function PopupInputs({ is_3D, previousValues, setPreviousValues, 
               name="X" 
               step="any" 
               value={marker.position.LatLng.lat}
-              onChange={(e) => {
-                let newMarker = structuredClone(marker); 
-                marker.position.LatLng.lat = parseFloat(e.target.value); 
-                updateMarker(index, newMarker)
-              }}
+              onChange={(e) => {var newVal = parseFloat(e.target.value); updateMarker(index, L.latLng(newVal, marker.position.LatLng.lng), marker.position.Z, marker.speed, marker.error)}}
               className="rounded border border-slate-300 p-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
@@ -68,11 +64,7 @@ export default function PopupInputs({ is_3D, previousValues, setPreviousValues, 
               name="Y" 
               step="any" 
               value={marker.position.LatLng.lng}
-              onChange={(e) => {
-                let newMarker = structuredClone(marker); 
-                marker.position.LatLng.lng = parseFloat(e.target.value); 
-                updateMarker(index, newMarker)
-              }}
+              onChange={(e) => {var newVal = parseFloat(e.target.value); updateMarker(index, L.latLng(marker.position.LatLng.lat, newVal), marker.position.Z, marker.speed, marker.error)}}              
               className="rounded border border-slate-300 p-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
@@ -82,17 +74,7 @@ export default function PopupInputs({ is_3D, previousValues, setPreviousValues, 
             <div className="flex flex-col gap-1 col-span-2">
               <label htmlFor="Z" className="text-xs font-semibold uppercase text-slate-500">Height (meters)</label>
               <input 
-                type="number" 
-                id="Z" 
-                name="Z" 
-                autoFocus 
-                value={marker.position.Z} defaultValue={previousValues.height} 
-                onChange={(e) => {
-                  setPreviousValues(prev => ({...prev, height: parseFloat(e.target.value)}));
-                  let newMarker = structuredClone(marker)
-                  newMarker.error = parseInt(e.target.value)
-                  updateMarker(index, newMarker)
-                }}
+                type="number" id="Z" name="Z" autoFocus value={marker.position.Z} defaultValue={previousValues.height} onChange={(e) => {setPreviousValues( prev => ({...prev, height: parseFloat(e.target.value)})); updateMarker(index, marker.position.LatLng, marker.position.Z, parseInt(e.target.value), marker.error)}}
                 className="rounded border border-slate-300 p-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
               />
             </div>
@@ -102,16 +84,7 @@ export default function PopupInputs({ is_3D, previousValues, setPreviousValues, 
           <div className="flex flex-col gap-1">
             <label htmlFor="speed" className="text-xs font-semibold uppercase text-slate-500">Speed</label>
             <input 
-              type="number" 
-              id="speed" 
-              name="speed" 
-              defaultValue={previousValues.speed} 
-              value={marker.speed} 
-              onChange={(e) => {
-                setPreviousValues( prev => ({...prev, speed: parseInt(e.target.value)}));
-                let newMarker = structuredClone(marker)
-                newMarker.speed = parseInt(e.target.value)
-                updateMarker(index, newMarker)}}
+              type="number" id="speed" name="speed" defaultValue={previousValues.speed} value={marker.speed} onChange={(e) => {setPreviousValues( prev => ({...prev, speed: parseInt(e.target.value)})); updateMarker(index, marker.position.LatLng, marker.position.Z, parseInt(e.target.value), marker.error)}}
               className="rounded border border-slate-300 p-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
