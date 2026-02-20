@@ -4,7 +4,9 @@
 *_noised*
 *_noised*
 *_sorted*
-/output
+output/*
+!output/config-generator/
+
 
 
 # Byte-compiled / optimized / DLL files

@@ -99,12 +99,57 @@ def ecef_to_geodetic(X, Y, Z):
 # 50-100 km: 10-50 meter errors - acceptable for regional simulations
 # 100-200 km: 50-200 meter errors - marginal accuracy
 # 200+ km: 200+ meter errors - significant distortion
-ORIGIN_LAT = np.radians(20.590305)   # ~20.59°N latitude
-ORIGIN_LON = np.radians(-157.697742)   # ~157.70°W longitude  
+ORIGIN_LAT = 20.590305   # ~20.59°N latitude (degrees)
+ORIGIN_LON = -157.697742   # ~157.70°W longitude (degrees)
 ORIGIN_HEIGHT = 0.0              # Sea level
   
 
-def local_to_geodetic(x, y, z=0.0, settings: Settings = Settings(0, {"latitude": ORIGIN_LAT, "longitude": ORIGIN_LON, "height": ORIGIN_HEIGHT})) -> tuple:
+def ecef_to_enu(ecef: np.ndarray, lat0: float, lon0: float, h0: float) -> np.ndarray:
+  """Convert ECEF coordinates (meters) to a local ENU vector (meters).
+
+  Args:
+    ecef: np.array([X, Y, Z]) in meters
+    lat0, lon0: origin geodetic coordinates in radians
+    h0: origin height in meters
+
+  Returns:
+    np.array([e, n, u]) in meters
+  """
+  origin_ecef = geodetic_to_ecef(lat0, lon0, h0)
+  delta = np.asarray(ecef, dtype=float) - origin_ecef
+  R = enu_to_ecef_matrix(lat0, lon0)
+  return R.T @ delta
+
+
+def geodetic_to_local(latitude_deg: float, longitude_deg: float, height_m: float = 0.0, settings: Settings | None = None) -> tuple[float, float, float]:
+  """Convert geodetic coordinates (degrees) to local ENU coordinates (meters).
+
+  This is the inverse of `local_to_geodetic`.
+
+  Args:
+    latitude_deg: latitude in degrees
+    longitude_deg: longitude in degrees
+    height_m: height above ellipsoid in meters
+    settings: simulation Settings; uses `settings.latlon_origin` as the ENU origin
+
+  Returns:
+    Tuple of (x_east_m, y_north_m, z_up_m)
+  """
+  settings = settings or Settings(0, {"latitude": ORIGIN_LAT, "longitude": ORIGIN_LON, "height": ORIGIN_HEIGHT})
+
+  lat_rad = np.radians(latitude_deg)
+  lon_rad = np.radians(longitude_deg)
+  ecef = geodetic_to_ecef(lat_rad, lon_rad, height_m)
+
+  lat0 = np.radians(settings.latlon_origin["latitude"])
+  lon0 = np.radians(settings.latlon_origin["longitude"])
+  h0 = settings.latlon_origin["height"]
+  enu = ecef_to_enu(ecef, lat0, lon0, h0)
+
+  return float(enu[0]), float(enu[1]), float(enu[2])
+
+
+def local_to_geodetic(x: float, y: float, z: float = 0.0, settings: Settings | None = None) -> tuple[float, float, float]:
   """
   Convert local ENU coordinates (meters) to geodetic coordinates (degrees).
   
@@ -116,6 +161,7 @@ def local_to_geodetic(x, y, z=0.0, settings: Settings = Settings(0, {"latitude":
   Returns:
     Tuple of (latitude_deg, longitude_deg, height_m)
   """
+  settings = settings or Settings(0, {"latitude": ORIGIN_LAT, "longitude": ORIGIN_LON, "height": ORIGIN_HEIGHT})
   # Create ENU vector
   enu = np.array([x, y, z])
   
@@ -132,29 +178,6 @@ def local_to_geodetic(x, y, z=0.0, settings: Settings = Settings(0, {"latitude":
   return lat_deg, lon_deg, h
 
 
-
-def _ais_fieldnames() -> list[str]:
-  # Matches the header row in AIS-Noiser/2023-09-03_ais_top10.csv
-  return [
-    "Unnamed: 0",
-    "MMSI",
-    "BaseDateTime",
-    "LAT",
-    "LON",
-    "SOG",
-    "COG",
-    "Heading",
-    "VesselName",
-    "IMO",
-    "CallSign",
-    "VesselType",
-    "Status",
-    "Length",
-    "Width",
-    "Draft",
-    "Cargo",
-    "TransceiverClass",
-  ]
 
 # Helper function to generate unique filenames for the csv_print_header function.
 def _name_file(settings: Settings) -> tuple[Path | None, Path | None]:
