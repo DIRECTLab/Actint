@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { previousValsTyp } from '@/types/otherTypes';
 import { DestinationTyp } from '@/types/vehicleSettings';
 
-import PopupInputs from '@/components/PopupInput'
+import PopupInputs from '@/components/Map/PopupInput'
 
 
 import L from 'leaflet';
@@ -33,12 +33,26 @@ export function HandleMarkers({ markers, setMarkers, vehicles_3d, is_3D }: Props
         error: 30,
     })
 
-    const updateMarker = (index: number, LatLng: L.LatLng, height: any, speed: number, error: number) => {
-        if (height) {
-            var newMarker: DestinationTyp = {error: error, speed: speed, position: {LatLng: LatLng, Z: height}}
-        } else {
-            var newMarker: DestinationTyp = {error: error, speed: speed, position: {LatLng: LatLng}}
-        }
+    // const updateMarker = (index: number, LatLng: {lat: number, lng: number}, height: any, speed: number, error: number) => {
+    //     if (height) {
+    //         var newMarker: DestinationTyp = {error: error, speed: speed, position: {LatLng: LatLng, Z: height}}
+    //     } else {
+    //         var newMarker: DestinationTyp = {error: error, speed: speed, position: {LatLng: LatLng}}
+    //     }
+
+    //     console.log(markers)
+    //     setMarkers((prev) => {
+    //         const newMarkers = [...prev];
+    //         newMarkers[index] = newMarker;
+    //         return newMarkers;
+    //     });
+    //     console.log(markers)
+    // };
+
+
+    const updateMarker = (index: number, newMarker: DestinationTyp) => {
+
+        var newMarker: DestinationTyp = structuredClone(newMarker)
 
         setMarkers((prev) => {
             const newMarkers = [...prev];
@@ -46,6 +60,8 @@ export function HandleMarkers({ markers, setMarkers, vehicles_3d, is_3D }: Props
             return newMarkers;
         });
     };
+
+
 
     const deleteMarker = (index: number) => {
         setMarkers((prev) => prev.filter((_, i) => i !== index));
@@ -110,8 +126,9 @@ export function HandleMarkers({ markers, setMarkers, vehicles_3d, is_3D }: Props
                     draggable={true}
                     eventHandlers={{
                         dragend: (e) => {
-                            const LatLng = e.target.getLatLng();
-                            updateMarker(index, LatLng, mark.position.Z, mark.speed, mark.error);
+                            let newMarker = structuredClone(mark)
+                            newMarker.position.LatLng = e.target.getLatLng();
+                            updateMarker(index, newMarker);
                         },
                     }}
                 >
@@ -124,14 +141,14 @@ export function HandleMarkers({ markers, setMarkers, vehicles_3d, is_3D }: Props
                           deleteMarker={deleteMarker}
                           index={index}
                           marker={mark}
-                        />
+                        />deleteMarker
                     </Popup>
                 </Marker>
             ))}
 
             {markers.length > 1 && (
                 <Polyline 
-                    positions={markers.map(m => m.position.LatLng)} // Polyline will automatically update when 'markers' state changes
+                    positions={markers.map(m => m.position.LatLng)} 
                     color="blue" 
                     weight={3}
                     dashArray="5, 10"

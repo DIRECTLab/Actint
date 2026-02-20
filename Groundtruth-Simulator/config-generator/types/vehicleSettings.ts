@@ -33,7 +33,7 @@ export type PropertiesTyp = {
 
 export type ActionPropertiesTyp = {
   target_id: number;
-  target_offset: PositionTyp;
+  target_offset: number;
   stay_time: number;
 }
 

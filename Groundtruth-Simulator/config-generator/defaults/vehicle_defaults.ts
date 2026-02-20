@@ -10,7 +10,7 @@ const DEFAULT_VEHICLE: VehicleTyp = {
     action: "stay",
     action_properties: {
       target_id: 0,
-      target_offset: {LatLng: {lat: 0, lng: 0}, Z: 0},
+      target_offset: 0,
       stay_time: 0,
     },
     properties: {

@@ -1,7 +1,8 @@
 import { VehicleTyp, DestinationTyp } from '@/types/vehicleSettings'
-import { VehiclesOptionsList } from './VehiclesOptionsList';
+import { VehiclesOptionsList } from '@/components/vehicle_sidebar/VehiclesOptionsList';
+import VehicleActions from '@/components/vehicle_sidebar/vehicle_behavior'
 import DEFAULT_VEHICLE from '@/defaults/vehicle_defaults';
-import { useState, useEffect } from 'react'
+import { useState, useEffect, cloneElement } from 'react'
 import L from 'leaflet'
 
 
@@ -16,32 +17,12 @@ type Props = {
 };
 
 export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, markers, setMarkers, vehiclesList, setVehiclesList, createNewVehicle}: Props) {
-    
-  // const [vehicleName, setVehicleName] = useState("name")
-
-  let show_vehicle_persue_evade = vehicle_settings.action == "Persue" || vehicle_settings.action == "Evade";
-  let show_vehicle_persue_offset = vehicle_settings.action == "OffsetPersue";
-  let show_vehicle_stay = vehicle_settings.action == "stay";
-
-  useEffect(() => {
-  if (
-    vehicle_settings.action_properties.target_id == vehicle_settings.vehicle_id
-  ) {
-    set_vehicle_settings(prev => ({
-      ...prev,
-      action_properties: {
-        ...prev.action_properties,
-        target_id: prev.action_properties.target_id + 1
-      }
-    }));
-  }
-}, [
-  vehicle_settings.action_properties.target_id,
-]);
 
   
     
     return(<>
+
+            {/* Vehicle Settings */}
             <div id="vehicle_settings">
               <div id="column">
                 <h1 className="bg-blue-500 p-3 rounded">Vehicle Settings</h1> 
@@ -49,6 +30,8 @@ export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, 
                 {/* <label htmlFor="name">Vehicle Name</label>
                 <input type="text" id="name" value={vehicleName} onChange={(e) => {setVehicleName(e.target.value)}}></input> */}
 
+
+                {/* Vehicle ID */}
                 <label htmlFor="vehicle_id">Vehicle ID</label>
                 <input 
                   type="number" 
@@ -57,6 +40,8 @@ export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, 
                   onChange={(e) => {set_vehicle_settings( prev => ({...prev, vehicle_id : parseInt(e.target.value)}))}}
                 />
                 
+
+                {/* Vehicle Dimension */}
                 <label htmlFor="dimension">2D or 3D</label>
                 <select 
                   id="dimension"
@@ -67,6 +52,8 @@ export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, 
                     <option value="true" >3D</option>
                 </select>
 
+
+                {/* Vehicle type */}
                 <label htmlFor="vehicle_type">Vehicle Type</label>
                 <select 
                   id="vehicle_type"
@@ -78,6 +65,8 @@ export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, 
                   <option value="drone">Drone</option>
                 </select>
 
+
+                {/* Vehicle speed */}
                 <label htmlFor="max_speed">Max Speed (meter/second)</label>
                 <input 
                   type="number" 
@@ -93,6 +82,8 @@ export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, 
                   }}
                 />
                 
+
+                {/* Vehicle force */}
                 <label htmlFor="max_force">Max Force (Newtons)</label>
                 <input 
                   type="number" 
@@ -108,92 +99,15 @@ export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, 
                   }}
                 />
                 
-                <label htmlFor="select_behavior">Select Behavior</label>
-                <select 
-                  id="select_behavior"
-                  value={vehicle_settings.action}
-                  onChange={(e) => set_vehicle_settings( prev => ({...prev, action: e.target.value}))}
-                >
-                    <option value="seek">Seek</option>
-                    <option value="flee">Flee</option>
-                    <option value="Persue">Persue</option>
-                    <option value="Evade">Evade</option>
-                    <option value="OffsetPersue">Offset Persue</option>
-                    <option value="stay">Stay</option>
-                </select>
 
-                {show_vehicle_persue_evade && (
-                  <>
-                  <div>
-                    <label htmlFor="targetID">Target ID</label>
-                    <input
-                      id="targetID"
-                      type="number"
-                      value={vehicle_settings.action_properties.target_id}
-                      onChange={(e) => {set_vehicle_settings(prev => ({...prev, action_properties: {...prev.action_properties, target_id: parseInt(e.target.value)}}))}}
-                    ></input>
-                  </div>
-                  </>
-                )}
-
-                {show_vehicle_persue_offset && (
-                  <>
-                  <div>
-                    <label htmlFor="targetID">Target ID</label>
-                    <input
-                      id="targetID"
-                      type="number"
-                      value={vehicle_settings.action_properties.target_id}
-                      onChange={(e) => {set_vehicle_settings(prev => ({...prev, action_properties: {...prev.action_properties, target_id: parseInt(e.target.value)}}))}}
-                    ></input>
-                  </div>
-
-                  <div>
-                    <label htmlFor="lat_offset">Lattitude offset</label>
-                    <input
-                      id="lat_offset"
-                      type="number"
-                      value={vehicle_settings.action_properties.target_offset.LatLng.lat}
-                      onChange={(e) => {set_vehicle_settings(prev => ({...prev, action_properties: {...prev.action_properties, target_offset: {...prev.action_properties.target_offset, LatLng: {...prev.action_properties.target_offset.LatLng, lat: parseInt(e.target.value)}}}}))}}
-                    ></input>
-                  </div>
-
-                  <div>
-                    <label htmlFor="lat_offset">Longitude offset</label>
-                    <input
-                      id="lat_offset"
-                      type="number"
-                      value={vehicle_settings.action_properties.target_offset.LatLng.lng}
-                      onChange={(e) => {set_vehicle_settings(prev => ({...prev, action_properties: {...prev.action_properties, target_offset: {...prev.action_properties.target_offset, LatLng: {...prev.action_properties.target_offset.LatLng, lng: parseInt(e.target.value)}}}}))}}
-                    ></input>
-                  </div>
-
-                  <div>
-                    <label htmlFor="lat_offset">Height offset</label>
-                    <input
-                      id="lat_offset"
-                      type="number"
-                      value={vehicle_settings.action_properties.target_offset.Z}
-                      onChange={(e) => {set_vehicle_settings(prev => ({...prev, action_properties: {...prev.action_properties, target_offset: {...prev.action_properties.target_offset, Z: parseInt(e.target.value)}}}))}}
-                    ></input>
-                  </div>
-                  </>
-                )}
-
-                {show_vehicle_stay && (
-                  <>
-                  <div>
-                    <label htmlFor="stay_time">Stay time:</label>
-                    <input 
-                      id="stay_time"
-                      type="number"
-                      value={vehicle_settings.action_properties.stay_time}
-                      onChange={(e) => {set_vehicle_settings(prev => ({...prev, action_properties: {...prev.action_properties, stay_time: parseFloat(e.target.value)}}))}}
-                    ></input>
-                  </div>
-                  </>
-                )}
-
+                {/* Vehicle Behavior */}
+                <VehicleActions
+                  vehicle_settings={vehicle_settings}
+                  set_vehicle_settings={set_vehicle_settings}
+                ></VehicleActions>
+                
+                
+                {/* Vehicle Position X */}
                 <label htmlFor="positionX">Position X: </label>
                 <input 
                   type="number" 
@@ -217,29 +131,22 @@ export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, 
                 )}}
                 />
 
+
+                {/* Vehicle Position Y */}
                 <label htmlFor="positionY">Position Y: </label>
                 <input 
                   type="number"
                   id="positionY"
                   name="positionY"
                   value={vehicle_settings.properties.position.LatLng.lat}
-                  onChange={
-                    
-                    (e) => {
-                      var newLatLng = L.latLng(parseFloat(e.target.value), vehicle_settings.properties.position.LatLng.lng)
-                      set_vehicle_settings( prev => ({
-                    ...prev, properties:  
-                    {...prev.properties, 
-                      position: 
-                      {
-                        ...prev.properties.position, 
-                        LatLng: newLatLng
-                      }
-                    }
-                  })
-                )}}
+                  onChange={(e) => {
+                    var newLatLng = L.latLng(parseFloat(e.target.value), vehicle_settings.properties.position.LatLng.lng)
+                    set_vehicle_settings(prev => ({...prev, properties: {...prev.properties, position: {...prev.properties.position, LatLng: newLatLng}}}))
+                  }}
                 />
 
+
+                {/* Vehicle Position Z */}
                 {(vehicle_settings.is_3D && <>
                   <label htmlFor="PositionZ">Position Z: </label>
                   <input 
@@ -251,6 +158,7 @@ export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, 
                 </>)}
 
 
+                {/* Save Track */}
                 <button 
                 type="button"
                 id="save_track"
@@ -258,25 +166,9 @@ export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, 
                 onClick={(e) => {
                   if (vehiclesList.some(v => v.vehicle_id == vehicle_settings.vehicle_id)) {
                     if(confirm(`You are about to make changes to vehicle ${vehicle_settings.vehicle_id}. Are you sure?`)) {
-
-
-                      const new_vehicle: VehicleTyp = {
-                        vehicle_id: vehicle_settings.vehicle_id,
-                        vehicle_type: vehicle_settings.vehicle_type,
-                        is_3D: vehicle_settings.is_3D,
-                        action: vehicle_settings.action,
-                        action_properties: vehicle_settings.action_properties,
-                        properties: vehicle_settings.properties,
-                        destinations: markers
-                      }
-                      // const selectedVehicle = vehiclesList.find(vehicle => vehicle.vehicle_id === targetId);
+                      const new_vehicle: VehicleTyp = structuredClone(vehicle_settings)
                       setVehiclesList(prevList => 
-                          prevList.map(vehicle => 
-                              // 1. Find the vehicle with the matching ID
-                              vehicle.vehicle_id === vehicle_settings.vehicle_id 
-                                  ? { ...vehicle, ...new_vehicle } // 2. Spread old data and overwrite with new
-                                  : vehicle                        // 3. Return others unchanged
-                          )
+                          prevList.map(vehicle => vehicle.vehicle_id === vehicle_settings.vehicle_id ? { ...vehicle, ...new_vehicle }: vehicle)
                       );
                     } 
                   } else {
@@ -300,6 +192,9 @@ export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, 
                   Save/Create Vehicle
                 </button>
 
+
+
+            {/* Vehicle Options List */}
             <div className="text-yellow-500">Click the specific vehicle to show that vehicle's markers</div>
             <VehiclesOptionsList 
               markers={markers}
@@ -310,6 +205,8 @@ export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, 
               // vehicleName={vehicleName}
             ></VehiclesOptionsList>
 
+
+            {/* Dekete Vehicle */}
             <button 
               type="button"
               onClick={() => {
@@ -320,17 +217,17 @@ export default function VehicleSidebar({vehicle_settings, set_vehicle_settings, 
                 }
               }}
               className="bg-red-500 p-1"
-
             >Delete Vehicle</button>
               
 
-          <button 
-            type="button"
-            onClick={() => {
-              setMarkers([])
-            }}
-            className="bg-yellow-500 p-1"
-          >Clear Markers</button>
+            {/* Clear Markers */}
+            <button 
+              type="button"
+              onClick={() => {
+                setMarkers([])
+              }}
+              className="bg-yellow-500 p-1"
+            >Clear Markers</button>
             
             </div>
           </div>

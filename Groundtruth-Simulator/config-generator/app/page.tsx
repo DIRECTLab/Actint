@@ -9,12 +9,12 @@ import "leaflet/dist/leaflet.css";
 import SimSettings from '../components/sim_settings';
 import dynamic from "next/dynamic";
 
-const Map = dynamic(() => import('../components/Map'), { 
+const Map = dynamic(() => import('../components/Map/Map'), { 
   ssr: false,
   loading: () => <p>Loading Map...</p>
 })
 
-const VehicleSidebar = dynamic(() => import('../components/vehicle_sidebar'), { 
+const VehicleSidebar = dynamic(() => import('../components/vehicle_sidebar/vehicle_sidebar'), { 
   ssr: false,
   loading: () => <p>Loading Map...</p>
 })

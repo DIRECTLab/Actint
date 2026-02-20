@@ -1,8 +1,8 @@
-import PopupInputs from '@/components/PopupInput'
+import PopupInputs from '@/components/Map/PopupInput'
 import { previousValsTyp } from '@/types/otherTypes'
 import { useState } from 'react'
 
-import { HandleMarkers } from '@/components/HandleMarkers'
+import { HandleMarkers } from '@/components/Map/HandleMarkers'
 
 'use client'
 

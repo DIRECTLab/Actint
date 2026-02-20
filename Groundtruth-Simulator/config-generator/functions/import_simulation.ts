@@ -64,18 +64,17 @@ export const handleImport = async (event: any, set_simulation_settings: React.Di
 
             switch(vehicle.action){
                 case "stay":
-                    defaultActionProperties.stay_time = vehicle.action_properties.stay_time;
+                    defaultActionProperties.stay_time = vehicle.stay_time;
                     break;
 
                 case "Persue":
                 case "Evade":
-                    defaultActionProperties.target_id = vehicle.action_properties.target_id;
+                    defaultActionProperties.target_id = vehicle.target_id;
                     break;
                 
                 case "OffsetPersue":
-                    let offset = vehicle.action_properties.target_offset;
-                    console.log(offset)
-                    defaultActionProperties.target_id = vehicle.action_properties.target_id;
+                    let offset = vehicle.target_offset;
+                    defaultActionProperties.target_id = vehicle.target_id;
                     defaultActionProperties.target_offset.LatLng = {lat: offset.lat, lng: offset.lng};
                     defaultActionProperties.target_offset.Z = offset.Z;
             }
