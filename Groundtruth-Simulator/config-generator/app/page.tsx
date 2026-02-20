@@ -45,6 +45,14 @@ export default function Home() {
   const [markers, setMarkers] = useState<DestinationTyp[]>([])
   const [vehiclesList, setVehiclesList] = useState<VehicleTyp[]>([]);
 
+  useEffect(() => {
+        if(markers.length > 0) {
+            let lat = markers[0].position.LatLng.lat
+            let lng = markers[0].position.LatLng.lng
+
+            setVehicleSettings(prev => ({...prev, properties: {...prev.properties, position: {...prev.properties.position, LatLng: {lat: lat, lng: lng}}}}))
+        }
+    }, [markers[0]])
 
   
   function vehicleIs3D () {

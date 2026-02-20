@@ -33,23 +33,6 @@ export function HandleMarkers({ markers, setMarkers, vehicles_3d, is_3D }: Props
         error: 30,
     })
 
-    // const updateMarker = (index: number, LatLng: {lat: number, lng: number}, height: any, speed: number, error: number) => {
-    //     if (height) {
-    //         var newMarker: DestinationTyp = {error: error, speed: speed, position: {LatLng: LatLng, Z: height}}
-    //     } else {
-    //         var newMarker: DestinationTyp = {error: error, speed: speed, position: {LatLng: LatLng}}
-    //     }
-
-    //     console.log(markers)
-    //     setMarkers((prev) => {
-    //         const newMarkers = [...prev];
-    //         newMarkers[index] = newMarker;
-    //         return newMarkers;
-    //     });
-    //     console.log(markers)
-    // };
-
-
     const updateMarker = (index: number, LatLng: {lat: number, lng: number}, height: any, speed: number, error: number) => {
         if (height) {
             var newMarker: DestinationTyp = {error: error, speed: speed, position: {LatLng: LatLng, Z: height}}
@@ -117,6 +100,8 @@ export function HandleMarkers({ markers, setMarkers, vehicles_3d, is_3D }: Props
 
 
     }, [is_3D]);
+
+    
 
     
 
