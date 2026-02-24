@@ -2,3 +2,4 @@ transformers
 numpy
 pandas
 matplotlib
+chromadb
