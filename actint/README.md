@@ -1,5 +1,21 @@
 # Activity Intelligence Framework (ACTINT) for multi-target tracking
 
+# Setup
+
+We use conda for environment management. To set up the environment, run the following command in the terminal:
+
+```bash
+conda create -n actint python=3.12 -y
+conda activate actint
+pip install -r requirements.txt
+```
+
+Then setup torch, scroll to the bottom of [this page](https://pytorch.org/) and copy the appropriate command for your system. For example, if you have an Nvidia GPU with cuda 13, you would run:
+
+```bash
+pip3 install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu130
+```
+
 # Problem scope and user
 ## Primary User
 The primary target of the ACTINT (activity intelligence) framework will be entities interested in intelligent tracking and monitering of various vehicles types, given several modalities of information. While primarily focused on military applications, this framework could extend to other fields such as shipping, public transportation, taxi fleets, and others. 
