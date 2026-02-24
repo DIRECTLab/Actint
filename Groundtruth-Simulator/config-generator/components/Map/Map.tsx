@@ -34,8 +34,8 @@ export default function Map({ markers, setMarkers, vehicles_3d, is_3D }: Props) 
   return (
     <div style={{ height: '100vh', width: '100%' }}>
       <MapContainer 
-        center={[51.505, -0.09]} 
-        zoom={13} 
+        center={[20.75, -157]} 
+        zoom={8} 
         style={{ height: '100%', width: '100%' }}
       >
         <TileLayer
