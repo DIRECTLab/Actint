@@ -1,0 +1,24 @@
+# This file groups Python dependencies by sub-project.
+# Stdlib-only modules (json, sys, pathlib, math, datetime, queue, etc.) are intentionally omitted.
+
+# ==================
+# AIS-Noiser
+# ==================
+numpy
+pandas
+
+# ==================
+# Groundtruth-Simulator (core simulator)
+# ==================
+numpy
+pandas
+
+# Groundtruth-Simulator/config-generator (Flask API)
+Flask
+flask-cors
+
+# ==================
+# simulation-plotter
+# ==================
+matplotlib
+pandas

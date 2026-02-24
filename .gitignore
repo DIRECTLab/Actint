@@ -1,6 +1,13 @@
 # Project specific ignores
-*_result*.csv
-*_noised*.csv
+*_result*
+*_result*
+*_noised*
+*_noised*
+*_sorted*
+output/*
+!output/config-generator/
+
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

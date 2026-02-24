@@ -1,18 +1,22 @@
 import math, random
 from datetime import datetime, timedelta
+from Settings import Settings
 
-def noise_coordinate(lat: float, lon: float, distance_m_lat: float, distance_m_lon: float) -> tuple[float, float]:
+def noise_coordinate(lat: float, lon: float, distance_m_lat: float, distance_m_lon: float, alt: float = None, distance_m_alt: float = 0, is_2d: bool = True) -> tuple[float, float]:
     """
-    Adds random noise up to distance_m in both lat and lon directions.
+    Adds random noise up to distance_m in both lat and lon directions and altitude if applicable.
     
     Args:
         lat: Latitude in decimal degrees.
         lon: Longitude in decimal degrees.
+        alt: Altitude in meters.
         distance_m_latitude: Maximum noise distance in meters for the latitude in decimal degrees.
         distance_m_longitude: Maximum noise distance in meters for the latitude in decimal degrees.
+        distance_m_altitude: Maximum noise distance in meters for the altitude.
         
     Returns:
-        A tuple of (noised_lat, noised_lon).
+        A tuple of (noised_lat, noised_lon) if altitude is not provided.
+        A tuple of (noised_lat, noised_lon, noised_alt) if altitude is provided.
     """
     # Earth Radius in Meters as found in WGS84
     earth_radius = 6_356_752.314245
@@ -32,20 +36,32 @@ def noise_coordinate(lat: float, lon: float, distance_m_lat: float, distance_m_l
     noised_lat = lat + math.degrees(d_lat)
     noised_lon = lon + math.degrees(d_lon)
 
-    return noised_lat, noised_lon
 
-def noise_time(timestamp: str, max_noise_seconds: float = 20.0) -> str:
+    if is_2d:
+        return noised_lat, noised_lon
+    else:
+        offset_z = random.uniform(-distance_m_alt, distance_m_alt)
+        noised_alt = alt + offset_z
+        return noised_lat, noised_lon, noised_alt
+
+def noise_time(**kwargs) -> str:
     """
     Adds random noise to a timestamp in seconds.
 
     Args:
-        timestamp: Original timestamp as a string in ISO 8601 format.
-        max_noise_seconds: Maximum noise to add or subtract in seconds. Defaults to 300 seconds (5 minutes).
+        datetime: Original timestamp as a string in ISO 8601 format.
+        date: Original date as a string in 'YYYY-MM-DD' format.
+        time: Original time as a string in 'HH:MM:SS' format.
+        settings: Settings object containing noise parameters.
     Returns:
         Noised timestamp as an ISO 8601 formatted string.
     """
-    noise = random.uniform(-max_noise_seconds, max_noise_seconds)
-    time = datetime.fromisoformat(timestamp) - timedelta(seconds=noise)
+    settings = kwargs['settings']
+    noise = random.uniform(-settings.noise_time, 0) if not settings.noise_time_backward else random.uniform(-settings.noise_time, settings.noise_time)
+    if 'datetime' in kwargs:
+        time = datetime.fromisoformat(kwargs['datetime']) + timedelta(seconds=noise)
+    else:
+        time = datetime.fromisoformat(kwargs['date'] + " " + kwargs['time']) - timedelta(seconds=noise)
     return time.isoformat(sep=' ', timespec='seconds')
 
 

@@ -1,6 +1,8 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 import numpy as np
 from numpy.typing import NDArray
+from .Vectors import Vector2D, Vector3D
 
 def _haversine_distance_numpy(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
   """
@@ -163,15 +165,15 @@ class Position2D(Position):
       return False
     return np.allclose(self._vector, other._vector)
   
-  def __add__(self, other: 'Position2D') -> 'Position2D':
+  def __add__(self, other: Position2D | Vector2D) -> Position2D:
     """Add two positions."""
-    if isinstance(other, Position2D):
+    if isinstance(other, (Position2D, Vector2D)):
       return Position2D(self.x + other.x, self.y + other.y)
     raise TypeError(f"Can only add Position2D to Position2D NOT {type(other).__name__}")
   
-  def __sub__(self, other: 'Position2D') -> 'Position2D':
+  def __sub__(self, other: Position2D | Vector2D) -> Position2D:
     """Subtract two positions."""
-    if isinstance(other, Position2D):
+    if isinstance(other, (Position2D, Vector2D)):
       return Position2D(self.x - other.x, self.y - other.y)
     raise TypeError(f"Can only subtract Position2D from Position2D NOT {type(other).__name__}")
 
@@ -325,17 +327,21 @@ class Position3D(Position2D):
       return False
     return np.allclose(self._vector, other._vector)
   
-  def __add__(self, other: 'Position3D') -> 'Position3D':
-    """Add two positions."""
-    if isinstance(other, Position3D):
+  def __add__(self, other: 'Position3D | Vector3D') -> 'Position3D':
+    """Add a 3D position and a 3D offset (vector)."""
+    if isinstance(other, (Position3D, Vector3D)):
       return Position3D(self.x + other.x, self.y + other.y, self.z + other.z)
-    raise TypeError(f"Can only add Position3D to Position3D NOT {type(other).__name__}")
+    raise TypeError(
+      f"Can only add Position3D to Position3D/Vector3D NOT {type(other).__name__}"
+    )
   
-  def __sub__(self, other: 'Position3D') -> 'Position3D':
-    """Subtract two positions."""
-    if isinstance(other, Position3D):
+  def __sub__(self, other: 'Position3D | Vector3D') -> 'Position3D':
+    """Subtract a 3D position/offset from this position."""
+    if isinstance(other, (Position3D, Vector3D)):
       return Position3D(self.x - other.x, self.y - other.y, self.z - other.z)
-    raise TypeError(f"Can only subtract Position3D from Position3D NOT {type(other).__name__}")
+    raise TypeError(
+      f"Can only subtract Position3D/Vector3D from Position3D NOT {type(other).__name__}"
+    )
   
   
 class Position2DGCS(Position):
