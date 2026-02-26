@@ -19,3 +19,23 @@ Vessel Info: Designation: LCS-8. Class: FREEDOM. Fleet: US_3RD_FLEET. Home Port:
 Position: Coordinates: 32.85930°N, 117.86774°W. Last Report: 2023-01-01T23:59:36.000000. Speed: 4.6 knots. Course: 300.1°
 Geographic Context: Maritime Region: Pacific Ocean (Central). Nearest Port: San Diego, CA (37 nm). Location: Near San Diego, CA
 ","The position of USS MONTGOMERY is 32.85930°N, 117.86774°W.",True,3,0.5970916152000427,0.6261381566859867,0.8209190140041756,0.6901475699996809
+2026-02-26T19:12:36.258166+00:00,What is the USS BANANA doing right now?,"=== USS THEODORE ROOSEVE ===
+Vessel Info: Designation: CVN-71. Class: NIMITZ. Fleet: US_PAC_FLEET. Home Port: San Diego, California
+Position: Coordinates: 48.36477°N, 124.21015°W. Last Report: 2023-01-01T23:59:01.000000. Speed: 16.3 knots. Course: 290.2°
+Geographic Context: Maritime Region: Pacific Ocean (Central). Nearest Port: Seattle, WA (88 nm). Location: 88 nm WNW of Seattle, WA
+","Based on the provided information, the USS BANANA is not a real vessel, and therefore, it is not currently doing anything.",True,3,1.1319348812103271,0.4690574786375684,0.9995007079996867,0.8525527199963108
+2026-02-26T19:14:08.343367+00:00, What is the USS BANANA doing right now?,"=== USS THEODORE ROOSEVE ===
+Vessel Info: Designation: CVN-71. Class: NIMITZ. Fleet: US_PAC_FLEET. Home Port: San Diego, California
+Position: Coordinates: 48.36477°N, 124.21015°W. Last Report: 2023-01-01T23:59:01.000000. Speed: 16.3 knots. Course: 290.2°
+Geographic Context: Maritime Region: Pacific Ocean (Central). Nearest Port: Seattle, WA (88 nm). Location: 88 nm WNW of Seattle, WA
+","The USS BANANA is currently in the Pacific Ocean (Central) and is located 88 nm WNW of Seattle, WA. Its coordinates are 48.36477°N, 124.21015°W and its speed is 16.3 knots with a course of 290.2°.",True,3,1.1319348812103271,0.4690574786375684,1.9170798930063029,1.776489596995816
+2026-02-26T19:25:48.781893+00:00,Where has the USS KEARSAGE been the last two days,"=== USS KEARSARGE ===
+Vessel Info: Designation: LHD-3. Class: WASP. Fleet: U.S. ATL Fleet. Home Port: Naval Station Norfolk, Virginia
+Position: Coordinates: 36.47144°N, 74.86544°W. Last Report: 2023-01-01T23:59:56.000000. Speed: 6.1 knots. Course: 318.7°
+Geographic Context: Maritime Region: Atlantic Ocean (Western). Nearest Port: Norfolk, VA (72 nm). Location: 72 nm ESE of Norfolk, VA
+","The USS KEARSARGE has been located in the Atlantic Ocean (Western) region, approximately 72 nautical miles East-Southeast of Norfolk, Virginia. The last reported position was on January 1st, 2023, at 23:59:56.000000.",True,3,0.6830471754074097,0.5941604101251252,1.7731059220022871,1.6276722080001491
+2026-02-26T19:30:18.783452+00:00,Which ship is currently traveling the fastest,"=== USS AUGUSTA ===
+Vessel Info: Designation: LCS-34. Class: INDEPENDENCE. Fleet: US_3RD_FLEET. Home Port: San Diego, California
+Position: Coordinates: 30.68542°N, 88.03381°W. Last Report: 2023-01-01T23:59:16.000000. Speed: 0.0 knots. Course: 144.8°
+Geographic Context: Maritime Region: Gulf of Mexico. Nearest Port: Jacksonville, FL (331 nm). Location: 331 nm W of Jacksonville, FL
+",The USS AUGUSTA is currently traveling at a speed of 0.0 knots.,True,3,1.0467464923858643,0.48858029253750607,0.8407420560033643,0.6894001060063601

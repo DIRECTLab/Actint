@@ -283,6 +283,7 @@ if __name__ == "__main__":
     parser.add_argument("--query", type=str, help="Question to ask (overrides test queries)")
     parser.add_argument("--test", action="store_true", help="Run default test queries")
     args = parser.parse_args()
+    llm = VesselQueryLLM(model_name=args.model, enrich_with_location_context=not args.no_location_context)
 
     test_queries = [
         "Where is USS KIDD right now?",
@@ -310,7 +311,6 @@ if __name__ == "__main__":
             print()
     else:
         print("\n--- Testing with LLM Generation ---\n")
-        llm = VesselQueryLLM(model_name=args.model, enrich_with_location_context=not args.no_location_context)
         for query in test_queries:
             print(f"Query: {query}")
             print("-" * 40)
