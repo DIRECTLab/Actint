@@ -9,7 +9,10 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/actint/src/actint/query_llm.py",
-            "args": ["--with-llm", "--test"],
+            "args": [
+                "--with-llm", 
+                "--test",
+                "--model", "Qwen/Qwen2-7B"],
             "console": "integratedTerminal"
         },
         {
