@@ -40,6 +40,7 @@ class VesselQueryLLM:
         self.enrich_with_location_context = enrich_with_location_context
         self._model = None
         self._tokenizer = None
+        self._load_model()
     
     def _load_model(self):
         """Lazy-load the LLM model and tokenizer."""
@@ -188,9 +189,6 @@ class VesselQueryLLM:
             result["answer"] = enriched_context
             return result
         
-        # Generate LLM response
-        self._load_model()
-        
         prompt = self.build_prompt(question, enriched_context)
         
         inputs = self._tokenizer(prompt, return_tensors="pt")
@@ -246,7 +244,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="AIS Vessel Query System with RAG and LLM")
     parser.add_argument("--with-llm", action="store_true", help="Generate answer using LLM (default: context only)")
     parser.add_argument("--no-location-context", action="store_true", help="Disable geographic context enrichment")
-    parser.add_argument("--model", type=str, default="mistralai/Mistral-7B-v0.1", help="LLM model name")
+    parser.add_argument("--model", type=str, default="Qwen/Qwen2-7B", help="LLM model name")
     parser.add_argument("--query", type=str, help="Question to ask (overrides test queries)")
     parser.add_argument("--test", action="store_true", help="Run default test queries")
     args = parser.parse_args()
@@ -282,10 +280,10 @@ if __name__ == "__main__":
             print(f"Query: {query}")
             print("-" * 40)
             result = llm.query(query)
-            print("Context Used for Answer:")
+            print("BEGIN CONTEXT\n" + "=" * 60)
             print(result["context"])
-            print("\nGenerated Answer:")
+            print("END OF CONTEXT \n" + "=" * 60 + "\n")
             print("BEGIN ANSWER\n" + "=" * 60)
-            print(f"Answer: {result['answer']}")
+            print(f"{result['answer']}")
             print("END OF ANSWER \n" + "=" * 60 + "\n")
             print()
