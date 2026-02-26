@@ -11,6 +11,16 @@
             "program": "${workspaceFolder}/actint/src/actint/query_llm.py",
             "args": [
                 "--with-llm", 
+                "--model", "Qwen/Qwen2-7B"],
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "run llm query test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/actint/src/actint/query_llm.py",
+            "args": [
+                "--with-llm", 
                 "--test",
                 "--model", "Qwen/Qwen2-7B"],
             "console": "integratedTerminal"
