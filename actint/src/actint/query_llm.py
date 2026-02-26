@@ -6,10 +6,11 @@ natural language responses using a local LLM. Integrates location
 context tools to provide geographic context for vessel positions.
 """
 
-from pathlib import Path
+import time
 from typing import Optional
 
 from actint.data_processing.rag import RAGPipeline, create_rag_pipeline
+from actint.actint_logging.logger import QueryLLMCSVLogger
 from actint.tools.lat_lon_context import (
     get_location_context,
     get_location_context_string,
@@ -34,10 +35,12 @@ class VesselQueryLLM:
         rag_pipeline: Optional[RAGPipeline] = None,
         model_name: str = "mistralai/Mistral-7B-v0.1",
         enrich_with_location_context: bool = True,
+        query_logger: Optional[QueryLLMCSVLogger] = None,
     ):
         self.rag = rag_pipeline or create_rag_pipeline()
         self.model_name = model_name
         self.enrich_with_location_context = enrich_with_location_context
+        self.query_logger = query_logger or QueryLLMCSVLogger()
         self._model = None
         self._tokenizer = None
         self._load_model()
@@ -168,6 +171,9 @@ class VesselQueryLLM:
         Returns:
             Dict with query info, context, and generated answer
         """
+        total_start = time.perf_counter()
+        llm_inference_time: Optional[float] = None
+
         # Retrieve context using RAG
         rag_result = self.rag.answer_location_query(question)
         
@@ -184,9 +190,24 @@ class VesselQueryLLM:
             "context": enriched_context,
             "matches": rag_result["matches"],
         }
+
+        top_match = rag_result["matches"][0] if rag_result["matches"] else {}
+        rag_distance_score = top_match.get("distance_score")
+        rag_confidence = QueryLLMCSVLogger.distance_to_confidence(rag_distance_score)
         
         if not use_llm:
             result["answer"] = enriched_context
+            self.query_logger.log_query(
+                query=question,
+                context=enriched_context,
+                response=result["answer"],
+                use_llm=False,
+                matches_found=result["matches_found"],
+                rag_distance_score=rag_distance_score,
+                rag_confidence=rag_confidence,
+                total_time_seconds=time.perf_counter() - total_start,
+                llm_inference_time_seconds=None,
+            )
             return result
         
         prompt = self.build_prompt(question, enriched_context)
@@ -195,6 +216,7 @@ class VesselQueryLLM:
         if hasattr(self._model, "device"):
             inputs = {k: v.to(self._model.device) for k, v in inputs.items()}
         
+        llm_start = time.perf_counter()
         outputs = self._model.generate(
             inputs["input_ids"],
             max_new_tokens=max_new_tokens,
@@ -203,6 +225,7 @@ class VesselQueryLLM:
             top_p=0.9,
             pad_token_id=self._tokenizer.eos_token_id,
         )
+        llm_inference_time = time.perf_counter() - llm_start
         
         # Decode only the new tokens (not the prompt)
         generated = outputs[0][inputs["input_ids"].shape[1]:]
@@ -210,6 +233,18 @@ class VesselQueryLLM:
         
         result["answer"] = answer.strip()
         result["prompt"] = prompt
+
+        self.query_logger.log_query(
+            query=question,
+            context=enriched_context,
+            response=result["answer"],
+            use_llm=True,
+            matches_found=result["matches_found"],
+            rag_distance_score=rag_distance_score,
+            rag_confidence=rag_confidence,
+            total_time_seconds=time.perf_counter() - total_start,
+            llm_inference_time_seconds=llm_inference_time,
+        )
         
         return result
     
