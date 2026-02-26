@@ -2,13 +2,20 @@
 LLM Query module for AIS vessel intelligence.
 
 Uses RAG pipeline to retrieve relevant vessel data, then generates
-natural language responses using a local LLM.
+natural language responses using a local LLM. Integrates location
+context tools to provide geographic context for vessel positions.
 """
 
 from pathlib import Path
 from typing import Optional
 
 from actint.data_processing.rag import RAGPipeline, create_rag_pipeline
+from actint.tools.lat_lon_context import (
+    get_location_context,
+    get_location_context_string,
+    get_distance_between,
+    TOOL_DEFINITIONS,
+)
 
 
 class VesselQueryLLM:
@@ -17,17 +24,20 @@ class VesselQueryLLM:
     
     For questions like "where is USS KIDD right now?", this:
     1. Uses RAG to retrieve relevant vessel/position data
-    2. Formats a prompt with the retrieved context
-    3. Generates a natural language response
+    2. Enriches position data with geographic context (maritime region, nearest port, etc.)
+    3. Formats a prompt with the retrieved context
+    4. Generates a natural language response
     """
     
     def __init__(
         self,
         rag_pipeline: Optional[RAGPipeline] = None,
         model_name: str = "mistralai/Mistral-7B-v0.1",
+        enrich_with_location_context: bool = True,
     ):
         self.rag = rag_pipeline or create_rag_pipeline()
         self.model_name = model_name
+        self.enrich_with_location_context = enrich_with_location_context
         self._model = None
         self._tokenizer = None
     
@@ -46,11 +56,86 @@ class VesselQueryLLM:
             )
             print("Model loaded.")
     
+    def _enrich_with_location_context(self, rag_result: dict) -> str:
+        """
+        Enrich RAG results with geographic context for each vessel position.
+        
+        Args:
+            rag_result: Result from RAG pipeline with vessel matches
+            
+        Returns:
+            Enriched context string with location information
+        """
+        enriched_parts = []
+        
+        for match in rag_result.get("matches", []):
+            vessel_name = match.get("info", {}).get("name", "Unknown Vessel")
+            position = match.get("position")
+            
+            enriched_parts.append(f"=== {vessel_name} ===")
+            
+            # Add vessel info
+            info = match.get("info", {})
+            info_parts = []
+            if info.get("type") and info.get("pennant"):
+                info_parts.append(f"Designation: {info['type']}-{info['pennant']}")
+            if info.get("class"):
+                info_parts.append(f"Class: {info['class']}")
+            if info.get("fleet"):
+                info_parts.append(f"Fleet: {info['fleet']}")
+            if info.get("home_base"):
+                info_parts.append(f"Home Port: {info['home_base']}")
+            
+            if info_parts:
+                enriched_parts.append("Vessel Info: " + ". ".join(info_parts))
+            
+            # Add position with location context
+            if position:
+                lat = position.get("lat")
+                lon = position.get("lon")
+                timestamp = position.get("timestamp", "Unknown")
+                sog = position.get("sog")
+                cog = position.get("cog")
+                
+                pos_parts = [f"Coordinates: {lat:.5f}°N, {abs(lon):.5f}°{'W' if lon < 0 else 'E'}"]
+                pos_parts.append(f"Last Report: {timestamp}")
+                
+                if sog is not None:
+                    pos_parts.append(f"Speed: {sog:.1f} knots")
+                if cog is not None:
+                    pos_parts.append(f"Course: {cog:.1f}°")
+                
+                enriched_parts.append("Position: " + ". ".join(pos_parts))
+                
+                # Get geographic context using location tool
+                if lat is not None and lon is not None:
+                    loc_context = get_location_context(lat, lon)
+                    
+                    context_parts = []
+                    if loc_context.maritime_region:
+                        context_parts.append(f"Maritime Region: {loc_context.maritime_region}")
+                    if loc_context.nearest_port and loc_context.distance_to_port_nm:
+                        context_parts.append(f"Nearest Port: {loc_context.nearest_port} ({loc_context.distance_to_port_nm:.0f} nm)")
+                    if loc_context.position_description:
+                        context_parts.append(f"Location: {loc_context.position_description}")
+                    if loc_context.nearest_waterway and loc_context.distance_to_waterway_nm:
+                        if loc_context.distance_to_waterway_nm < 500:
+                            context_parts.append(f"Near Waterway: {loc_context.nearest_waterway} ({loc_context.distance_to_waterway_nm:.0f} nm)")
+                    
+                    if context_parts:
+                        enriched_parts.append("Geographic Context: " + ". ".join(context_parts))
+            else:
+                enriched_parts.append("Position: No recent position data available")
+            
+            enriched_parts.append("")  # Blank line between vessels
+        
+        return "\n".join(enriched_parts)
+    
     def build_prompt(self, query: str, context: str) -> str:
         """
         Build a prompt for the LLM using retrieved context.
         """
-        prompt = f"""You are a maritime intelligence assistant. Answer the user's question based on the provided vessel data.
+        prompt = f"""You are a maritime intelligence assistant. Answer the user's question based on the provided vessel data. Use the geographic context to provide informative answers about vessel locations.
 
 ### Vessel Data:
 {context}
@@ -84,22 +169,28 @@ class VesselQueryLLM:
         # Retrieve context using RAG
         rag_result = self.rag.answer_location_query(question)
         
+        # Enrich with geographic context if enabled
+        if self.enrich_with_location_context and rag_result.get("matches"):
+            enriched_context = self._enrich_with_location_context(rag_result)
+        else:
+            enriched_context = rag_result["context"]
+        
         result = {
             "question": question,
             "vessel_extracted": rag_result["vessel_name_extracted"],
             "matches_found": len(rag_result["matches"]),
-            "context": rag_result["context"],
+            "context": enriched_context,
             "matches": rag_result["matches"],
         }
         
         if not use_llm:
-            result["answer"] = rag_result["context"]
+            result["answer"] = enriched_context
             return result
         
         # Generate LLM response
         self._load_model()
         
-        prompt = self.build_prompt(question, rag_result["context"])
+        prompt = self.build_prompt(question, enriched_context)
         
         inputs = self._tokenizer(prompt, return_tensors="pt")
         if hasattr(self._model, "device"):

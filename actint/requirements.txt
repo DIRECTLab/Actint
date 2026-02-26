@@ -3,3 +3,5 @@ numpy
 pandas
 matplotlib
 chromadb
+geopy
+reverse_geocoder
