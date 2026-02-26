@@ -375,7 +375,7 @@ def setup_chromadb(summaries: list[dict], chroma_path: Path) -> None:
     # Delete existing collection if it exists
     try:
         client.delete_collection("vessels")
-    except ValueError:
+    except Exception:
         pass
     
     # Create collection
