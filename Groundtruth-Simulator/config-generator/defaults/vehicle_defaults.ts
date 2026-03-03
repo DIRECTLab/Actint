@@ -1,7 +1,6 @@
 "use client"
 
 import { VehicleTyp, PropertiesTyp } from '@/types/vehicleSettings'
-// import type L from 'leaflet'
 
 const DEFAULT_VEHICLE: VehicleTyp = {
     vehicle_id: 1,

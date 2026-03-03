@@ -33,6 +33,8 @@ export function HandleMarkers({ markers, setMarkers, vehicles_3d, is_3D }: Props
         error: 30,
     })
 
+    /************************************************************  Marker Functions  ******************************************************************************/
+
     const updateMarker = (index: number, LatLng: {lat: number, lng: number}, height: any, speed: number, error: number) => {
         if (height) {
             var newMarker: DestinationTyp = {error: error, speed: speed, position: {LatLng: LatLng, Z: height}}
@@ -61,6 +63,8 @@ export function HandleMarkers({ markers, setMarkers, vehicles_3d, is_3D }: Props
         }  
     })
 
+    
+    /************************************************************  3D handling  ******************************************************************************/
 
     useEffect(() => {
       
@@ -88,7 +92,7 @@ export function HandleMarkers({ markers, setMarkers, vehicles_3d, is_3D }: Props
             );
         }
         
-        console.log(height)
+        
         setValues((prev: previousValsTyp) => ({
             ...prev, height: height
         }));
@@ -102,9 +106,7 @@ export function HandleMarkers({ markers, setMarkers, vehicles_3d, is_3D }: Props
     }, [is_3D]);
 
     
-
-    
-
+/****************************************************  Render Markers  ******************************************************************************/
     return (
         <>
             {markers.map((mark, index) => (

@@ -4,8 +4,10 @@ import { VehicleTyp } from '@/types/vehicleSettings'
 
 const export_simulation = (simulationSettings: SimulationSettingsTyp, vehiclesList: VehicleTyp[]): void => {
 let saveVehiclesList = []
+console.log(vehiclesList)
 for (let currentVehicle of vehiclesList) {
     let saveVehicle: any = structuredClone(currentVehicle);
+    console.log(saveVehicle)
 
     if(currentVehicle.destinations){
         let saveDestinations = []
@@ -36,7 +38,7 @@ for (let currentVehicle of vehiclesList) {
 
     switch(saveVehicle.action) {
         case "stay":
-            saveVehicle = saveVehicle.action_properties.stay_time
+            saveVehicle.stay_time = saveVehicle.action_properties.stay_time
             break;
         
         
@@ -47,16 +49,17 @@ for (let currentVehicle of vehiclesList) {
 
         case "OffsetPersue":
             saveVehicle.target_id = saveVehicle.action_properties.target_id
-            saveVehicle.target_offset = saveVehicle.action_properties.offset
+            saveVehicle.target_offset = saveVehicle.action_properties.target_offset
             break;
 
         case "seek":
         case "flee":
-            saveVehicle = {}
+            
             break;
     }
 
     delete saveVehicle.action_properties
+    console.log(saveVehicle)
 
     saveVehiclesList.push(saveVehicle)
 }

@@ -21,69 +21,70 @@ export const handleImport = async (event: any, set_simulation_settings: React.Di
     console.log(json_config_files)
 
     try{
-    console.log("converting lat lon to LatLng: {lat, lng}")
-    if(json_config_files.vehicles) {
-        let saveVehicles = [];
-        for (let vehicle of json_config_files.vehicles) {
-            console.log(vehicle)
-            let saveVehicle = vehicle
+        console.log("converting lat lon to LatLng: {lat, lng}")
+        if(json_config_files.vehicles) {
+            let saveVehicles = [];
+            for (let vehicle of json_config_files.vehicles) {
+                console.log(vehicle)
+                let saveVehicle = structuredClone(vehicle)
 
-            let lat = vehicle.properties.position.lat
-            let lon = vehicle.properties.position.lon
-            
-            saveVehicle.properties.position.LatLng = { lat: lat, lng: lon }
-
-            delete saveVehicle.properties.position.lat
-            delete saveVehicle.properties.position.lon
-
-            let saveDestinations = []
-            if (vehicle.destinations) {
-                for (let destination of vehicle.destinations) {
-                    let saveDestination = destination
-                    let lon = saveDestination.position.lon
-                    let lat = saveDestination.position.lat
-                    saveDestination.position.LatLng = { lat: lat, lng: lon }
-                    delete saveDestination.position.lat
-                    delete saveDestination.position.lon
-                    
-                    saveDestinations.push(saveDestination)
-                }
-                saveVehicle.destinations = saveDestinations
-            }
-
-            saveVehicles.push(saveVehicle)
-
-            json_config_files.vehicles = saveVehicles
-
-
-            let defaultActionProperties = {
-                target_id: 0,
-                target_offset: {LatLng: {lat: 0, lng: 0}, Z:0},
-                stay_time: 0,
-            }
-
-            switch(vehicle.action){
-                case "stay":
-                    defaultActionProperties.stay_time = vehicle.stay_time;
-                    break;
-
-                case "Persue":
-                case "Evade":
-                    defaultActionProperties.target_id = vehicle.target_id;
-                    break;
+                let lat = vehicle.properties.position.lat
+                let lon = vehicle.properties.position.lon
                 
-                case "OffsetPersue":
-                    let offset = vehicle.target_offset;
-                    defaultActionProperties.target_id = vehicle.target_id;
-                    defaultActionProperties.target_offset.LatLng = {lat: offset.lat, lng: offset.lng};
-                    defaultActionProperties.target_offset.Z = offset.Z;
-            }
+                saveVehicle.properties.position.LatLng = { lat: lat, lng: lon }
 
-            vehicle.action_properties = defaultActionProperties;
-        }
+                delete saveVehicle.properties.position.lat
+                delete saveVehicle.properties.position.lon
+
+                let saveDestinations = []
+                if (vehicle.destinations) {
+                    for (let destination of vehicle.destinations) {
+                        let saveDestination = destination
+                        let lon = saveDestination.position.lon
+                        let lat = saveDestination.position.lat
+                        saveDestination.position.LatLng = { lat: lat, lng: lon }
+                        delete saveDestination.position.lat
+                        delete saveDestination.position.lon
+                        
+                        saveDestinations.push(saveDestination)
+                    }
+                    saveVehicle.destinations = saveDestinations
+                }
+
+                
+                let defaultActionProperties = {
+                    target_id: 0,
+                    target_offset: 0,
+                    stay_time: 0,
+                }
+
+                switch(vehicle.action){
+                    case "stay":
+                        defaultActionProperties.stay_time = vehicle.stay_time;
+                        break;
+
+                    case "Persue":
+                    case "Evade":
+                        defaultActionProperties.target_id = vehicle.target_id;
+                        break;
+                    
+                    case "OffsetPersue":
+                        defaultActionProperties.target_id = vehicle.target_id;
+                        defaultActionProperties.target_offset = vehicle.target_offset;
+                        break;
+                }
+                
+                saveVehicle.action_properties = defaultActionProperties;
+
+                saveVehicles.push(saveVehicle)
+
+                json_config_files.vehicles = saveVehicles
+
+            }
+        } 
     }
-    } catch {
-        console.log("failed to convert stonesoup { lat, lon } to leaflet { lat, lng }")
+    catch (err) {
+        console.log("failed to convert stonesoup { lat, lon } to leaflet { lat, lng }", err)
     }
 
     console.log(json_config_files)

@@ -41,9 +41,9 @@ export default function VehicleActions({vehicle_settings, set_vehicle_settings} 
     >
         <option value="seek">Seek</option>
         <option value="flee">Flee</option>
-        <option value="Persue">Persue</option>
-        <option value="Evade">Evade</option>
-        <option value="OffsetPersue">Offset Persue</option>
+        <option value="pursue">Pursue</option>
+        <option value="evade">Evade</option>
+        <option value="follow">Follow</option>
         <option value="stay">Stay</option>
     </select>
 

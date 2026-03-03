@@ -4,5 +4,12 @@ export type SimulationSettingsTyp = {
     time_step: number;
     start_time: string;
     time_format: string;
+    print_time_as: string;
+    print_format: string;
+    latlon_origin: {
+        latitude: number;
+        longitude: number;
+        height: number;
+    }
 }
 

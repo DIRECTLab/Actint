@@ -45,6 +45,6 @@ export type VehicleTyp = {
   action: string;
   action_properties: ActionPropertiesTyp;
   properties: PropertiesTyp;
-  destinations?: DestinationTyp[]
+  destinations?: DestinationTyp[];
 };
 

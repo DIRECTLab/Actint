@@ -16,38 +16,6 @@ type Props = {
 
 export default function SimSettings({ simulation_settings, set_simulation_settings, vehiclesList, setVehiclesList, saveSimulation }: Props) {
   
-    // const handleImport = async (event: any) => {
-    //   if(confirm("WARNING: If you choose to continue, everything you have created will be replaced by your uploaded file. Be sure to save your work. \nContinue?")) {
-    //     const file = event.target.files[0]
-    //     let text;
-    //     try {
-    //       text = await file.text()
-    //     }catch{
-    //       console.log("Failed to parse the file")
-    //     }
-    //     let json_config_files
-    //     try{
-    //       json_config_files = JSON.parse(text)
-    //     } catch {
-    //       console.log("failed to parse file into json.")
-    //     }
-    //     console.log(json_config_files)
-
-    //     const imported_sim_settings = json_config_files['sim_settings']
-    //     const imported_vehicles = json_config_files['vehicles']
-    //     try {
-    //       set_simulation_settings(imported_sim_settings)
-    //     } catch {
-    //       console.log("Error: It seems like your simulation settings are formatted wrong.")
-    //     }
-    //     try { 
-    //       setVehiclesList(imported_vehicles)
-    //     } catch {
-    //       console.log("Error: it seems like you vehicles are formatted wrong.")
-    //     }
-    //   }
-    // }
-
 
     return (
             <div id='simulation_settings'>
@@ -110,6 +78,47 @@ export default function SimSettings({ simulation_settings, set_simulation_settin
                     onChange={(e) => {set_simulation_settings( prev => ({...prev, time_step: parseFloat(e.target.value)})) } }
                   />
                 </div>
+
+
+                <div>
+                  <label htmlFor="sim_lattitude">Latitude:</label>
+                  <input
+                  type="number"
+                  id="sim_lattitude"
+                  name="sim_lattitude"
+                  className="p-2"
+                  value={simulation_settings.latlon_origin.latitude}
+                  onChange={(e) => set_simulation_settings( prev => ({...prev, latlon_origin: {...prev.latlon_origin, latitude: parseFloat(e.target.value)}})) }
+                  />
+                </div>
+
+
+                <div>
+                  <label htmlFor="sim_longitude">Longitude:</label>
+                  <input
+                  type="number"
+                  id="sim_longitude"
+                  name="sim_longitude"
+                  className="p-2"
+                  value={simulation_settings.latlon_origin.longitude}
+                  onChange={(e) => set_simulation_settings( prev => ({...prev, latlon_origin: {...prev.latlon_origin, longitude: parseFloat(e.target.value)}})) }
+                  />
+                </div>
+
+
+                <div>
+                  <label htmlFor="sim_height">Height:</label>
+                  <input
+                  type="number"
+                  id="sim_height"
+                  name="sim_height"
+                  className="p-2"
+                  value={simulation_settings.latlon_origin.height}
+                  onChange={(e) => set_simulation_settings( prev => ({...prev, latlon_origin: {...prev.latlon_origin, height: parseFloat(e.target.value)}})) }
+                  />
+                </div>
+
+
                 <div>
                   <label style={{ cursor: "pointer"}} htmlFor="file_import">Import File</label>
                   <input id="file_import" name="file_import" type="file" style={{ display: "none" }} onChange={(e) => {handleImport(e, set_simulation_settings, setVehiclesList)}}></input>
@@ -120,7 +129,6 @@ export default function SimSettings({ simulation_settings, set_simulation_settin
                   id="export_settings"
                   onClick={() => {
                     saveSimulation(simulation_settings, vehiclesList)
-                    console.log(vehiclesList)
                   }} 
                   
                 >Export Settings</button>
