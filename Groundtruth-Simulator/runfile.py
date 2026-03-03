@@ -2,8 +2,7 @@ import json
 import queue
 from classes import Vehicle2D, Vehicle3D, Position, Position2D, Position3D
 from classes import Destination2D, Destination3D
-from classes import Settings
-from print import geodetic_to_local
+from classes import Settings, Unit_conversions
 
 def read_json(filename: str) -> tuple[list[Vehicle2D | Vehicle3D], Settings]:
     vehicles: list[Vehicle2D | Vehicle3D] = []
@@ -19,6 +18,7 @@ def read_json(filename: str) -> tuple[list[Vehicle2D | Vehicle3D], Settings]:
         start_time=data['sim_settings'].get('start_time', '2026-01-29 17:45:00'),
         print_format=data['sim_settings'].get('print_format', 'json'),
         print_time_as=data['sim_settings'].get('print_time_as', 'iso'),
+        time_format=data['sim_settings'].get('time_format', "%Y-%m-%d %H:%M:%S")
     )
         for v in data['vehicles']:
             id = v['vehicle_id']
@@ -26,7 +26,7 @@ def read_json(filename: str) -> tuple[list[Vehicle2D | Vehicle3D], Settings]:
             is_3d = v.get('is_3d', False)
             max_speed = v['properties'].get('max_speed', 100.0)
             max_force = v['properties'].get('max_force', 200.0)
-            action = v.get('action', 'seek')
+            action = v.get('action', 'seek').lower()
             target_vehicle = v.get('target_id', None)
             follow_distance = v.get('follow_distance', 0.0)
             stay_time = v.get('stay_time', 50.0)
@@ -36,13 +36,13 @@ def read_json(filename: str) -> tuple[list[Vehicle2D | Vehicle3D], Settings]:
             if is_3d:
                 settings.has_vehicle3d = True
                 for d in v.get('destinations', []):
-                    position = Position3D(*geodetic_to_local(d['position'].get('lat', 100), d['position'].get('lon', 100), d['position'].get('alt', 100)))
+                    position = Position3D(*Unit_conversions.geodetic_to_local(d['position'].get('lat', 100), d['position'].get('lon', 100), d['position'].get('alt', 100)))
                     error = d.get('error', 5.0)
                     speed = d.get('speed', 50.0)
                     destinations.put(Destination3D(position, speed, error))
                 max_altitude = v['properties'].get('max_altitude', 1200)
                 
-                position = Position3D(*geodetic_to_local(float(v['properties']['position'].get('lat', 0)), float(v['properties']['position'].get('lon', 0)), float(v['properties']['position'].get('alt', 0))))
+                position = Position3D(*Unit_conversions.geodetic_to_local(float(v['properties']['position'].get('lat', 0)), float(v['properties']['position'].get('lon', 0)), float(v['properties']['position'].get('alt', 0))))
                 vehicle = Vehicle3D(
                     vehicle_id=id,
                     vehicle_type=type,
@@ -61,13 +61,13 @@ def read_json(filename: str) -> tuple[list[Vehicle2D | Vehicle3D], Settings]:
             else:
                 settings.has_vehicle2d = True
                 for d in v.get('destinations', []):
-                    x, y, z = geodetic_to_local(d['position'].get('lat', 100), d['position'].get('lon', 100), 0.0)
+                    x, y, z = Unit_conversions.geodetic_to_local(d['position'].get('lat', 100), d['position'].get('lon', 100), 0.0)
                     position = Position2D(x, y)
                     error = d.get('error', 30.0)
                     speed = d.get('speed', 50.0)
                     destinations.put(Destination2D(position, speed, error))
                 
-                x, y, z = geodetic_to_local(float(v['properties']['position'].get('lat', 0)), float(v['properties']['position'].get('lon', 0)), 0.0)
+                x, y, z = Unit_conversions.geodetic_to_local(float(v['properties']['position'].get('lat', 0)), float(v['properties']['position'].get('lon', 0)), 0.0)
                 position = Position2D(x, y)
                 vehicle = Vehicle2D(
                     vehicle_id=id,

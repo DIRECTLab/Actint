@@ -6,6 +6,8 @@ from .Position import Position2D
 from .Vectors import Vector2D
 from .Settings import Settings
 from datetime import datetime as dt
+#import xarray as xr
+from .Unit_conversions import local_to_geodetic
 
 # Helper functions adapted to use Vector2D (positions are Position2D)
 def _as_vector2d(pos: Position2D) -> Vector2D:
@@ -280,44 +282,72 @@ class Vehicle2D(Vehicle):
         self.target = target_vehicle.position + scale_vector(target_vehicle.velocity, float(sim_time_steps))
 
         return self.flee()
-
-    def stay(self):
-
-        pass
+    
+    def stay(self, settings: Settings) -> None:
+        if self.position.distance_to(self.target) > self.next_destination.error:
+            self.update_kinematics(settings.time_step, self.arrive())
+            return
+        else:
+            self.velocity = Vector2D(0.0, 0.0)
+            self.update_kinematics(settings.time_step, Vector2D(0.0, 0.0))
+            if isinstance(self.stay_time, int | float):
+                if self.stay_time < 0:
+                        self._assign_next_destination()
+                        return
+                else:
+                    self.stay_time -= settings.time_step
+                    return
+            else:
+                if settings.current_simulation_time <= self.stay_time:
+                    return
+                else:
+                    self._assign_next_destination()
 
 
     def collision_avoidance(self):
         pass
 
-    def update_kinematics(self, dt: float) -> None:
+    def update_kinematics(self, settings: Settings, acceleration: Vector2D) -> None:
         """Update vehicle kinematics based on acceleration."""
-        self.velocity = truncate(
-            self.velocity + scale_vector(self._acceleration, float(dt)),
-            float(self.max_speed),
-        )
-        self.position += scale_vector(self.velocity, float(dt))
-
+        self.acceleration = acceleration
+        self.velocity = truncate(self.velocity + scale_vector(self.acceleration, float(settings.time_step)), float(self.max_speed))
+        purposed_position = self.position + scale_vector(self.velocity, float(settings.time_step))
+        if self.position.distance_to(purposed_position) < self.position.distance_to(self.target):
+            x, y, z = local_to_geodetic(self.position.x, self.position.y, settings=settings)
+            self.position = purposed_position + scale_vector(settings.ocean_current.get_current(y, x), 100000 * float(settings.time_step)) 
+        else:
+            self.position = self.target
+            self.velocity = truncate(self.velocity + scale_vector(self.acceleration, float(settings.time_step)), float(self.max_speed))
+        
         if np.linalg.norm(self.velocity.vector) > 1e-6:
             direction = normalize(self.velocity)
             self.heading = math.atan2(direction.y, direction.x)
 
 
+    def has_reached_destination(self) -> bool:
+        if self.next_destination.has_reached(self.position):
+            if self._has_next_destination():
+                self._assign_next_destination()
+            else:
+                self.done = True
+                return True
+        return False
+
+
     def update(self, settings: Settings, vehicles, ) -> None:
-        """Update vehicle position and state."""
-        if self.action == 'follow':
-            self.follow_update(settings.time_step, vehicles)
-        elif self.action == 'stay':
-            self.stay_update(settings)
-        elif self.action == 'pursue':
-            self.pursue_update(settings.time_step, vehicles)
-
-        else:
-            self.standard_update(settings.time_step, vehicles)
-
-    def standard_update(self, dt: float, vehicles) -> None:
-        """Update vehicle position and state."""
         if self.done:
             return
+        """Update vehicle position and state."""
+        if self.action == 'follow':
+            self.follow_update(settings, vehicles)
+        elif self.action == 'pursue':
+            self.pursue_update(settings, vehicles)
+        else:
+            self.standard_update(settings)
+
+
+    def standard_update(self, settings: Settings) -> None:
+        """Update vehicle position and state."""
         if self.next_destination is None:
             if self._has_next_destination():
                 self._assign_next_destination()
@@ -326,46 +356,37 @@ class Vehicle2D(Vehicle):
                 return
 
         if self.action == 'seek':
-            self.acceleration = self.seek()
+            self.update_kinematics(settings, self.seek())
         elif self.action == 'flee':
             distance_to_target = self.position.distance_to(self.target)
             if distance_to_target < 1000:
-                self.acceleration = self.flee()
+                self.update_kinematics(settings, self.flee())
             else:
                 if self._has_next_destination():
                     self._assign_next_destination()
                 else:
                     self.done = True
         elif self.action == 'arrive':
-            self.acceleration = self.arrive()
+            self.update_kinematics(settings, self.arrive())
+        elif self.action == 'stay':
+            self.stay(settings)
+            return
         else:
             self.done = True
-            self.acceleration = Vector2D(0.0, 0.0)
+            self.update_kinematics(settings, Vector2D(0.0, 0.0))
 
-        self.update_kinematics(dt)
+        self.has_reached_destination()
 
-        if self.next_destination.has_reached(self.position):
-            if self._has_next_destination():
-                self._assign_next_destination()
-            else:
-                self.done = True
-                return
-
-    
             
-    def follow_update(self, dt: float, vehicles) -> None:
+    def follow_update(self, settings: Settings, vehicles) -> None:
         """Update vehicle position and state for follow action."""
-        if self.done:
-            return
         target_vehicle = next((v for v in vehicles if v.vehicle_id == self.target_id), None)
         if target_vehicle is None:
             print(f"Vehicle {self.vehicle_id} cannot find target vehicle {self.target_id} to follow.")
             self.done = True
             return
         
-        self.acceleration = self.follow(target_vehicle, self.follow_distance)
-
-        self.update_kinematics(dt)
+        self.update_kinematics(settings, self.follow(target_vehicle, self.follow_distance))
 
     def stay_update(self, settings: Settings) -> None:
         if self.done:
@@ -377,14 +398,12 @@ class Vehicle2D(Vehicle):
                 self.done = True
                 return
         if not self.next_destination.has_reached(self.position):
-            self.acceleration = self.arrive()
-            self.update_kinematics(settings.time_step)
+            self.update_kinematics(settings, self.arrive())
             return
         
         else:
-            self.acceleration = Vector2D(0.0, 0.0)
             self.velocity = Vector2D(0.0, 0.0)
-            self.update_kinematics(settings.time_step)
+            self.update_kinematics(settings, Vector2D(0.0, 0.0))
             if isinstance(self.stay_time, int | float):
                 if self.stay_time < 0:
                     if self._has_next_destination():
@@ -404,22 +423,23 @@ class Vehicle2D(Vehicle):
                         self.done = True
                         return
                     
-    def pursue_update(self, dt: float, vehicles) -> None:
+    def pursue_update(self, settings: Settings, vehicles) -> None:
         """Update vehicle position and state for pursue action."""
-        if self.done:
-            return
         target_vehicle = next((v for v in vehicles if v.vehicle_id == self.target_id), None)
         if self.position.distance_to(target_vehicle.position) < 1e-6:
-            self.acceleration = Vector2D(0.0, 0.0)
             self.velocity = Vector2D(0.0, 0.0)
-            self.update_kinematics(dt)
+            self.update_kinematics(settings, Vector2D(0.0, 0.0))
             self.done = True
             return
         if target_vehicle is None:
             print(f"Vehicle {self.vehicle_id} cannot find target vehicle {self.target_id} to pursue.")
             self.done = True
             return
+        if self.position.distance_to(target_vehicle.position) < 1e-6:
+            self.velocity = Vector2D(0.0, 0.0)
+            self.update_kinematics(settings, Vector2D(0.0, 0.0))
+            self.done = True
+            return
         
-        self.acceleration = self.pursue(target_vehicle, dt)
+        self.update_kinematics(settings, self.pursue(target_vehicle, settings.time_step))
 
-        self.update_kinematics(dt)

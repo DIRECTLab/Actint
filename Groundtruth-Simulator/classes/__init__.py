@@ -6,6 +6,7 @@ from .Position import Position, Position2D, Position3D
 from .Settings import Settings
 from .Vectors import Vector2D, Vector3D
 
+
 __all__ = [
     'Vehicle',
     'Vehicle2D',
@@ -17,4 +18,5 @@ __all__ = [
     'Position2D',
     'Position3D',
     'Settings',
+    'Unit_conversions',
     ]
