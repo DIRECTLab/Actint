@@ -1,8 +1,10 @@
 import json
 import queue
-from classes import Vehicle2D, Vehicle3D, Position, Position2D, Position3D
+from classes import Vehicle2D, Vehicle3D
 from classes import Destination2D, Destination3D
-from classes import Settings, Unit_conversions
+from classes import Settings
+from classes import PositionLatLon
+
 
 def read_json(filename: str) -> tuple[list[Vehicle2D | Vehicle3D], Settings]:
     vehicles: list[Vehicle2D | Vehicle3D] = []
@@ -36,19 +38,19 @@ def read_json(filename: str) -> tuple[list[Vehicle2D | Vehicle3D], Settings]:
             if is_3d:
                 settings.has_vehicle3d = True
                 for d in v.get('destinations', []):
-                    position = Position3D(*Unit_conversions.geodetic_to_local(d['position'].get('lat', 100), d['position'].get('lon', 100), d['position'].get('alt', 100)))
                     error = d.get('error', 5.0)
                     speed = d.get('speed', 50.0)
-                    destinations.put(Destination3D(position, speed, error))
+                    destinations.put(Destination3D(PositionLatLon(d['position'].get('lat', 100), (d['position'].get('lon', 100)+180)%360-180), speed, error))
                 max_altitude = v['properties'].get('max_altitude', 1200)
                 
-                position = Position3D(*Unit_conversions.geodetic_to_local(float(v['properties']['position'].get('lat', 0)), float(v['properties']['position'].get('lon', 0)), float(v['properties']['position'].get('alt', 0))))
                 vehicle = Vehicle3D(
+                    initial_global_latitude=float(v['properties']['position'].get('lat', 0)),
+                    initial_global_longitude=float(v['properties']['position'].get('lon', 0)),
+                    initial_global_altitude=float(v['properties']['position'].get('z', 0)),
                     vehicle_id=id,
                     vehicle_type=type,
                     destination_queue=destinations,
                     time_step=settings.time_step,
-                    position=position,
                     max_speed=max_speed,
                     max_force=max_force,
                     max_altitude=max_altitude,
@@ -57,24 +59,23 @@ def read_json(filename: str) -> tuple[list[Vehicle2D | Vehicle3D], Settings]:
                     follow_distance=follow_distance,
                     stay_time=stay_time,
                     )
+                print(f"Created 3D Vehicle {vehicle}")
                 vehicles.append(vehicle)
             else:
                 settings.has_vehicle2d = True
                 for d in v.get('destinations', []):
-                    x, y, z = Unit_conversions.geodetic_to_local(d['position'].get('lat', 100), d['position'].get('lon', 100), 0.0)
-                    position = Position2D(x, y)
                     error = d.get('error', 30.0)
                     speed = d.get('speed', 50.0)
-                    destinations.put(Destination2D(position, speed, error))
+                    destinations.put(Destination2D(PositionLatLon(d['position'].get('lat', 100), (d['position'].get('lon', 100)+180)%360-180), speed, error))
                 
-                x, y, z = Unit_conversions.geodetic_to_local(float(v['properties']['position'].get('lat', 0)), float(v['properties']['position'].get('lon', 0)), 0.0)
-                position = Position2D(x, y)
+                
                 vehicle = Vehicle2D(
+                    initial_global_latitude=float(v['properties']['position'].get('lat', 0)),
+                    initial_global_longitude=float(v['properties']['position'].get('lon', 0)),
                     vehicle_id=id,
                     vehicle_type=type,
                     destination_queue=destinations,
                     time_step=settings.time_step,
-                    position=position,
                     max_speed=max_speed,
                     max_force=max_force,
                     action=action,
@@ -91,5 +92,5 @@ if __name__ == "__main__":
     for v in vehicles:
         for i in range(200):
             if not v.done:
-                print(f"Vehicle {v.vehicle_id}: {v.vehicle_type} at {v.position} with destination: {v.next_destination.position if v.next_destination else 'None'} and action: {v.action if v.next_destination else 'None'}")
+                print(f"Vehicle {v.vehicle_id}: {v.vehicle_type} at {v.position_utm}{v.position_latlon} with destination: {v.next_destination.position if v.next_destination else 'None'} and action: {v.action if v.next_destination else 'None'}")
             v.update(settings.time_step)

@@ -3,7 +3,8 @@ import numpy as np
 import datetime
 import json
 from pathlib import Path
-from classes import Settings, Unit_conversions
+from classes import Vehicle, Vehicle2D, Vehicle3D, Settings
+from typing import List
 
 # Helper function to generate unique filenames for the csv_print_header function.
 def _name_file(settings: Settings) -> tuple[Path | None, Path | None]:
@@ -72,8 +73,8 @@ def csv_print_header(settings: Settings) -> tuple:
   df2D = pd.DataFrame(columns=[
     "MMSI",           # Maritime Mobile Service Identity (using vehicle_id)
     "BaseDateTime",   # Timestamp
-    "LAT",            # Latitude (using position_y)
-    "LON",            # Longitude (using position_x)
+    "LAT",            # Latitude (using latitude property)
+    "LON",            # Longitude (using longitude property)
     "SOG",            # Speed Over Ground (calculated from velocity)
     "COG",            # Course Over Ground (using heading in degrees)
     "Heading",        # Vessel heading (using heading in degrees)
@@ -88,8 +89,8 @@ def csv_print_header(settings: Settings) -> tuple:
     "date",                 # date
     "time",                 # time
     "icao_hex",             # ICAO hex (using vehicle_id)
-    "latitude",             # Latitude (using position_y)
-    "longitude",            # Longitude (using position_x)
+    "latitude",             # Latitude (using latitude property)
+    "longitude",            # Longitude (using longitude property)
     "altitude",             # Altitude (using position_z)
     "altitude_unit",        # Altitude unit (e.g., meters)
     "vertical_rate",        # Vertical rate (using velocity_z)
@@ -209,15 +210,12 @@ def json_print_data(vehicles: list, filename2D: str, filename3D: str, settings: 
     z = getattr(v, 'pos_z', 0.0)
     
     # Convert local ENU coordinates to geodetic (lat/lon in degrees)
-    lat, lon, height = Unit_conversions.local_to_geodetic(v.pos_x, v.pos_y, z, settings)
     if v.__class__.__name__ == 'Vehicle2D':
       data_rows_2d.append({
         "MMSI": v.vehicle_id,
         "BaseDateTime": settings.current_simulation_time.timestamp() if settings.print_time_as == "unix" else settings.current_simulation_time.isoformat(sep=' ', timespec='seconds'),
-        # "LAT": round(lat, 6),  # Latitude in degrees (~0.1m precision)
-        # "LON": round(lon, 6),  # Longitude in degrees (~0.1m precision)
-        "LAT": v.pos_y,
-        "LON": v.pos_x,
+        "LAT": v.latitude,
+        "LON": v.longitude,
         "SOG": round(np.linalg.norm(v.velocity.vector), 3),  # Speed over ground from velocity magnitude
         "COG": round(np.degrees(v.heading) % 360, 3),  # Course over ground in degrees
         "Heading": round(np.degrees(v.heading) % 360, 3),  # Heading in degrees
@@ -231,9 +229,9 @@ def json_print_data(vehicles: list, filename2D: str, filename3D: str, settings: 
         "date": settings.current_simulation_time.isoformat(sep=",", timespec="seconds").split(",")[0] if settings.print_time_as == "iso" else "",  # Date part of ISO timestamp
         "time": settings.current_simulation_time.isoformat(sep=",", timespec="seconds").split(",")[1] if settings.print_time_as == "iso" else settings.current_simulation_time.timestamp(),
         "icao_hex": f"{v.vehicle_id:06X}",  # ICAO hex from vehicle_id
-        "latitude": round(lat, 6),  # Latitude in degrees (~0.1m precision)
-        "longitude": round(lon, 6),  # Longitude in degrees (~0.1m precision)
-        "altitude": round(height, 3),  # Altitude in meters
+        "latitude": v.latitude,  # Latitude in degrees (~0.1m precision)
+        "longitude": v.longitude,  # Longitude in degrees (~0.1m precision)
+        "altitude": round(v.pos_z, 3),  # Altitude in meters
         "altitude_unit": "meters",
         "vertical_rate": round(v.velocity.z * 60, 3),  # Vertical rate in meters per minute
         "vertical_rate_unit": "meters/minute",
@@ -245,7 +243,7 @@ def json_print_data(vehicles: list, filename2D: str, filename3D: str, settings: 
   if settings.has_vehicle3d and filename3D is not None:
     _append_json_array(filename3D, data_rows_3d)
 
-def csv_print_data(vehicles: list, filename2D: str, filename3D: str, settings: Settings) -> None:
+def csv_print_data(vehicles: List[Vehicle], filename2D: str, filename3D: str, settings: Settings) -> None:
   """Append vehicle data to an existing CSV file in AIS format.
   
   Extracts vehicle data and writes it in AIS-like format.
@@ -269,15 +267,14 @@ def csv_print_data(vehicles: list, filename2D: str, filename3D: str, settings: S
     z = getattr(v, 'pos_z', 0.0)
     
     # Convert local ENU coordinates to geodetic (lat/lon in degrees)
-    lat, lon, height = Unit_conversions.local_to_geodetic(v.pos_x, v.pos_y, z, settings)
-    if v.__class__.__name__ == 'Vehicle2D':
+    # lat, lon, height = local_to_geodetic(v.pos_x, v.pos_y, z, settings)
+    if isinstance(v, Vehicle2D):
+
       data_rows_2d.append({
         "MMSI": v.vehicle_id,
         "BaseDateTime": settings.current_simulation_time.timestamp() if settings.print_time_as == "unix" else settings.current_simulation_time.isoformat(sep=' ', timespec='seconds'),
-        # "LAT": round(lat, 6),  # Latitude in degrees (~0.1m precision)
-        # "LON": round(lon, 6),  # Longitude in degrees (~0.1m precision)
-        "LAT": v.pos_y,
-        "LON": v.pos_x,
+        "LAT": round(v.latitude, 6),
+        "LON": round(v.longitude, 6),
         "SOG": round(np.linalg.norm(v.velocity.vector), 3),  # Speed over ground from velocity magnitude
         "COG": round(np.degrees(v.heading) % 360, 3),  # Course over ground in degrees
         "Heading": round(np.degrees(v.heading) % 360, 3),  # Heading in degrees
@@ -286,14 +283,14 @@ def csv_print_data(vehicles: list, filename2D: str, filename3D: str, settings: S
         "Length": round(getattr(v, 'scale', 0.0), 3),  # Using scale as length approximation
         "Width": round(getattr(v, 'scale', 0.0) / 3, 3),  # Approximate width as 1/3 of length
       })
-    elif v.__class__.__name__ == 'Vehicle3D':
+    elif isinstance(v, Vehicle3D):
       data_rows_3d.append({
         "date": settings.current_simulation_time.isoformat(sep=",", timespec="seconds").split(",")[0] if settings.print_time_as == "iso" else "",
         "time": settings.current_simulation_time.isoformat(sep=",", timespec="seconds").split(",")[1] if settings.print_time_as == "iso" else settings.current_simulation_time.timestamp(),
         "icao_hex": f"{v.vehicle_id:06X}",  # ICAO hex from vehicle_id
-        "latitude": round(lat, 6),  # Latitude in degrees (~0.1m precision)
-        "longitude": round(lon, 6),  # Longitude in degrees (~0.1m precision)
-        "altitude": round(height, 3),  # Altitude in meters
+        "latitude": round(v.latitude, 6),  # Latitude in degrees (~0.1m precision)
+        "longitude": round(v.longitude, 6),  # Longitude in degrees (~0.1m precision)
+        "altitude": round(v.pos_z, 3),  # Altitude in meters
         "altitude_unit": "meters",
         "vertical_rate": round(v.velocity.z * 60, 3),  # Vertical rate in meters per minute
         "vertical_rate_unit": "meters/minute",
