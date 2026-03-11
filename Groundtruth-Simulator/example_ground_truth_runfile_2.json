@@ -1,0 +1,56 @@
+{
+  "sim_settings": {
+    "output_file_2d": "JFN-Groundtruth-Simulator_result_2D.csv",
+    "output_file_3d": "JFN-Groundtruth-Simulator_result_3D.csv",
+    "time_step": 0.4,
+    "start_time": "2025-01-27 02:58:45",
+    "time_format": "%Y-%m-%d %H:%M:%S"
+  },
+  "vehicles": [
+    {
+      "id": 1,
+      "type": "car",
+      "is_3d": false,
+      "properties": {
+        "max_speed": 100.0,
+        "max_force": 200.0,
+        "initial_global_position": {
+          "latitude": 42.00107,
+          "longitude": -111.33747
+        }
+      },
+      "destinations": [
+        {
+          "global_position": { "latitude": 42.00110, "longitude": -111.33750 },
+          "speed": 50.0,
+          "error": 30.0,
+          "action": "seek"
+        },
+        {
+          "global_position": { "latitude": 42.00120, "longitude": -111.33600 },
+          "speed": 50.0,
+          "error": 30.0,
+          "action": "seek"
+        },
+        {
+          "global_position": { "latitude": 42.00120, "longitude": -111.33500 },
+          "speed": 50.0,
+          "error": 30.0,
+          "action": "seek"
+        },
+        {
+          "global_position": { "latitude": 42.00110, "longitude": -111.33400 },
+          "speed": 50.0,
+          "error": 30.0,
+          "action": "seek"
+        },
+        {
+          "global_position": { "latitude": 42.00107, "longitude": -111.33747 },
+          "speed": 50.0,
+          "error": 30.0,
+          "action": "arrive"
+        }
+      ]
+    }
+  ]
+}
