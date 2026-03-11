@@ -1,8 +1,14 @@
 import queue, math
 import numpy as np
 from numpy.typing import NDArray
+# Assuming Position, PositionUTM, Position3D, PositionLatLon are in 'classes' module
+from .Position import Position, PositionUTM, Position3D
+# Assuming Vehicle is imported from classes.Vehicle
 from .Vehicle import Vehicle
-from .Position import Position3D
+# Assuming utm conversion functions are imported (from helpers.coordinate_converters)
+from helpers.utm import latlon_to_utm, utm_to_latlon # Corrected import
+# Need Vehicle2D to inherit from
+from .Vehicle2D import Vehicle2D as BaseVehicle2D
 from .Vectors import Vector3D
 from .Settings import Settings
 from datetime import datetime as dt
@@ -34,32 +40,41 @@ def truncate(v: Vector3D, limit: float) -> Vector3D:
 def scale_vector(vec: Vector3D, scalar: float) -> Vector3D:
     return Vector3D(vec.x * scalar, vec.y * scalar, vec.z * scalar)
 
-class Vehicle3D(Vehicle):
+class Vehicle3D(BaseVehicle2D): # Inherit from the new Vehicle2D
     def __init__(
             self,
             vehicle_id: int,
             vehicle_type: str,
             destination_queue: queue.Queue,
-            time_step: float,
+            time_step: float = 1, # Default time_step
 
-            position: Position3D = Position3D(0,0,0),
-            max_speed: float = 100,
-            max_force: float = 200,
-            max_altitude: int = 10000,
+            # Global Lat/Lon position is now the primary input for initialization
+            initial_global_latitude: float = 42.00107,
+            initial_global_longitude: float = -111.33747,
+            initial_global_altitude: float = 0.0, # New parameter for 3D
+
+            max_speed: float = 100.0,
+            max_force: float = 200.0,
+            max_altitude: float = 10000.0, # Float for consistency
             scale: float = 10.0,
             action: str = 'seek',
             target_id: int | None = None,
             follow_distance: float = 0.0,
             stay_time: str | float = 0.0,
             ):
+        # Call the parent's (Vehicle2D's) constructor
         super().__init__(
-            vehicle_id,
-            vehicle_type,
-            destination_queue,
-            time_step,
-            action
+            vehicle_id=vehicle_id,
+            vehicle_type=vehicle_type,
+            destination_queue=destination_queue,
+            time_step=time_step,
+            initial_global_latitude=initial_global_latitude,
+            initial_global_longitude=initial_global_longitude,
+            max_speed=max_speed,
+            max_force=max_force,
+            scale=scale,
+            action=action,
             )
-        self._position: Position3D = position
         self._velocity: Vector3D = Vector3D(0.0, 0.0, 0.0)
         self._acceleration: Vector3D = Vector3D(0.0, 0.0, 0.0)
         self.max_speed: np.float64 = np.float64(max_speed)
@@ -76,6 +91,11 @@ class Vehicle3D(Vehicle):
         # Inherited from Vehicle:
         # self.next_destination: Destination = None
         # self.done : bool = False
+        self.initial_global_latitude=initial_global_latitude,
+        self.initial_global_longitude=initial_global_longitude,
+        self.max_speed=max_speed,
+        self.max_force=max_force,
+        self.scale=scale
 
     @property
     def pos_x(self) -> float:
@@ -92,46 +112,83 @@ class Vehicle3D(Vehicle):
     @pos_y.setter
     def pos_y(self, value: float) -> None:
         self._position.y = value
+        # Override the _position_utm (from PositionUTM) to Position3D
+        # and ensure _velocity, _acceleration are also 3D.
+        # super().__init__ already set _position_utm as a PositionUTM based on initial Lat/Lon.
+        # Now, we "upgrade" _position_utm to Position3D, adding the initial altitude.
+        self._position_utm: Position3D = Position3D(
+            self._position_utm.x,
+            self._position_utm.y,
+            self.initial_global_altitude
+        )
+        # Velocity and acceleration also need to be 3D
+        self._velocity: Position3D = Position3D(0.0, 0.0, 0.0)
+        self._acceleration: Position3D = Position3D(0.0, 0.0, 0.0)
+        
+        self.max_altitude: float = float(self.max_altitude) # Ensure float type
+        
+        # Target for local steering, should be in 3D UTM
+        self.target: Position3D = Position3D(
+            self._position_utm.x,
+            self._position_utm.y,
+            self._position_utm.z
+        )
 
+    # --- Properties ---
     @property
     def pos_z(self) -> float:
         return self.position.z
     
     @pos_z.setter
     def pos_z(self, value: float) -> None:
-        self._position.z = value
+        # Create a new Position3D object to trigger the main @position.setter
+        new_pos = Position3D(self.position.x, self.position.y, value)
+        self.position = new_pos # This will call the main @position.setter
 
     @property
     def position(self) -> Position3D:
-        return Position3D(self._position.x, self._position.y, self._position.z)
+        """
+        Returns the current UTM position (easting, northing, altitude).
+        """
+        return self._position_utm
     
     @position.setter
-    def position(self, position: Position3D) -> None:
-        self._position = position
+    def position(self, new_utm_position: Position3D) -> None:
+        """
+        Sets the UTM position. This setter will convert the new UTM coordinates
+        (x,y) back to Lat/Lon and then use the parent's global_position setter to handle
+        zone re-evaluation and coordinate updates for x,y. The altitude (z) is
+        updated directly and clamped.
+        """
+        if not isinstance(new_utm_position, Position3D):
+            raise TypeError("position for Vehicle3D must be a Position3D object (easting, northing, altitude).")
 
-    @property
-    def velocity_x(self) -> float:
-        return self._velocity.x
+        if self._utm_zone_number == 0 or not self._utm_zone_letter:
+             raise ValueError("UTM zone info not set for 3D vehicle before setting UTM position directly.")
 
-    @velocity_x.setter
-    def velocity_x(self, value: float) -> None:
-        self._velocity.x = value
+        lat, lon = utm_to_latlon(
+            new_utm_position.x,
+            new_utm_position.y,
+            self._utm_zone_number,
+            self._utm_zone_letter
+        )
+        
+        # --- FIX HERE: Call the parent's property setter ---
+        # This will update self._global_position_latlon and self._position_utm (x,y)
+        # BUT it will set self._position_utm to a PositionUTM object.
+        BaseVehicle2D.global_position.fset(self, PositionUTM(lat, lon))
 
-    @property
-    def velocity_y(self) -> float:
-        return self._velocity.y
+        # --- SECOND FIX HERE: Re-cast _position_utm back to Position3D ---
+        # After the parent setter runs, self._position_utm is PositionUTM.
+        # We need it to be Position3D for a 3D vehicle.
+        # We reconstruct it using its current X, Y and the new Z.
+        if not isinstance(self._position_utm, Position3D):
+            self._position_utm = Position3D(self._position_utm.x, self._position_utm.y, 0.0) # Default Z for recasting
 
-    @velocity_y.setter
-    def velocity_y(self, value: float) -> None:
-        self._velocity.y = value
+        # Now, update the Z component (altitude) for the (now correctly typed) 3D UTM position
+        clamped_z = np.clip(new_utm_position.z, 0.0, self.max_altitude)
+        self._position_utm.z = float(clamped_z)
 
-    @property
-    def velocity_z(self) -> float:
-        return self._velocity.z
-    
-    @velocity_z.setter
-    def velocity_z(self, value: float) -> None:
-        self._velocity.z = value
 
     @property
     def velocity(self) -> Vector3D:
@@ -163,18 +220,23 @@ class Vehicle3D(Vehicle):
 
     __str__ = lambda self: f"Vehicle3D(id={self.vehicle_id}, type={self.vehicle_type}, position=({self.position.x}, {self.position.y}, {self.position.z}), velocity=({self.velocity.x}, {self.velocity.y}, {self.velocity.z}), action={self.action})"
         
+    # --- Methods ---
+
     def _build_arrow(self) -> NDArray[np.float64]:
+        # For now, keeping 2D projection on X,Y plane, but storing as 3D vectors
         return np.array([
-            [1, 0],
-            [-1, 0.5],
-            [-0.5, 0],
-            [-1, -0.5]
+            [1, 0, 0], # x, y, z
+            [-1, 0.5, 0],
+            [-0.5, 0, 0],
+            [-1, -0.5, 0]
         ], dtype=np.float64) * self.scale
     
     def _assign_next_destination(self) -> bool:
         """Assign the next destination and set target to the destination's position."""
-        success = super()._assign_next_destination()
+        success = super()._assign_next_destination() 
         if success and self.next_destination:
+            if not isinstance(self.next_destination.position, Position3D):
+                raise TypeError("3D vehicle's destination position must be Position3D.")
             self.target = self.next_destination.position
         return success
 
@@ -299,6 +361,20 @@ class Vehicle3D(Vehicle):
             self.acceleration = Vector3D(0.0, 0.0, 0.0)
 
         self.update_kinematics(dt)
+        self._velocity = truncate(
+            self._velocity + scale_vector(self._acceleration, float(dt)),
+            float(self.max_speed),
+        )
+        self.position = self.position + scale_vector(self._velocity, float(dt))
+
+        if np.linalg.norm(self._velocity.vector) > 1e-6:
+            direction = normalize(self._velocity)
+            self.heading = math.atan2(direction.y, direction.x)
+
+        if self._velocity.magnitude() > 1e-6: 
+            horizontal_speed_sq = self._velocity.x**2 + self._velocity.y**2
+            if horizontal_speed_sq > 1e-12:
+                self.heading = math.atan2(self._velocity.y, self._velocity.x)
 
         if self.next_destination.has_reached(self.position):
             if self._has_next_destination():

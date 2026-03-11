@@ -1,4 +1,5 @@
 from datetime import datetime as dt, timedelta
+from .Currents import Currents
 
 
 class Settings:
@@ -16,6 +17,7 @@ class Settings:
         self.has_vehicle2d = False
         self.has_vehicle3d = False
         self.print_time_as = print_time_as  # Default time format for printing (iso or unix)
+        self.ocean_current = Currents()  # Initialize currents data
 
     @property
     def has_vehicle2d(self) -> bool:

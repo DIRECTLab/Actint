@@ -30,7 +30,7 @@ def main():
         all_done = all(v.done == True for v in vehicles)
         settings.advance_time(settings.time_step)
     
-
+    settings.ocean_current.close()
 
 
 if __name__== "__main__":

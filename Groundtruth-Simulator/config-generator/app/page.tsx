@@ -9,12 +9,12 @@ import "leaflet/dist/leaflet.css";
 import SimSettings from '../components/sim_settings';
 import dynamic from "next/dynamic";
 
-const Map = dynamic(() => import('../components/Map'), { 
+const Map = dynamic(() => import('../components/Map/Map'), { 
   ssr: false,
   loading: () => <p>Loading Map...</p>
 })
 
-const VehicleSidebar = dynamic(() => import('../components/vehicle_sidebar'), { 
+const VehicleSidebar = dynamic(() => import('../components/vehicle_sidebar/vehicle_sidebar'), { 
   ssr: false,
   loading: () => <p>Loading Map...</p>
 })
@@ -45,6 +45,14 @@ export default function Home() {
   const [markers, setMarkers] = useState<DestinationTyp[]>([])
   const [vehiclesList, setVehiclesList] = useState<VehicleTyp[]>([]);
 
+  useEffect(() => {
+        if(markers.length > 0) {
+            let lat = markers[0].position.LatLng.lat
+            let lng = markers[0].position.LatLng.lng
+
+            setVehicleSettings(prev => ({...prev, properties: {...prev.properties, position: {...prev.properties.position, LatLng: {lat: lat, lng: lng}}}}))
+        }
+    }, [markers[0]])
 
   
   function vehicleIs3D () {
