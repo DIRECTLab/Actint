@@ -39,3 +39,18 @@ Vessel Info: Designation: LCS-34. Class: INDEPENDENCE. Fleet: US_3RD_FLEET. Home
 Position: Coordinates: 30.68542°N, 88.03381°W. Last Report: 2023-01-01T23:59:16.000000. Speed: 0.0 knots. Course: 144.8°
 Geographic Context: Maritime Region: Gulf of Mexico. Nearest Port: Jacksonville, FL (331 nm). Location: 331 nm W of Jacksonville, FL
 ",The USS AUGUSTA is currently traveling at a speed of 0.0 knots.,True,3,1.0467464923858643,0.48858029253750607,0.8407420560033643,0.6894001060063601
+2026-03-05T21:00:44.097292+00:00,Where is USS KIDD right now?,"=== USS KIDD ===
+Vessel Info: Designation: DDG-100. Class: ARLEIGH BRUKE. Fleet: US_PAC_FLEET. Home Port: Naval Station Evverett, Washington
+Position: Coordinates: 33.08487°N, 118.49759°W. Last Report: 2023-01-01T23:59:17.000000. Speed: 10.9 knots. Course: 211.7°
+Geographic Context: Maritime Region: Pacific Ocean (Central). Nearest Port: Los Angeles, CA (41 nm). Location: Near Los Angeles, CA
+","USS KIDD is currently located near Los Angeles, California, in the Pacific Ocean (Central).",True,3,0.6573381423950195,0.6033771711516275,4.124625087017193,2.40687275500386
+2026-03-05T21:00:44.995200+00:00,What is the position of USS MONTGOMERY?,"=== USS MONTGOMERY ===
+Vessel Info: Designation: LCS-8. Class: FREEDOM. Fleet: US_3RD_FLEET. Home Port: San Diego, California
+Position: Coordinates: 32.85930°N, 117.86774°W. Last Report: 2023-01-01T23:59:36.000000. Speed: 4.6 knots. Course: 300.1°
+Geographic Context: Maritime Region: Pacific Ocean (Central). Nearest Port: San Diego, CA (37 nm). Location: Near San Diego, CA
+","The position of USS MONTGOMERY is at coordinates 32.85930°N, 117.86774°W.",True,3,0.5970916152000427,0.6261381566859867,0.8924203329952434,0.7077888599887956
+2026-03-05T22:17:37.924231+00:00,"Hello, how are you doing?","=== USS LASSEN ===
+Vessel Info: Designation: DDG-82. Class: ARLEIGH BRUKE. Fleet: US_FLEET_FORCES_COMMAND. Home Port: Naval Station Mayport, Florida
+Position: Coordinates: 30.39730°N, 81.41468°W. Last Report: 2023-01-01T23:59:48.000000. Speed: 0.1 knots. Course: 107.0°
+Geographic Context: Maritime Region: Gulf of Mexico. Nearest Port: Mayport, FL (1 nm). Location: Near Mayport, FL
+",I am a maritime intelligence assistant and I am here to help you with any questions or concerns you may have related to maritime activities.,True,3,1.6774078607559204,0.37349557930918564,1.5861170610005502,0.8604744529875461
