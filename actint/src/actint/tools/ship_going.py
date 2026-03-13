@@ -21,21 +21,27 @@ If the ship is travelling exactly toward the target, the ratio will be 1"""
 
 """It might be a good idea to make this thing "smart" and only take the tracks that roughly follow a straight line"""
 
-VECTOR_DISTANCE_RATIO = 0.4
+VECTOR_DISTANCE_RATIO = 0.7
 DEGREE_THRESHOLD= 15
 
-def calculate_vector_and_distance_sum(ship_mmsi: str, number_detections=100, tracking_time=timedelta(hours=1)):
+def calculate_vector_and_distance_sum(ship_mmsi: str, number_detections=300, tracking_time=timedelta(hours=1)):
     positions = query_ais_positions({"mmsi": ship_mmsi}, sort=True)
     
     position1 = positions[number_detections]
+    rescent_reversed_positions = reversed(positions[:number_detections])
     total_vector = [0.0, 0.0]
     total_distance = 0
-    for position2 in reversed(positions[:number_detections]):
+    for position2 in rescent_reversed_positions:
         latlng = vectorize(position1[3], position1[4], position2[3], position2[4])
         total_vector[0] += latlng[0]
         total_vector[1] += latlng[1]
         total_distance += math.hypot(latlng[0], latlng[1])
     print(total_vector, total_distance)
+    
+    for position in rescent_reversed_positions:
+        print(position)
+
+        
     if(math.hypot(total_vector[0], total_vector[1])/total_distance > VECTOR_DISTANCE_RATIO):                                                       #Caan use this to describe if the ship is going fast or slow
         print("The ship is going toward something")
 
@@ -99,8 +105,8 @@ def get_possible_destinations(current_position, direction_vector):
     max_fov_continent_name = None
     max_fov_maritime_name = None
 
-
-    if math.hypot(nearest_thing[0], nearest_thing[1]) < 300:
+    print(haversine_distance_nm(current_position[0], current_position[1], nearest_thing[0], nearest_thing[1]) )
+    if haversine_distance_nm(current_position[0], current_position[1], nearest_thing[0], nearest_thing[1]) < 300:
         return f"The ship is going toward {nearest_thing_name}"
 
     else:
@@ -115,11 +121,6 @@ def get_possible_destinations(current_position, direction_vector):
 
             current_lat = current_position[0]
             current_lon = current_position[1]
-
-            print(lat_min)            
-            print(lat_max)
-            print(lon_min)
-            print(lon_max)
 
             
             degree1 = calculate_bearing(current_lat, current_lon, lat_min, lon_min)
@@ -192,4 +193,4 @@ def get_possible_destinations(current_position, direction_vector):
 
 
 if __name__ == "__main__":
-    calculate_vector_and_distance_sum(338839000)
+    calculate_vector_and_distance_sum(368011000)

@@ -1,5 +1,5 @@
-from actint.tools.close_to_fleet import is_ship_in_fleet, calculate_fleet_position
+from actint.tools.ship_going import calculate_vector_and_distance_sum
 
 
-print(is_ship_in_fleet(368011000))
+print(calculate_vector_and_distance_sum(368011000))
 
