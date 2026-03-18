@@ -13,6 +13,20 @@
   },
   "vehicles": [
     {
+      "id": 2,
+      "type": "drone",
+      "is_3d": true,
+      "action": "follow",
+      "target_id": 1,
+      "follow_distance": 5.0,
+      "properties": {
+        "max_speed": 100.0,
+        "max_force": 200.0,
+        "max_altitude": 1200,
+        "position": { "x": 0, "y": 0, "z": 0 }
+      }
+    },
+    {
       "id": 1,
       "type": "plane",
       "is_3d": true,
@@ -50,20 +64,6 @@
           "error": 30.0
         }
       ]
-    },
-    {
-      "id": 2,
-      "type": "drone",
-      "is_3d": true,
-      "action": "follow",
-      "target_id": 1,
-      "follow_distance": 5.0,
-      "properties": {
-        "max_speed": 100.0,
-        "max_force": 200.0,
-        "max_altitude": 1200,
-        "position": { "x": 0, "y": 0, "z": 0 }
-      }
     }
   ]
 }

@@ -1,5 +1,5 @@
 from abc import ABC
-from .Position import Position, Position2D, Position3D
+from .Position import Position, PositionLatLon, PositionUTM, Position3D
 
 class Destination(ABC):
     """
@@ -62,13 +62,13 @@ class Destination2D(Destination):
     specifically designed for 2D positions.
     
     Attributes:
-        position (Position2D): The 2D geometric position of the destination
+        position (PositionLatLon): The 2D geometric position of the destination
         target_speed_to_next_destination (float): Target speed to reach the next destination
         error (float): Acceptable error margin for determining if destination is reached
     """
     
     def __init__(self,
-                 position: Position2D,
+                 position: PositionLatLon,
                  target_speed_to_next_destination: float,
                  error: float,
                  ):
@@ -76,7 +76,7 @@ class Destination2D(Destination):
         Initialize a 2D Destination instance.
         
         Args:
-            position (Position2D): The 2D geometric position of the destination
+            position (PositionLatLon): The 2D geometric position of the destination
             target_speed_to_next_destination (float): Target speed to reach the next destination
             error (float): Acceptable error margin for determining if destination is reached
         """
@@ -106,7 +106,7 @@ class Destination3D(Destination):
         
         Args:
             position (Position3D): The 3D geometric position of the destination
-            target_speed_to_next_destination (int): Target speed to reach the next destination
+            target_speed_to_next_destination (float): Target speed to reach the next destination
             error (float): Acceptable error margin for determining if destination is reached
         """
         super().__init__(position, target_speed_to_next_destination, error)
