@@ -314,7 +314,7 @@ if __name__ == "__main__":
         for query in test_queries:
             print(f"Query: {query}")
             print("-" * 40)
-            result = llm.query(query)
+            result = llm.query(query, max_new_tokens=2048)
             print("BEGIN CONTEXT\n" + "=" * 60)
             print(result["context"])
             print("END OF CONTEXT \n" + "=" * 60 + "\n")
