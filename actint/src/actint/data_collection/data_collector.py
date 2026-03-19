@@ -71,6 +71,7 @@ import io
 from alive_progress import alive_bar
 import time
 import re
+import gc
 
 # -------------------------
 # Configuration
@@ -139,23 +140,45 @@ def download_Tar(day):
     content_file = io.BytesIO(content)
 
     with tarfile.open(fileobj=content_file, mode="r:*") as tar:
+        
         #tar.extractall(RAW_DIR, filter=lambda tarinfo, _: tarinfo) #writes extracted tar to raw data directory (need to add date folder)
+        total_matches = 0
+
         for member in tar.getmembers():
-            #print(member.name)
-            # Match files in traces/00-ff/ ending in .json.gz
-            #if re.match(r'^./traces/[0-9a-fA-F]{2}/.*\.json$', member.name):
-            if re.match(r'^./traces/00/.*\.json$', member.name):
-                print(f"regex match found: {member.name}")
-                f = tar.extractfile(member)
-                if f:
-                    with gzip.open(f, 'rb') as gz:
-                        try:
-                            data = json.load(gz)
-                            # Optional: Add the source filename to the data
-                            # data['_source_file'] = member.name
-                            all_records.append(data)
-                        except (json.JSONDecodeError, gzip.BadGzipFile):
-                            continue
+            if re.match(r'^./traces/[0-9a-fA-F]{2}/.*\.json$', member.name):
+                total_matches = total_matches + 1
+
+        print(f"Total JSON Matches: {total_matches}")
+
+
+        with alive_bar(total_matches) as bar:
+
+            bar.title = 'Extracting JSON Traces: '
+
+            for member in tar.getmembers():
+                #print(member.name)
+
+                # Match files in traces/00-ff/ ending in .json.gz
+                if re.match(r'^./traces/[0-9a-fA-F]{2}/.*\.json$', member.name): #all json matched
+                #if re.match(r'^./traces/00/.*\.json$', member.name): #testing match to reduce number of files
+                    #print(f"regex match found: {member.name}")
+                    f = tar.extractfile(member)
+                    if f:
+                        with gzip.open(f, 'rb') as gz:
+                            try:
+                                data = json.load(gz)
+                                # Optional: Add the source filename to the data
+                                # data['_source_file'] = member.name
+                                all_records.append(data)
+                            except (json.JSONDecodeError, gzip.BadGzipFile):
+                                continue
+
+                            #clean up unused objects now that all data is saved to all_records
+                            del data
+                            del gz
+                            del f
+                            gc.collect()
+                            bar()
 
     # Write the final combined list to a local file
     with open("combined_traces.json", "w", encoding="utf-8") as out_file:
