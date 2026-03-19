@@ -8,36 +8,26 @@ Optional arguments: data-out-dir (set output directory to store json data in) de
 
 Example download links
 
-https://github.com/adsblol/globe_history_2026/releases/tag/v2026.03.15-planes-readsb-prod-0#assets
-https://github.com/adsblol/globe_history_2026/releases/tag/v2026.03.14-planes-readsb-prod-0#assets
-
 https://github.com/adsblol/globe_history_2026/releases/download/v2026.03.14-planes-readsb-prod-0/v2026.03.14-planes-readsb-prod-0.tar.aa
 https://github.com/adsblol/globe_history_2026/releases/download/v2026.03.14-planes-readsb-prod-0/v2026.03.14-planes-readsb-prod-0.tar.ab
-
-https://github.com/adsblol/globe_history_2025/releases/download/v2025.12.08-planes-readsb-prod-0/v2025.12.08-planes-readsb-prod-0.tar.ab
-
-https://github.com/adsblol/globe_history_2024/releases/tag/v2024.01.31-planes-readsb-prod-0#assets
 https://github.com/adsblol/globe_history_2024/releases/download/v2024.02.01-planes-readsb-prod-0/v2024.02.01-planes-readsb-prod-0.tar
 
 Pseudo Code
-
-main function
+        
+new design
 
     get start and end dates from arguments
     end date defaults to start date
     optional output directory argument defaults to DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
 
     determine number of days and which days we will be looping through to get data 
-        needs to account for multiple months or years
-        and leap year in 2024 (feb 29th)
 
-    loop for each day in list of days
-        download_day("date") //gets the tar.a* files
-        unzip() //finds the tar file in the DATA_DIR and does cat file.tar.a* | tar -xf - -C combined/ to unzip and save to a folder
-                //next it will unzip the json files that are zip compressed with command: gzip -dc file.json.gz > ./folder/file.json
-        concat_json() //takes the latest uncompressed json files and concatenates them into one file
+    stream tar files to memory
+    extract tar files
+    loop through trace folder and extract and combine json files (in the tar archive there is a directory called traces with directories 00-ff each has compressed json data)
+    write out json file
+    
 
-        
 AI suggested design
         
 
@@ -77,6 +67,10 @@ import json
 from pathlib import Path
 from datetime import datetime, timedelta
 import sqlite3
+import io
+from alive_progress import alive_bar
+import time
+import re
 
 # -------------------------
 # Configuration
@@ -87,7 +81,6 @@ OUT_DIR = DATA_DIR / "processed"
 BATCH_SIZE = 5000
 
 BASE_URL = "https://github.com/adsblol/globe_history_{year}/releases/download"
-
 
 
 # -------------------------
@@ -117,66 +110,60 @@ def build_date_range(start_str, end_str=None):
 
 
 # -------------------------
-# Download helpers
+# Downloading TAR to memory
 # -------------------------
-def download_file(url, path):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists():
-        print(f"[INFO] Skipping existing file: {path.name}")
-        return
-    print(f"[INFO] Downloading: {url}")
-    with requests.get(url, stream=True) as r:
-        r.raise_for_status()
-        with open(path, "wb") as f:
-            for chunk in r.iter_content(1024 * 1024):
-                f.write(chunk)
 
 
+def download_Tar(day): 
+    
+    all_records = []
 
-def download_day(day):
     year = day.year
     tag = f"v{day:%Y.%m.%d}-planes-readsb-prod-0"
-    raw_day_dir = RAW_DIR / f"{day:%Y-%m-%d}"
-    raw_day_dir.mkdir(parents=True, exist_ok=True)
 
-    files = []
+    url = f"{BASE_URL.format(year=year)}/{tag}/{tag}.tar"
 
-    # First try the single .tar file (no parts)
-    single_filename = f"{tag}.tar"
-    single_url = f"{BASE_URL.format(year=year)}/{tag}/{single_filename}"
-    single_path = raw_day_dir / single_filename
-
-    try:
-        download_file(single_url, single_path)
-        files.append(single_path)
-        return files  # if single .tar exists, no need to check parts
-    except requests.HTTPError as e:
-        if e.response.status_code != 404:
-            raise
-        # else, single file doesn't exist → fall back to parts
-
-    # Generate parts dynamically from 'aa' to 'az'
-    parts = [f"a{chr(ord('a') + i)}" for i in range(26)]
-
-    for part in parts:
-        filename = f"{tag}.tar.{part}"
-        url = f"{BASE_URL.format(year=year)}/{tag}/{filename}"
-        path = raw_day_dir / filename
-
+    with alive_bar(title=f"Getting: {day:%Y.%m.%d} ") as bar:
         try:
-            download_file(url, path)
-            files.append(path)
-        except requests.HTTPError as e:
-            if e.response.status_code == 404:
-                # stop after first missing part
-                break
-            else:
-                raise
+            response = requests.get(url)
+            response.raise_for_status() 
 
-    if not files:
-        print(f"[WARN] No tar files found for {day:%Y-%m-%d}")
-        
-    return files
+            #bar.text = 'Data fetched successfully!'
+            bar()
+        except requests.exceptions.RequestException as e:
+            #bar.text = f'Request failed: {e}'
+            print(f"Request failed: {e}")
+
+    content = response.content 
+
+    content_file = io.BytesIO(content)
+
+    with tarfile.open(fileobj=content_file, mode="r:*") as tar:
+        #tar.extractall(RAW_DIR, filter=lambda tarinfo, _: tarinfo) #writes extracted tar to raw data directory (need to add date folder)
+        for member in tar.getmembers():
+            #print(member.name)
+            # Match files in traces/00-ff/ ending in .json.gz
+            #if re.match(r'^./traces/[0-9a-fA-F]{2}/.*\.json$', member.name):
+            if re.match(r'^./traces/00/.*\.json$', member.name):
+                print(f"regex match found: {member.name}")
+                f = tar.extractfile(member)
+                if f:
+                    with gzip.open(f, 'rb') as gz:
+                        try:
+                            data = json.load(gz)
+                            # Optional: Add the source filename to the data
+                            # data['_source_file'] = member.name
+                            all_records.append(data)
+                        except (json.JSONDecodeError, gzip.BadGzipFile):
+                            continue
+
+    # Write the final combined list to a local file
+    with open("combined_traces.json", "w", encoding="utf-8") as out_file:
+        json.dump(all_records, out_file, indent=4)
+
+    print(f"Done! Saved {len(all_records)} JSON objects to combined_traces.json")
+
+
 
 
 # -------------------------
@@ -188,7 +175,7 @@ def main():
 
     for day in days:
         print(f"[DATE] {day.date()}")
-        parts = download_day(day)
+        download_Tar(day)
 
 
 if __name__ == "__main__":
