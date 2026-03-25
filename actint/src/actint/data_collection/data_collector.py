@@ -13,8 +13,6 @@ https://github.com/adsblol/globe_history_2026/releases/download/v2026.03.14-plan
 https://github.com/adsblol/globe_history_2024/releases/download/v2024.02.01-planes-readsb-prod-0/v2024.02.01-planes-readsb-prod-0.tar
 
 Pseudo Code
-        
-new design
 
     get start and end dates from arguments
     end date defaults to start date
@@ -25,38 +23,10 @@ new design
     stream tar files to memory
     extract tar files
     loop through trace folder and extract and combine json files (in the tar archive there is a directory called traces with directories 00-ff each has compressed json data)
-    write out json file
-    
-
-AI suggested design
-        
-
-Start the program
-    Read the start date and optional end date from the command-line arguments
-    Determine the list of days to process (handle month/year changes and leap years)
-
-For each day in the list:
-    Download all parts of the day's tar archive from the server
-    Combine the tar parts into a single stream (without writing a big file to disk)
-    
-    For each JSON.gz file inside the tar stream:
-        Open the gzip file as a stream
-        For each record in the JSON:
-            Flatten or extract the fields needed for the database
-            Add the record to a batch
-
-            If the batch reaches a certain size:
-                Insert all records in the batch into the SQLite database
-                Clear the batch
-
-    After finishing all files:
-        If any records remain in the batch:
-            Insert them into SQLite
-
-    Optionally:
-        Generate embeddings from the records and insert them into ChromaDB
-
-End the program
+    normalize the json file (flatten and add keys)
+    write normed data to SQL DB
+    compile list of aircrafts as entries are saved and write to a table
+    embed aircraft table entries into ChromaDB
 
 """
 import argparse
@@ -113,8 +83,6 @@ def build_date_range(start_str, end_str=None):
 # -------------------------
 # Downloading TAR to memory
 # -------------------------
-
-
 def download_Tar(day): 
     
     all_records = []
@@ -124,22 +92,42 @@ def download_Tar(day):
 
     url = f"{BASE_URL.format(year=year)}/{tag}/{tag}.tar"
 
+    parts = []
+
     with alive_bar(title=f"Getting: {day:%Y.%m.%d} ") as bar:
         try:
             response = requests.get(url)
-            response.raise_for_status() 
+            if response.status_code == 200:
+                print("Found single file")
+                parts.append(response.content)
 
-            #bar.text = 'Data fetched successfully!'
+            else:
+                print("Using multi-part file")
+                for b in "abcdefghijklmnopqrstuvwxyz":
+                    part = f"a{b}"
+                    url_parts = f"{url}.{part}"
+
+                    r = requests.get(url_parts)
+                    if r.status_code == 404:
+                        break
+
+                    r.raise_for_status()
+                    parts.append(r.content)
+
             bar()
+
         except requests.exceptions.RequestException as e:
-            #bar.text = f'Request failed: {e}'
             print(f"Request failed: {e}")
 
-    content = response.content 
+    
+    if not parts:
+        print("No data found")
+        return
+    
+    tar_bytes = b"".join(parts)
+    tar_buffer = io.BytesIO(tar_bytes)
 
-    content_file = io.BytesIO(content)
-
-    with tarfile.open(fileobj=content_file, mode="r:*") as tar:
+    with tarfile.open(fileobj=tar_buffer, mode="r:*") as tar:
         
         #tar.extractall(RAW_DIR, filter=lambda tarinfo, _: tarinfo) #writes extracted tar to raw data directory (need to add date folder)
         total_matches = 0
@@ -150,26 +138,22 @@ def download_Tar(day):
 
         print(f"Total JSON Matches: {total_matches}")
 
-
         with alive_bar(total_matches) as bar:
 
             bar.title = 'Extracting JSON Traces: '
 
             for member in tar.getmembers():
-                #print(member.name)
 
                 # Match files in traces/00-ff/ ending in .json.gz
-                if re.match(r'^./traces/[0-9a-fA-F]{2}/.*\.json$', member.name): #all json matched
-                #if re.match(r'^./traces/00/.*\.json$', member.name): #testing match to reduce number of files
-                    #print(f"regex match found: {member.name}")
+                #if re.match(r'^./traces/[0-9a-fA-F]{2}/.*\.json$', member.name): #all json matched
+                if re.match(r'^./traces/00/.*\.json$', member.name): #testing match to reduce number of files
                     f = tar.extractfile(member)
                     if f:
-                        with gzip.open(f, 'rb') as gz:
+                        with gzip.open(f, 'rt', encoding='utf-8') as gz:
                             try:
                                 data = json.load(gz)
-                                # Optional: Add the source filename to the data
-                                # data['_source_file'] = member.name
-                                all_records.append(data)
+                                normed_data = normalize_data([data])
+                                all_records.append(normed_data)
                             except (json.JSONDecodeError, gzip.BadGzipFile):
                                 continue
 
@@ -187,6 +171,65 @@ def download_Tar(day):
     print(f"Done! Saved {len(all_records)} JSON objects to combined_traces.json")
 
 
+
+# -------------------------
+# Normalize JSON data (flatten and add keys)
+# -------------------------
+def normalize_data(json_data):
+
+    flattened = []
+
+    for record in json_data:
+
+        base = {
+            "ICAO": record.get("icao"),
+            "REG_NUM": record.get("r"),
+            "TYPE": record.get("t"),
+            "DESC": record.get("desc"),
+            "DBFLAGS": record.get("dbFlags"),
+            "MILITARY": bool(record.get("dbFlags", 0) & 1),
+            #"interesting": bool(record.get("dbFlags", 0) & 2),
+            #"pia": bool(record.get("dbFlags", 0) & 4),
+            #"ladd": bool(record.get("dbFlags", 0) & 8),
+            "TIMESTAMP": record.get("timestamp"),
+        }
+
+        trace_list = record.get("trace", [])
+
+        for entry in trace_list:
+            if not isinstance(entry, list):
+                continue
+
+            # unpack with safe indexing
+            trace_obj = {
+                **base,
+                "TIME_OFFSET": entry[0] if len(entry) > 0 else None,
+                "LAT": entry[1] if len(entry) > 1 else None,
+                "LON": entry[2] if len(entry) > 2 else None,
+                "ALTITUDE": entry[3] if len(entry) > 3 else None,
+                "GROUND_SPEED": entry[4] if len(entry) > 4 else None,
+                "TRACK": entry[5] if len(entry) > 5 else None,
+                "FLAGS": entry[6] if len(entry) > 6 else None,
+                "VERTICAL_RATE": entry[7] if len(entry) > 7 else None,
+                #"aircraft_meta": entry[8] if len(entry) > 8 else None,
+                "POS_SOURCE": entry[9] if len(entry) > 9 else None,
+                "ALT_GEOM": entry[10] if len(entry) > 10 else None,
+                "GEOM_RATE": entry[11] if len(entry) > 11 else None,
+                "IAS": entry[12] if len(entry) > 12 else None,
+                "ROLL": entry[13] if len(entry) > 13 else None,
+            }
+
+            # optional: decode flags
+            flags = trace_obj["FLAGS"]
+            if isinstance(flags, int):
+                trace_obj["FLAG_POS_STALE"] = bool(flags & 1)
+                trace_obj["FLAG_NEW_LEG"] = bool(flags & 2)
+                trace_obj["FLAG_GEOM_RATE"] = bool(flags & 4)
+                trace_obj["FLAG_GEOM_ALT"] = bool(flags & 8)
+        
+            flattened.append(trace_obj)
+
+    return flattened
 
 
 # -------------------------
