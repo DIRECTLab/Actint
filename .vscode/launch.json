@@ -31,6 +31,13 @@
             "request": "launch",
             "program": "${workspaceFolder}/actint/src/actint/data_processing/json_to_db.py",
             "console": "integratedTerminal"
+        },
+        {
+            "name": "test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/actint/src/actint/data_processing/test.py",
+            "console": "integratedTerminal"
         }
     ]
 }
