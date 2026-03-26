@@ -51,6 +51,12 @@ RAW_DIR = DATA_DIR / "raw"
 OUT_DIR = DATA_DIR / "processed"
 BATCH_SIZE = 5000
 
+# Paths
+DB_DIR = DATA_DIR / "db"
+SQLITE_PATH = DB_DIR / "adsb.db"
+CHROMA_PATH = DB_DIR / "adsb_chroma"
+
+
 BASE_URL = "https://github.com/adsblol/globe_history_{year}/releases/download"
 
 
@@ -145,15 +151,20 @@ def download_Tar(day):
             for member in tar.getmembers():
 
                 # Match files in traces/00-ff/ ending in .json.gz
-                #if re.match(r'^./traces/[0-9a-fA-F]{2}/.*\.json$', member.name): #all json matched
-                if re.match(r'^./traces/00/.*\.json$', member.name): #testing match to reduce number of files
+                if re.match(r'^./traces/[0-9a-fA-F]{2}/.*\.json$', member.name): #all json matched
+                #if re.match(r'^./traces/00/.*\.json$', member.name): #testing match to reduce number of files
+                    #print(f"Files Name: {member.name}")
                     f = tar.extractfile(member)
                     if f:
                         with gzip.open(f, 'rt', encoding='utf-8') as gz:
                             try:
                                 data = json.load(gz)
                                 normed_data = normalize_data([data])
-                                all_records.append(normed_data)
+
+                                conn = sqlite3.connect(SQLITE_PATH)
+                                insert_to_sqlite(conn, normed_data)
+
+                                #all_records.append(normed_data)
                             except (json.JSONDecodeError, gzip.BadGzipFile):
                                 continue
 
@@ -165,10 +176,10 @@ def download_Tar(day):
                             bar()
 
     # Write the final combined list to a local file
-    with open("combined_traces.json", "w", encoding="utf-8") as out_file:
-        json.dump(all_records, out_file, indent=4)
+    #with open("combined_traces.json", "w", encoding="utf-8") as out_file:
+    #    json.dump(all_records, out_file, indent=4)
 
-    print(f"Done! Saved {len(all_records)} JSON objects to combined_traces.json")
+    #print(f"Done! Saved {len(all_records)} JSON objects to combined_traces.json")
 
 
 
@@ -183,7 +194,7 @@ def normalize_data(json_data):
 
         base = {
             "ICAO": record.get("icao"),
-            "REG_NUM": record.get("r"),
+            "REG_NUM": record.get("r") if record.get("r") else f"noRegData: {record.get("noRegData")}"  ,
             "TYPE": record.get("t"),
             "DESC": record.get("desc"),
             "DBFLAGS": record.get("dbFlags"),
@@ -191,8 +202,10 @@ def normalize_data(json_data):
             #"interesting": bool(record.get("dbFlags", 0) & 2),
             #"pia": bool(record.get("dbFlags", 0) & 4),
             #"ladd": bool(record.get("dbFlags", 0) & 8),
-            "TIMESTAMP": record.get("timestamp"),
+            #"TIMESTAMP": record.get("timestamp"),
         }
+
+        TIMESTAMP = record.get("timestamp")
 
         trace_list = record.get("trace", [])
 
@@ -203,7 +216,8 @@ def normalize_data(json_data):
             # unpack with safe indexing
             trace_obj = {
                 **base,
-                "TIME_OFFSET": entry[0] if len(entry) > 0 else None,
+                #"TIME_OFFSET": entry[0] if len(entry) > 0 else None,
+                "TIMESTAMP": TIMESTAMP + (entry[0] if len(entry) > 0 else None),
                 "LAT": entry[1] if len(entry) > 1 else None,
                 "LON": entry[2] if len(entry) > 2 else None,
                 "ALTITUDE": entry[3] if len(entry) > 3 else None,
@@ -232,12 +246,190 @@ def normalize_data(json_data):
     return flattened
 
 
+
+def create_sqlite_schema(conn: sqlite3.Connection) -> None:
+    """Create SQLite tables for AIS data."""
+    cursor = conn.cursor()
+    
+    # Main AIS positions table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS adsb_positions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            icao TEXT NOT NULL,
+            reg_num TEXT NOT NULL,
+            type TEXT,
+            desc TEXT,
+            db_flags INTEGER,
+            military BOOLEAN, 
+            timestamp REAL NOT NULL,
+            lat REAL NOT NULL,
+            lon REAL NOT NULL,
+            altitude INTEGER,
+            ground_speed REAL,
+            track REAL,
+            flags INTEGER,                
+            vertical_rate INTEGER,
+            pos_source TEXT,
+            alt_geom INTEGER,
+            geom_rate INTEGER,
+            ias TEXT,
+            roll TEXT,
+            flag_pos_stale BOOLEAN,
+            flag_new_leg BOOLEAN,
+            flag_geom_rate BOOLEAN,
+            flag_geom_alt BOOLEAN,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    
+    # Aircraft metadata table (static info, normalized)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS aircraft (
+            
+            icao TEXT PRIMARY KEY,
+            reg_num TEXT,
+            type TEXT,
+            desc TEXT,
+            db_flags INTEGER,
+            military BOOLEAN, 
+            first_seen TEXT,
+            last_seen TEXT   
+        )
+    """)
+    
+    
+    # Create indexes for common queries
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_positions_icao ON adsb_positions(icao)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_positions_datetime ON adsb_positions(timestamp)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_positions_coords ON adsb_positions(lat, lon)")
+
+    
+    conn.commit()
+    print("SQLite schema created")
+
+
+
+
+
+def insert_to_sqlite(conn: sqlite3.Connection, data: list[dict]) -> None:
+    """Insert normalized data into SQLite."""
+    cursor = conn.cursor()
+    
+    # Track vessels for metadata table
+    vessels_seen = {}
+    
+    #print("Inserting ADS-B positions...")
+    for i, record in enumerate(data):
+        # Insert position
+        cursor.execute("""
+            INSERT INTO adsb_positions (
+                    
+                icao, reg_num, type, desc, db_flags, military, 
+                timestamp, lat, lon, altitude, ground_speed, 
+                track, flags, vertical_rate, pos_source, alt_geom, 
+                geom_rate, ias, roll, flag_pos_stale, flag_new_leg,  
+                flag_geom_rate, flag_geom_alt 
+
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            record.get("ICAO"),
+            record.get("REG_NUM"),
+            record.get("TYPE"),
+            record.get("DESC"),
+            record.get("DBFLAGS"),
+            record.get("MILITARY"),
+            record.get("TIMESTAMP"),
+            record.get("LAT"),
+            record.get("LON"),
+            record.get("ALTITUDE"),
+            record.get("GROUND_SPEED"),
+            record.get("TRACK"),
+            record.get("FLAGS"),
+            record.get("VERTICAL_RATE"),
+            record.get("POS_SOURCE"),
+            record.get("ALT_GEOM"),
+            record.get("GEOM_RATE"),
+            record.get("IAS"),
+            record.get("ROLL"),
+            record.get("FLAG_POS_STALE"),
+            record.get("FLAG_NEW_LEG"),
+            record.get("FLAG_GEOM_RATE"),
+            record.get("FLAG_GEOM_ALT"),
+        ))
+        
+        # Track vessel metadata
+        icao = record.get("ICAO")
+        if icao:
+            dt = record.get("TIMESTAMP", "")
+            if icao not in vessels_seen:
+                vessels_seen[icao] = {
+
+                    "icao": icao,
+                    "reg_num": record.get("REG_NUM"),
+                    "type": record.get("TYPE"),
+                    "desc": record.get("DESC"),
+                    "db_flags": record.get("DBFLAGS"),
+                    "military": record.get("MILITARY"),
+                    "first_seen": dt,
+                    "last_seen": dt,
+                }
+            else:
+                # Update last_seen
+                if dt > vessels_seen[icao]["last_seen"]:
+                    vessels_seen[icao]["last_seen"] = dt
+        
+        
+        if (i + 1) % 50000 == 0:
+            print(f"  Processed {i + 1}/{len(data)} records...")
+            conn.commit()
+    
+    conn.commit()
+    #print(f"Inserted {len(data)} position records")   
+
+    # Insert vessel metadata
+    #print("Inserting vessel metadata...")
+    for vessel in vessels_seen.values():
+        cursor.execute("""
+            INSERT OR REPLACE INTO aircraft (
+                
+                icao,
+                reg_num,
+                type,
+                desc,
+                db_flags,
+                military, 
+                first_seen,
+                last_seen 
+
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            vessel["icao"],
+            vessel["reg_num"],
+            vessel["type"],
+            vessel["desc"],
+            vessel["db_flags"],
+            vessel["military"],
+            vessel["first_seen"],
+            vessel["last_seen"],
+        ))
+    
+    conn.commit()
+    #print(f"Inserted {len(vessels_seen)} vessel records")
+    
+
+
+
 # -------------------------
 # Main
 # -------------------------
 def main():
     args = parse_args()
     days = build_date_range(args.start, args.end)
+
+    DB_DIR.mkdir(parents=True, exist_ok=True)
+
+    conn = sqlite3.connect(SQLITE_PATH)
+    create_sqlite_schema(conn)
 
     for day in days:
         print(f"[DATE] {day.date()}")

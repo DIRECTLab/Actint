@@ -1,7 +1,7 @@
 import json
 
-INPUT_FILE = "combined_traces.json"
-OUTPUT_FILE = "flattened_traces.jsonl"
+INPUT_FILE = "testing_data.json"
+OUTPUT_FILE = "flattened_traces.json"
 
 def process_file():
     with open(INPUT_FILE, "r") as f:
@@ -20,8 +20,10 @@ def process_file():
                 #"interesting": bool(record.get("dbFlags", 0) & 2),
                 #"pia": bool(record.get("dbFlags", 0) & 4),
                 #"ladd": bool(record.get("dbFlags", 0) & 8),
-                "timestamp": record.get("timestamp"),
+                #"timestamp": record.get("timestamp"),
             }
+
+            TIMESTAMP = record.get("timestamp")
 
             trace_list = record.get("trace", [])
 
@@ -32,7 +34,8 @@ def process_file():
                 # unpack with safe indexing
                 trace_obj = {
                     **base,
-                    "time_offset": entry[0] if len(entry) > 0 else None,
+                    #"TIME_OFFSET": entry[0] if len(entry) > 0 else None,
+                    "TIMESTAMP": TIMESTAMP + (entry[0] if len(entry) > 0 else None),
                     "lat": entry[1] if len(entry) > 1 else None,
                     "lon": entry[2] if len(entry) > 2 else None,
                     "altitude": entry[3] if len(entry) > 3 else None,
