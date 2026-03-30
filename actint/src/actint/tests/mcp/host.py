@@ -16,6 +16,7 @@ async def run_agent():
     )
 
     model_name = "Qwen/Qwen3.5-9B"
+    # model_name = "unsloth/Meta-Llama-3.1-8B-Instruct"
 
     async with stdio_client(server_params) as (read, write):
         async with ClientSession(read, write) as session:
@@ -39,11 +40,11 @@ async def run_agent():
                 })
             
             # 3. Prepare the conversation but don't format the prompt until we load the tokenizer
-            system_prompt = f"You are a helpful assistant. You have access to the following tools:\n{json.dumps(llm_tools, indent=2)}\n\nIf you need to use a tool, reply ONLY with a JSON object in this format: {{\"name\": \"tool_name\", \"arguments\": {{\"arg1\": \"value\"}}}}. NEVER include ANY other text before or after the JSON object."
+            # system_prompt = f"You are a helpful assistant. You have access to the following tools:\n{json.dumps(llm_tools, indent=2)}\n\nIf you need to use a tool, reply ONLY with a JSON object in this format: {{\"name\": \"tool_name\", \"arguments\": {{\"arg1\": \"value\"}}}}. NEVER include ANY other text before or after the JSON object."
             system_prompt = f"You are a helpful assistant."
             messages = [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": "What is the weather in Paris?"}
+                {"role": "user", "content": "What is the weather in Logan, Utah?"}
             ]
             
             try:
@@ -69,7 +70,6 @@ async def run_agent():
                 raise
             try:
                 # Format using apply_chat_template
-                # Qwen2-7B's template does not support the 'tools' kwarg, so we manually inject them into the system prompt above.
                 prompt = tokenizer.apply_chat_template(
                     messages,
                     tokenize=False,
@@ -106,7 +106,7 @@ async def run_agent():
                 # We need to slice off the input tokens to get just the response.
                 input_length = inputs['input_ids'].shape[1]
                 generated_tokens = outputs[0][input_length:]
-                llm_response_text = tokenizer.decode(generated_tokens, skip_special_tokens=True)
+                llm_response_text = tokenizer.decode(generated_tokens, skip_special_tokens=False)
                 
                 print(f"\nResponse:\n{llm_response_text}", file=sys.stderr)
                 print("\n✓ Script completed successfully", file=sys.stderr)
