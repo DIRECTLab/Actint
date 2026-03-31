@@ -14,7 +14,14 @@ Tools provided:
 """
 
 import json
+import sqlite3
+from pathlib import Path
 from fastmcp import FastMCP
+
+# Database path
+DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
+DB_DIR = DATA_DIR / "db"
+SQLITE_PATH = DB_DIR / "ais.db"
 
 # Import tool functions from parent package
 from actint.tools.previous_locations import get_vehicle_locations, ship_following
@@ -300,6 +307,152 @@ def get_vessel_destination(mmsi: int, number_detections: int = 300) -> str:
         return json.dumps(result, indent=2)
     except Exception as e:
         return json.dumps({"error": str(e)})
+
+
+# ============================================================================
+# Tools: Database Introspection
+# ============================================================================
+
+def _quote_sqlite_identifier(identifier: str) -> str:
+    """Safely quote a SQLite identifier (table/column name) using double quotes."""
+    return '"' + (identifier or "").replace('"', '""') + '"'
+
+
+@mcp.tool()
+def get_database_info() -> str:
+    """Get basic SQLite database schema info (tables and column definitions).
+
+    Returns:
+        JSON object containing database path and a list of tables with columns.
+    """
+    try:
+        if not SQLITE_PATH.exists():
+            return json.dumps({"error": f"SQLite database not found at {SQLITE_PATH}"})
+
+        conn = sqlite3.connect(str(SQLITE_PATH))
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT name FROM sqlite_master "
+            "WHERE type='table' AND name NOT LIKE 'sqlite_%' "
+            "ORDER BY name;"
+        )
+        table_names = [r[0] for r in cursor.fetchall()]
+
+        tables: list[dict] = []
+        for table_name in table_names:
+            quoted = _quote_sqlite_identifier(table_name)
+            cursor.execute(f"PRAGMA table_info({quoted});")
+            # PRAGMA table_info returns: cid, name, type, notnull, dflt_value, pk
+            columns = []
+            for cid, name, col_type, notnull, dflt_value, pk in cursor.fetchall():
+                columns.append(
+                    {
+                        "cid": cid,
+                        "name": name,
+                        "type": col_type,
+                        "notnull": bool(notnull),
+                        "default": dflt_value,
+                        "pk": bool(pk),
+                    }
+                )
+
+            tables.append({"name": table_name, "columns": columns})
+
+        conn.close()
+
+        return json.dumps(
+            {
+                "db_path": str(SQLITE_PATH),
+                "table_count": len(tables),
+                "tables": tables,
+            },
+            indent=2,
+        )
+    except sqlite3.Error as e:
+        return json.dumps({"error": f"Database error: {str(e)}"})
+    except Exception as e:
+        return json.dumps({"error": f"Introspection error: {str(e)}"})
+
+
+# ============================================================================
+# Tools: Database Query
+# ============================================================================
+
+@mcp.tool()
+def query_database(sql_query: str, max_rows: int = 200) -> str:
+    """Execute a read-only SQL query against the AIS database and return results.
+    
+    Args:
+        sql_query: Read-only SQL query to execute (SELECT / WITH ... SELECT)
+        max_rows: Maximum number of rows to return (default: 200)
+    
+    Returns:
+        JSON with query results and column names, or error message
+    """
+    try:
+        query = (sql_query or "").strip()
+        if not query:
+            return json.dumps({"error": "sql_query is required"})
+
+        # Guardrails: read-only, single-statement queries only
+        ql = query.lower().lstrip()
+        if not (ql.startswith("select") or ql.startswith("with")):
+            return json.dumps({"error": "Only read-only SELECT queries are allowed"})
+
+        forbidden = [
+            "insert ", "update ", "delete ", "drop ", "alter ", "create ",
+            "attach ", "detach ", "vacuum", "pragma", "reindex", "replace ",
+            "truncate ",
+        ]
+        if any(tok in ql for tok in forbidden):
+            return json.dumps({"error": "Query contains forbidden keywords"})
+
+        # Disallow multi-statement execution; allow a single trailing semicolon
+        if ";" in query.rstrip(";"):
+            return json.dumps({"error": "Multiple SQL statements are not allowed"})
+
+        if max_rows <= 0:
+            max_rows = 200
+        if max_rows > 5000:
+            max_rows = 5000
+
+        conn = sqlite3.connect(str(SQLITE_PATH))
+        cursor = conn.cursor()
+
+        cursor.execute(query)
+        
+        # Get column names
+        columns = [description[0] for description in cursor.description] if cursor.description else []
+        
+        # Fetch bounded results
+        rows = cursor.fetchmany(max_rows + 1)
+        
+        # Convert rows to list of dicts
+        result_list = []
+        truncated = False
+        if len(rows) > max_rows:
+            truncated = True
+            rows = rows[:max_rows]
+
+        for row in rows:
+            row_dict = {col: val for col, val in zip(columns, row)}
+            result_list.append(row_dict)
+        
+        conn.close()
+        
+        result = {
+            "columns": columns,
+            "row_count": len(result_list),
+            "truncated": truncated,
+            "max_rows": max_rows,
+            "rows": result_list
+        }
+        return json.dumps(result, indent=2)
+    except sqlite3.Error as e:
+        return json.dumps({"error": f"Database error: {str(e)}"})
+    except Exception as e:
+        return json.dumps({"error": f"Query error: {str(e)}"})
 
 
 # ============================================================================
