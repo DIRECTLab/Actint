@@ -1,11 +1,14 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
+import json
 import time
 import torch
 import sys
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from threading import Thread
+from transformers import AutoTokenizer, AutoModelForCausalLM, TextIteratorStreamer
 
 model_name = "Qwen/Qwen3.5-9B"
 ml_models = {}
@@ -129,6 +132,58 @@ async def chat_completions(request: ChatCompletionRequest):
             gen_kwargs["top_p"] = request.top_p
     else:
         gen_kwargs["do_sample"] = False
+
+    if request.stream:
+        streamer = TextIteratorStreamer(
+            tokenizer,
+            skip_prompt=True,
+            skip_special_tokens=False,
+        )
+
+        generate_kwargs = dict(inputs)
+        generate_kwargs.update(gen_kwargs)
+        generate_kwargs["streamer"] = streamer
+
+        def run_generation():
+            with torch.inference_mode():
+                model.generate(**generate_kwargs)
+
+        thread = Thread(target=run_generation)
+        thread.start()
+
+        async def event_stream():
+            for text_piece in streamer:
+                if not text_piece:
+                    continue
+
+                chunk = {
+                    "id": "chatcmpl-123",
+                    "object": "chat.completion.chunk",
+                    "created": int(time.time()),
+                    "model": request.model,
+                    "choices": [{
+                        "index": 0,
+                        "delta": {"content": text_piece},
+                        "finish_reason": None,
+                    }],
+                }
+                yield f"data: {json.dumps(chunk)}\n\n"
+
+            done_chunk = {
+                "id": "chatcmpl-123",
+                "object": "chat.completion.chunk",
+                "created": int(time.time()),
+                "model": request.model,
+                "choices": [{
+                    "index": 0,
+                    "delta": {},
+                    "finish_reason": "stop",
+                }],
+            }
+            yield f"data: {json.dumps(done_chunk)}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(event_stream(), media_type="text/event-stream")
             
     with torch.inference_mode():
         outputs = model.generate(**inputs, **gen_kwargs)
