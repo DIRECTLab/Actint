@@ -78,7 +78,7 @@ class QueryRequest(BaseModel):
     """Request model for vessel queries."""
     question: str
     max_tokens: int = 100_000
-    temperature: float = 1.0
+    temperature: float = 0.8
 
 
 class QueryResponse(BaseModel):
