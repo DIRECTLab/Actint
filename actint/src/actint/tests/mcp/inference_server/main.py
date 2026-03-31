@@ -40,6 +40,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+@app.get("/test/")
+def test():
+    return {"message": "Hello World"}
+
 # Define request/response structures matching hugingface_hub's text_generation parameters
 class GenerateParameters(BaseModel):
     max_new_tokens: Optional[int] = 2048
