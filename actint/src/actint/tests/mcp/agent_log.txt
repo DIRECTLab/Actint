@@ -1,0 +1,213 @@
+[
+    ChatMessage(role=<MessageRole.SYSTEM: 'system'>,
+        content=[{'type': 'text', 'text': 
+            'You are an expert assistant who can solve any task using tool calls. You will be given a task to solve as best you can.
+            To do so, you have been given access to some tools.
+
+            The tool call you write is an action: after the tool is executed, you will get the result of the tool call as an "observation".
+            This Action/Observation can repeat N times, you should take several steps when needed.
+
+            You can use the result of the previous action as input for the next action.
+            The observation will always be a string: it can represent a file, like "image_1.jpg".
+            Then you can use it as input for the next action. You can do it for instance as follows:
+
+            Observation: "image_1.jpg"
+
+            Action:
+            {
+            "name": "image_transformer",
+            "arguments": {"image": "image_1.jpg"}
+            }
+
+            To provide the final answer to the task, use an action blob with "name": "final_answer" tool. It is the only way to complete the task, else you will be stuck on a loop. So your final output should look like this:
+            Action:
+            {
+            "name": "final_answer",
+            "arguments": {"answer": "insert your final answer here"}
+            }
+
+
+            Here are a few examples using notional tools:
+            ---
+            Task: "Generate an image of the oldest person in this document."
+
+            Action:
+            {
+            "name": "document_qa",
+            "arguments": {"document": "document.pdf", "question": "Who is the oldest person mentioned?"}
+            }
+            Observation: "The oldest person in the document is John Doe, a 55 year old lumberjack living in Newfoundland."
+
+            Action:
+            {
+            "name": "image_generator",
+            "arguments": {"prompt": "A portrait of John Doe, a 55-year-old man living in Canada."}
+            }
+            Observation: "image.png"
+
+            Action:
+            {
+            "name": "final_answer",
+            "arguments": "image.png"
+            }
+
+            ---
+            Task: "What is the result of the following operation: 5 + 3 + 1294.678?"
+
+            Action:
+            {
+                "name": "python_interpreter",
+                "arguments": {"code": "5 + 3 + 1294.678"}
+            }
+            Observation: 1302.678
+
+            Action:
+            {
+            "name": "final_answer",
+            "arguments": "1302.678"
+            }
+
+            ---
+            Task: "Which city has the highest population , Guangzhou or Shanghai?"
+
+            Action:
+            {
+                "name": "web_search",
+                "arguments": "Population Guangzhou"
+            }
+            Observation: [\'Guangzhou has a population of 15 million inhabitants as of 2021.\']
+
+
+            Action:
+            {
+                "name": "web_search",
+                "arguments": "Population Shanghai"
+            }
+            Observation: \'26 million (2019)\'
+
+            Action:
+            {
+            "name": "final_answer",
+            "arguments": "Shanghai"
+            }
+
+            Above example were using notional tools that might not exist for you. You only have access to these tools:
+            - get_vessel_mmsi: Get the MMSI for a given vessel.
+
+            Args:
+                vessel_name: The name of the vessel (case insenstive)
+
+            Returns:
+                The MMSI number of the vessel as an int. Returns -1 if no vessels match the given name.
+                Takes inputs: {\'vessel_name\': {\'type\': \'string\', \'description\': \'see tool description\'}}
+                Returns an output of type: object
+            - get_vessel_current_position: Get the most recent position of a vessel.
+
+            Args:
+                mmsi: Maritime Mobile Service Identity number of the vessel
+
+            Returns:
+                JSON object with current position, speed, heading, and timestamp
+                Takes inputs: {\'mmsi\': {\'type\': \'integer\', \'description\': \'see tool description\'}}
+                Returns an output of type: object
+            - final_answer: Provides a final answer to the given problem.
+                Takes inputs: {\'answer\': {\'type\': \'any\', \'description\': \'The final answer to the problem\'}}
+                Returns an output of type: any
+
+            Here are the rules you should always follow to solve your task:
+            1. ALWAYS provide a tool call, else you will fail.
+            2. Always use the right arguments for the tools. Never use variable names as the action arguments, use the value instead.
+            3. Call a tool only when needed: do not call the search agent if you do not need information, try to solve the task yourself. If no tool call is needed, use final_answer tool to return your answer.
+            4. Never re-do a tool call that you previously did with the exact same parameters.
+
+            Now Begin!
+        '}],
+        tool_calls=None, raw=None, token_usage=None), 
+        
+    ChatMessage(role=<MessageRole.USER: 'user'>,
+        content=[{'type': 'text', 'text': 
+        'New task:
+        Where is the USS Kidd?'}], tool_calls=None, raw=None, token_usage=None), 
+        
+    ChatMessage(role=<MessageRole.ASSISTANT: 'assistant'>,
+        content=[{'type': 'text', 'text': 
+        'Action:
+        {
+              "name": "get_vessel_current_position",
+          "arguments": {"mmsi": 366235000}
+        }'}], tool_calls=None, raw=None, token_usage=None), 
+        
+    ChatMessage(role=<MessageRole.TOOL_CALL: 'tool-call'>,
+        content=[{'type': 'text', 'text': 
+        "Calling tools:
+        [{'id': 'fce30c77-a291-4ea0-8f15-00a101933f71', 'type': 'function', 'function': {'name': 'get_vessel_current_position', 'arguments': {'mmsi': 366235000}}}]"}], tool_calls=None, raw=None, token_usage=None), 
+        
+    ChatMessage(role=<MessageRole.TOOL_RESPONSE: 'tool-response'>,
+        content=[{'type': 'text', 'text': 
+        'Observation:
+        {"error": "list index out of range"}'}], tool_calls=None, raw=None, token_usage=None), 
+        
+    ChatMessage(role=<MessageRole.ASSISTANT: 'assistant'>,
+        content=[{'type': 'text', 'text': 
+        'Action:
+        {
+              "name": "get_vessel_mmsi",
+          "arguments": {"vessel_name": "USS Kidd"}
+        }'}], tool_calls=None, raw=None, token_usage=None), 
+        
+    ChatMessage(role=<MessageRole.TOOL_CALL: 'tool-call'>,
+        content=[{'type': 'text', 'text': 
+        "Calling tools:
+        [{'id': 'd813b1bd-f2e5-4244-b9b2-fe90deb90ef2', 'type': 'function', 'function': {'name': 'get_vessel_mmsi', 'arguments': {'vessel_name': 'USS Kidd'}}}]"}], tool_calls=None, raw=None, token_usage=None), 
+        
+    ChatMessage(role=<MessageRole.TOOL_RESPONSE: 'tool-response'>,
+        content=[{'type': 'text', 'text': 
+        'Observation:
+        368011000'}], tool_calls=None, raw=None, token_usage=None), 
+        
+    ChatMessage(role=<MessageRole.ASSISTANT: 'assistant'>,
+        content=[{'type': 'text', 'text': 
+        'Action:
+        {
+              "name": "get_vessel_current_position",
+          "arguments": {"mmsi": 368011000}
+        }'}], tool_calls=None, raw=None, token_usage=None), 
+        
+    ChatMessage(role=<MessageRole.TOOL_CALL: 'tool-call'>,
+        content=[{'type': 'text', 'text': 
+        "Calling tools:
+        [{'id': '518f64d4-b87b-4156-8b17-e57e184395e4', 'type': 'function', 'function': {'name': 'get_vessel_current_position', 'arguments': {'mmsi': 368011000}}}]"}], tool_calls=None, raw=None, token_usage=None), 
+        
+    ChatMessage(role=<MessageRole.TOOL_RESPONSE: 'tool-response'>,
+        content=[{'type': 'text', 'text': 
+        'Observation:
+        {
+              "mmsi": 368011000,
+          "vessel_name": "USS KIDD",
+          "timestamp": "2023-01-01T23:59:17.000000",
+          "latitude": 33.08487,
+          "longitude": -118.49759,
+          "speed_over_ground": 10.9,
+          "course_over_ground": 211.7,
+          "heading": 511.0
+        }'}], tool_calls=None, raw=None, token_usage=None), 
+        
+    ChatMessage(role=<MessageRole.ASSISTANT: 'assistant'>,
+        content=[{'type': 'text', 'text': 
+        'Action:
+        {
+              "name": "final_answer",
+          "arguments": {"answer": "The USS Kidd is currently at latitude 33.08487, longitude -118.49759."}
+        }'}], tool_calls=None, raw=None, token_usage=None), 
+        
+    ChatMessage(role=<MessageRole.TOOL_CALL: 'tool-call'>,
+        content=[{'type': 'text', 'text': 
+        "Calling tools:
+        [{'id': '23c27ce6-5401-42c1-a9e5-cf2dcf459d7a', 'type': 'function', 'function': {'name': 'final_answer', 'arguments': {'answer': 'The USS Kidd is currently at latitude 33.08487, longitude -118.49759.'}}}]"}], tool_calls=None, raw=None, token_usage=None), 
+        
+    ChatMessage(role=<MessageRole.TOOL_RESPONSE: 'tool-response'>,
+        content=[{'type': 'text', 'text': 
+        'Observation:
+        The USS Kidd is currently at latitude 33.08487, longitude -118.49759.'}], tool_calls=None, raw=None, token_usage=None)
+        
+]

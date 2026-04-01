@@ -129,7 +129,7 @@ def ship_following_analysis(mmsi1: int, mmsi2: int) -> str:
         return json.dumps({"error": str(e)})
 
 # ============================================================================
-# Tools: Query Processing
+# Tools: Translation
 # ============================================================================
  
 @mcp.tool()
