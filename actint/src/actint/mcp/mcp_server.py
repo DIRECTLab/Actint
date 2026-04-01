@@ -38,6 +38,7 @@ from actint.tools.ship_going import (
     get_possible_destinations,
 )
 
+from actint.data_processing.query_database import query_vessels
 # ============================================================================
 # FastMCP Server Setup
 # ============================================================================
@@ -127,6 +128,25 @@ def ship_following_analysis(mmsi1: int, mmsi2: int) -> str:
     except Exception as e:
         return json.dumps({"error": str(e)})
 
+# ============================================================================
+# Tools: Query Processing
+# ============================================================================
+ 
+@mcp.tool()
+def get_vessel_mmsi(vessel_name: str) -> int:
+    """Get the MMSI for a given vessel.
+
+    Args:
+        vessel_name: The name of the vessel (case insenstive)
+
+    Returns:
+        The MMSI number of the vessel as an int. Returns -1 if no vessels match the given name.
+    """
+    result = query_vessels({"vessel_name": vessel_name.upper()})
+    if result and result[0]:
+        return result[0][0]
+    else:
+        return -1
 
 # ============================================================================
 # Tools: Geographic Context
