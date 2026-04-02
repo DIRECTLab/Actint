@@ -28,8 +28,9 @@ uvicorn
 pydantic
 httpx
 python-dotenv
-smolagents==1.24.0
+smolagents
 smolagents[mcp]
+smolagents[gradio]
 smolagents[telemetry,toolkit]
 huggingface_hub
 huggingface_hub[mcp]

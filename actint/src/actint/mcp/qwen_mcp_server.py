@@ -16,7 +16,12 @@ Tools provided:
 import json
 import sqlite3
 from pathlib import Path
-from fastmcp import FastMCP
+import pprint
+import urllib.parse
+import json5
+from qwen_agent.agents import Assistant
+from qwen_agent.tools.base import BaseTool, register_tool
+from qwen_agent.utils.output_beautify import typewriter_print
 
 # Database path
 DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
@@ -50,18 +55,17 @@ mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 # Health & Info Endpoints
 # ============================================================================
 
-@mcp.tool()
-def get_vessel_locations(mmsi: int | str) -> str:
+@register_tool()
+def get_vessel_locations(mmsi: int) -> str:
     """Get all recorded positions for a specific vessel identified by MMSI.
     
     Args:
-        mmsi (int): Maritime Mobile Service Identity number of the vessel
+        mmsi: Maritime Mobile Service Identity number of the vessel
     
     Returns:
-        str: JSON list of vessel positions with coordinates, timestamps, and speed data
+        JSON list of vessel positions with coordinates, timestamps, and speed data
     """
     try:
-        mmsi = int(mmsi)
         locations = get_vehicle_locations(mmsi)
         result_data = [
             {
@@ -81,18 +85,17 @@ def get_vessel_locations(mmsi: int | str) -> str:
         return json.dumps({"error": str(e)})
 
 
-@mcp.tool()
-def get_vessel_current_position(mmsi: int | str) -> str:
+@register_tool()
+def get_vessel_current_position(mmsi: int) -> str:
     """Get the most recent position of a vessel.
     
     Args:
-        mmsi (int): Maritime Mobile Service Identity number of the vessel
+        mmsi: Maritime Mobile Service Identity number of the vessel
     
     Returns:
-        str: JSON object with current position, speed, heading, and timestamp
+        JSON object with current position, speed, heading, and timestamp
     """
     try:
-        mmsi = int(mmsi)
         locations = get_vehicle_locations(mmsi)
         if locations:
             loc = locations[0]  # Most recent
@@ -113,20 +116,18 @@ def get_vessel_current_position(mmsi: int | str) -> str:
         return json.dumps({"error": str(e)})
 
 
-@mcp.tool()
-def ship_following_analysis(mmsi1: int | str, mmsi2: int | str) -> str:
+@register_tool()
+def ship_following_analysis(mmsi1: int, mmsi2: int) -> str:
     """Determine if one vessel has been following another vessel's path.
     
     Args:
-        mmsi1 (int): MMSI of the initial vessel
-        mmsi2 (int): MMSI of the vessel to check if following
+        mmsi1: MMSI of the initial vessel
+        mmsi2: MMSI of the vessel to check if following
     
     Returns:
-        str: Analysis string indicating how many times vessel 2 was near vessel 1
+        Analysis string indicating how many times vessel 2 was near vessel 1
     """
     try:
-        mmsi1 = int(mmsi1)
-        mmsi2 = int(mmsi2)
         result = ship_following(mmsi1, mmsi2)
         return json.dumps({"analysis": result})
     except Exception as e:
@@ -136,15 +137,15 @@ def ship_following_analysis(mmsi1: int | str, mmsi2: int | str) -> str:
 # Tools: Translation
 # ============================================================================
  
-@mcp.tool()
+@register_tool()
 def get_vessel_mmsi(vessel_name: str) -> int:
     """Get the MMSI for a given vessel.
 
     Args:
-        vessel_name (str): The name of the vessel (case insenstive)
+        vessel_name: The name of the vessel (case insenstive)
 
     Returns:
-        int: The MMSI number of the vessel as an int. Returns -1 if no vessels match the given name.
+        The MMSI number of the vessel as an int. Returns -1 if no vessels match the given name.
     """
     result = query_vessels({"vessel_name": vessel_name.upper()})
     if result and result[0]:
@@ -156,20 +157,18 @@ def get_vessel_mmsi(vessel_name: str) -> int:
 # Tools: Geographic Context
 # ============================================================================
 
-@mcp.tool()
-def get_location_context(latitude: float | str, longitude: float | str) -> str:
+@register_tool()
+def get_location_context(latitude: float, longitude: float) -> str:
     """Get geographic context for a lat/lon including maritime region, nearest ports, and strategic waterways.
     
     Args:
-        latitude (float): Latitude in decimal degrees
-        longitude (float): Longitude in decimal degrees
+        latitude: Latitude in decimal degrees
+        longitude: Longitude in decimal degrees
     
     Returns:
-        str: JSON with maritime region, nearest port, nearest waterway, and reverse geocoding info
+        JSON with maritime region, nearest port, nearest waterway, and reverse geocoding info
     """
     try:
-        latitude = float(latitude)
-        longitude = float(longitude)
         context = get_geolocation_context(latitude, longitude)
         result = {
             "latitude": latitude,
@@ -190,44 +189,38 @@ def get_location_context(latitude: float | str, longitude: float | str) -> str:
         return json.dumps({"error": str(e)})
 
 
-@mcp.tool()
-def get_distance_between(lat1: float | str, lon1: float | str, lat2: float | str, lon2: float | str) -> str:
+@register_tool()
+def get_distance_between(lat1: float, lon1: float, lat2: float, lon2: float) -> str:
     """Calculate distance and bearing between two geographic points.
     
     Args:
-        lat1 (float): Latitude of first point
-        lon1 (float): Longitude of first point
-        lat2 (float): Latitude of second point
-        lon2 (float): Longitude of second point
+        lat1: Latitude of first point
+        lon1: Longitude of first point
+        lat2: Latitude of second point
+        lon2: Longitude of second point
     
     Returns:
-        str: JSON with distance in nautical miles and bearing in degrees
+        JSON with distance in nautical miles and bearing in degrees
     """
     try:
-        lat1 = float(lat1)
-        lon1 = float(lon1)
-        lat2 = float(lat2)
-        lon2 = float(lon2)
         result = calc_distance_between(lat1, lon1, lat2, lon2)
         return json.dumps(result, indent=2)
     except Exception as e:
         return json.dumps({"error": str(e)})
 
 
-@mcp.tool()
-def identify_maritime_region(latitude: float | str, longitude: float | str) -> str:
+@register_tool()
+def identify_maritime_region(latitude: float, longitude: float) -> str:
     """Identify which maritime region a lat/lon coordinate is in.
     
     Args:
-        latitude (float): Latitude in decimal degrees
-        longitude (float): Longitude in decimal degrees
+        latitude: Latitude in decimal degrees
+        longitude: Longitude in decimal degrees
     
     Returns:
-        str: JSON with the name of the maritime region or "Unknown"
+        JSON with the name of the maritime region or "Unknown"
     """
     try:
-        latitude = float(latitude)
-        longitude = float(longitude)
         region = identify_region(latitude, longitude)
         result = {"region": region if region else "Unknown"}
         return json.dumps(result, indent=2)
@@ -235,20 +228,18 @@ def identify_maritime_region(latitude: float | str, longitude: float | str) -> s
         return json.dumps({"error": str(e)})
 
 
-@mcp.tool()
-def find_nearest_port(latitude: float | str, longitude: float | str) -> str:
+@register_tool()
+def find_nearest_port(latitude: float, longitude: float) -> str:
     """Find the nearest major port to a given lat/lon.
     
     Args:
-        latitude (float): Latitude in decimal degrees
-        longitude (float): Longitude in decimal degrees
+        latitude: Latitude in decimal degrees
+        longitude: Longitude in decimal degrees
     
     Returns:
-        str: JSON with port name and distance in nautical miles
+        JSON with port name and distance in nautical miles
     """
     try:
-        latitude = float(latitude)
-        longitude = float(longitude)
         port_name, distance = find_closest_port(latitude, longitude)
         result = {"port_name": port_name, "distance_nm": distance}
         return json.dumps(result, indent=2)
@@ -256,20 +247,18 @@ def find_nearest_port(latitude: float | str, longitude: float | str) -> str:
         return json.dumps({"error": str(e)})
 
 
-@mcp.tool()
-def find_nearest_waterway(latitude: float | str, longitude: float | str) -> str:
+@register_tool()
+def find_nearest_waterway(latitude: float, longitude: float) -> str:
     """Find the nearest strategic waterway to a given lat/lon.
     
     Args:
-        latitude (float): Latitude in decimal degrees
-        longitude (float): Longitude in decimal degrees
+        latitude: Latitude in decimal degrees
+        longitude: Longitude in decimal degrees
     
     Returns:
-        str: JSON with waterway name and distance in nautical miles
+        JSON with waterway name and distance in nautical miles
     """
     try:
-        latitude = float(latitude)
-        longitude = float(longitude)
         waterway_name, distance = find_closest_waterway(latitude, longitude)
         result = {"waterway_name": waterway_name, "distance_nm": distance}
         return json.dumps(result, indent=2)
@@ -281,15 +270,15 @@ def find_nearest_waterway(latitude: float | str, longitude: float | str) -> str:
 # Tools: Fleet Analysis
 # ============================================================================
 
-@mcp.tool()
+@register_tool()
 def calculate_fleet_position(fleet_name: str) -> str:
     """Calculate the average position of a fleet of vessels.
     
     Args:
-        fleet_name (str): Canonical name of the fleet
+        fleet_name: Canonical name of the fleet
     
     Returns:
-        str: JSON with fleet position (latitude and longitude)
+        JSON with fleet position (latitude and longitude)
     """
     try:
         lat, lon = calc_fleet_position(fleet_name)
@@ -302,18 +291,17 @@ def calculate_fleet_position(fleet_name: str) -> str:
         return json.dumps({"error": str(e)})
 
 
-@mcp.tool()
-def is_ship_in_fleet(mmsi: int | str) -> str:
+@register_tool()
+def is_ship_in_fleet(mmsi: int) -> str:
     """Check if a vessel is within fleet proximity (10 nautical miles).
     
     Args:
-        mmsi (int): MMSI of the vessel to check
+        mmsi: MMSI of the vessel to check
     
     Returns:
-        str: String indicating if ship is in fleet or outside fleet proximity
+        String indicating if ship is in fleet or outside fleet proximity
     """
     try:
-        mmsi = int(mmsi)
         result_str = check_ship_in_fleet(mmsi)
         return json.dumps({"proximity_check": result_str})
     except Exception as e:
@@ -324,20 +312,18 @@ def is_ship_in_fleet(mmsi: int | str) -> str:
 # Tools: Destination Prediction
 # ============================================================================
 
-@mcp.tool()
-def get_vessel_destination(mmsi: int | str, number_detections: int | str = 300) -> str:
+@register_tool()
+def get_vessel_destination(mmsi: int, number_detections: int = 300) -> str:
     """Predict where a vessel is heading based on recent trajectory.
     
     Args:
-        mmsi (int): MMSI of the vessel
-        number_detections (int): Number of recent position detections to consider (default: 300)
+        mmsi: MMSI of the vessel
+        number_detections: Number of recent position detections to consider (default: 300)
     
     Returns:
-        str: JSON with analysis result and note about trajectory analysis
+        JSON with analysis result and note about trajectory analysis
     """
     try:
-        mmsi = int(mmsi)
-        number_detections = int(number_detections)
         calculate_vector_and_distance_sum(mmsi, number_detections)
         result = {
             "mmsi": mmsi,
@@ -357,12 +343,12 @@ def _quote_sqlite_identifier(identifier: str) -> str:
     return '"' + (identifier or "").replace('"', '""') + '"'
 
 
-@mcp.tool()
+@register_tool()
 def get_database_info() -> str:
     """Get basic SQLite database schema info (tables and column definitions).
 
     Returns:
-        str: JSON object containing database path and a list of tables with columns.
+        JSON object containing database path and a list of tables with columns.
     """
     try:
         if not SQLITE_PATH.exists():
@@ -418,19 +404,18 @@ def get_database_info() -> str:
 # Tools: Database Query
 # ============================================================================
 
-@mcp.tool()
-def query_database(sql_query: str, max_rows: int | str = 200) -> str:
+@register_tool()
+def query_database(sql_query: str, max_rows: int = 200) -> str:
     """Execute a read-only SQL query against the AIS database and return results.
     
     Args:
-        sql_query (str): Read-only SQL query to execute (SELECT / WITH ... SELECT)
-        max_rows (int): Maximum number of rows to return (default: 200)
+        sql_query: Read-only SQL query to execute (SELECT / WITH ... SELECT)
+        max_rows: Maximum number of rows to return (default: 200)
     
     Returns:
-        str: JSON with query results and column names, or error message
+        JSON with query results and column names, or error message
     """
     try:
-        max_rows = int(max_rows)
         query = (sql_query or "").strip()
         if not query:
             return json.dumps({"error": "sql_query is required"})

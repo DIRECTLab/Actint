@@ -16,6 +16,7 @@ SmolagentsInstrumentor().instrument()
 # 'smolagents[mcp]'
 
 model_id = "Qwen/Qwen3.5-9B"
+# model_id = "Qwen/Qwen2-7B-Instruct"
 
 # Use actint_env if it exists, otherwise fall back to system python or current env
 conda_prefix = os.getenv("CONDA_PREFIX")
@@ -45,7 +46,7 @@ try:
     agent = ToolCallingAgent(tools=tools, model=model)
 
     result = agent.run("Where is the USS Montgomery?")
-    GradioUI(agent).launch()
+    # GradioUI(agent).launch()
     # with open("agent_log.txt", "w") as f:
     #     print(agent.write_memory_to_messages(), file=f)
 finally:
