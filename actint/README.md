@@ -2,12 +2,13 @@
 
 # Setup
 
-We use conda for environment management. To set up the environment, run the following command in the terminal:
+We use conda for environment management. To set up the environment, run the following command in the terminal, run the following from the actint directory (where this README is located):
 
 ```bash
 conda create -n actint python=3.12 -y
 conda activate actint
 pip install -r requirements.txt
+pip install -e .
 ```
 
 Then setup torch, scroll to the bottom of [this page](https://pytorch.org/) and copy the appropriate command for your system. For example, if you have an Nvidia GPU with cuda 13, you would run:
