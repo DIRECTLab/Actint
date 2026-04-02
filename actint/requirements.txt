@@ -28,9 +28,9 @@ uvicorn
 pydantic
 httpx
 python-dotenv
-smolagents
 smolagents[mcp]
 smolagents[gradio]
 smolagents[telemetry,toolkit]
+git+https://github.com/DIRECTLab/smolagents
 huggingface_hub
 huggingface_hub[mcp]
