@@ -16,6 +16,22 @@ Then setup torch, scroll to the bottom of [this page](https://pytorch.org/) and 
 pip3 install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu130
 ```
 
+you can inspect llm output easily with arize ai pheonix, run 
+
+```bash
+python -m phoenix.server.main serve
+```
+
+and make sure you have the following at the top of your smolagent.py file:
+
+```python
+from phoenix.otel import register
+from openinference.instrumentation.smolagents import SmolagentsInstrumentor
+
+register()
+SmolagentsInstrumentor().instrument()
+```
+
 # Problem scope and user
 ## Primary User
 The primary target of the ACTINT (activity intelligence) framework will be entities interested in intelligent tracking and monitering of various vehicles types, given several modalities of information. While primarily focused on military applications, this framework could extend to other fields such as shipping, public transportation, taxi fleets, and others. 

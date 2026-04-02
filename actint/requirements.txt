@@ -13,17 +13,23 @@ geopy
 reverse_geocoder
 
 # LLM
-torch>=2.0.0
-transformers>=4.35.0
+torch
+torchvision
+transformers
 accelerate
 
 # Optional RAG / vector DB (required by some actint.data_processing modules)
 chromadb
 
 # MCP + HTTP server
-fastmcp>=0.1.0
-fastapi>=0.104.0
-uvicorn>=0.24.0
-pydantic>=2.0.0
-httpx>=0.25.0
-python-dotenv>=1.0.0
+fastmcp
+fastapi
+uvicorn
+pydantic
+httpx
+python-dotenv
+smolagents==1.24.0
+smolagents[mcp]
+smolagents[telemetry,toolkit]
+huggingface_hub
+huggingface_hub[mcp]
