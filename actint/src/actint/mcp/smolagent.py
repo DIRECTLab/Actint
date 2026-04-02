@@ -18,18 +18,9 @@ SmolagentsInstrumentor().instrument()
 model_id = "Qwen/Qwen3.5-9B"
 # model_id = "Qwen/Qwen2-7B-Instruct"
 
-# Use actint_env if it exists, otherwise fall back to system python or current env
 conda_prefix = os.getenv("CONDA_PREFIX")
-if conda_prefix:
-    python = str(Path(conda_prefix) / "bin" / "python")
-else:
-    # Fallback to a hardcoded path or searching for actint_env
-    # For now, let's try to find it in the usual place
-    actint_env_path = Path("/home/isaacp/miniforge3/envs/actint_env/bin/python")
-    if actint_env_path.exists():
-        python = str(actint_env_path)
-    else:
-        python = "python3" # Global fallback
+python = str(Path(conda_prefix) / "bin" / "python")
+
 
 server_params = StdioServerParameters(
     command=python,
@@ -45,7 +36,7 @@ try:
     model = TransformersModel(model_id=model_id)
     agent = ToolCallingAgent(tools=tools, model=model)
 
-    result = agent.run("Where is the USS Montgomery?")
+    result = agent.run("Are there any anomolies in the data?")
     # GradioUI(agent).launch()
     # with open("agent_log.txt", "w") as f:
     #     print(agent.write_memory_to_messages(), file=f)
