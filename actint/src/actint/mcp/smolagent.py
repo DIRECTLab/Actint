@@ -20,16 +20,7 @@ model_id = "Qwen/Qwen3.5-9B"
 
 # Use actint_env if it exists, otherwise fall back to system python or current env
 conda_prefix = os.getenv("CONDA_PREFIX")
-if conda_prefix:
-    python = str(Path(conda_prefix) / "bin" / "python")
-else:
-    # Fallback to a hardcoded path or searching for actint_env
-    # For now, let's try to find it in the usual place
-    actint_env_path = Path("/home/isaacp/miniforge3/envs/actint_env/bin/python")
-    if actint_env_path.exists():
-        python = str(actint_env_path)
-    else:
-        python = "python3" # Global fallback
+python = str(Path(conda_prefix) / "bin" / "python")
 
 server_params = StdioServerParameters(
     command=python,
