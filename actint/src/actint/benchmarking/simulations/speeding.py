@@ -1,10 +1,10 @@
-"""Loitering anomaly simulation for AIS benchmarking.
+"""Speeding anomaly simulation for AIS benchmarking.
 
 Pipeline:
 1. Clone a baseline SQLite AIS database.
-2. Select existing ships, remove their original records, and inject synthetic loitering tracks.
-3. Emit a benchmark config that validates whether agents detect injected MMSIs.
-4. Optionally run the benchmark harness against the cloned anomaly database.
+2. Select existing ships, remove original records, and inject synthetic tracks with sudden speed spikes.
+3. Emit a benchmark definition file for speeding anomaly detection.
+4. Optionally run the benchmark harness against the generated anomaly database.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ ANOMALIES_ROOT = Path(__file__).resolve().parents[4] / "data" / "db" / "anomalie
 
 
 @dataclass
-class InjectedLoiteringAnomaly:
+class InjectedSpeedingAnomaly:
 	anomaly_id: str
 	mmsi: int
 	vessel_name: str
@@ -37,10 +37,11 @@ class InjectedLoiteringAnomaly:
 	source_vessel_name: str
 	center_lat: float
 	center_lon: float
-	radius_nm: float
 	start_time: str
 	end_time: str
 	point_count: int
+	spike_indices: list[int]
+	spike_speeds: list[float]
 
 
 def resolve_default_source_db() -> Path:
@@ -57,8 +58,8 @@ def resolve_default_source_db() -> Path:
 
 def default_output_db_path() -> Path:
 	stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-	scenario_dir = ANOMALIES_ROOT / "loitering" / stamp
-	return scenario_dir / "ais_loitering.db"
+	scenario_dir = ANOMALIES_ROOT / "speeding" / stamp
+	return scenario_dir / "ais_speeding.db"
 
 
 def parse_iso_timestamp(value: str | None) -> datetime:
@@ -111,11 +112,7 @@ def get_source_vessels(conn: sqlite3.Connection, min_positions: int, limit: int)
 
 
 def remove_ship_data(conn: sqlite3.Connection, mmsi: int) -> int:
-	"""Remove existing vessel metadata and position history for one MMSI.
-
-	Returns:
-		Number of position rows removed from ais_positions.
-	"""
+	"""Remove existing vessel metadata and position history for one MMSI."""
 	row = conn.execute("SELECT COUNT(*) FROM ais_positions WHERE mmsi = ?", (mmsi,)).fetchone()
 	removed_positions = int(row[0]) if row else 0
 	conn.execute("DELETE FROM ais_positions WHERE mmsi = ?", (mmsi,))
@@ -123,10 +120,10 @@ def remove_ship_data(conn: sqlite3.Connection, mmsi: int) -> int:
 	return removed_positions
 
 
-def create_loitering_table(conn: sqlite3.Connection) -> None:
+def create_speeding_table(conn: sqlite3.Connection) -> None:
 	conn.execute(
 		"""
-		CREATE TABLE IF NOT EXISTS loitering_anomalies (
+		CREATE TABLE IF NOT EXISTS speeding_anomalies (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			anomaly_id TEXT UNIQUE NOT NULL,
 			mmsi INTEGER UNIQUE NOT NULL,
@@ -135,10 +132,11 @@ def create_loitering_table(conn: sqlite3.Connection) -> None:
 			source_vessel_name TEXT,
 			center_lat REAL,
 			center_lon REAL,
-			radius_nm REAL,
 			start_time TEXT,
 			end_time TEXT,
 			point_count INTEGER,
+			spike_indices TEXT,
+			spike_speeds TEXT,
 			created_at TEXT DEFAULT CURRENT_TIMESTAMP
 		)
 		"""
@@ -181,21 +179,35 @@ def nm_offset_to_lat_lon(center_lat: float, center_lon: float, radius_nm: float,
 	return center_lat + dlat, center_lon + dlon
 
 
-def inject_loitering_anomalies(
+def _choose_spike_indices(point_count: int, spike_count: int, rng: random.Random) -> list[int]:
+	if point_count < 4:
+		return [max(0, point_count - 1)]
+
+	start_idx = max(1, point_count // 5)
+	end_idx = max(start_idx + 1, point_count - 2)
+	candidates = list(range(start_idx, end_idx))
+	spike_count = max(1, min(spike_count, len(candidates)))
+	return sorted(rng.sample(candidates, k=spike_count))
+
+
+def inject_speeding_anomalies(
 	db_path: Path,
 	num_anomalies: int,
 	point_count: int,
 	radius_nm: float,
 	interval_minutes: int,
-	max_sog_knots: float,
+	normal_max_sog_knots: float,
+	spike_min_sog_knots: float,
+	spike_max_sog_knots: float,
+	spike_count: int,
 	min_source_positions: int,
 	rng_seed: int,
-) -> list[InjectedLoiteringAnomaly]:
+) -> list[InjectedSpeedingAnomaly]:
 	conn = sqlite3.connect(str(db_path))
 	conn.row_factory = sqlite3.Row
 
 	try:
-		create_loitering_table(conn)
+		create_speeding_table(conn)
 
 		source_candidates = get_source_vessels(
 			conn,
@@ -209,7 +221,7 @@ def inject_loitering_anomalies(
 			)
 
 		rng = random.Random(rng_seed)
-		anomalies: list[InjectedLoiteringAnomaly] = []
+		anomalies: list[InjectedSpeedingAnomaly] = []
 
 		for i in range(num_anomalies):
 			source = source_candidates[i]
@@ -226,15 +238,13 @@ def inject_loitering_anomalies(
 			else:
 				latest_time = datetime.utcnow()
 
-			# Replace the selected ship's original rows in the cloned DB.
 			remove_ship_data(conn, source_mmsi)
 
 			start_time = latest_time + timedelta(hours=1)
 			anomaly_mmsi = source_mmsi
 			vessel_name = source_name
-			anomaly_id = f"LOITER-{source_mmsi}"
+			anomaly_id = f"SPEED-{source_mmsi}"
 
-			# Insert synthetic vessel metadata derived from a real vessel profile.
 			conn.execute(
 				"""
 				INSERT OR REPLACE INTO vessels (
@@ -247,7 +257,7 @@ def inject_loitering_anomalies(
 				(
 					anomaly_mmsi,
 					vessel_name,
-					(f"SL{anomaly_mmsi % 100000:05d}"),
+					(f"SS{anomaly_mmsi % 100000:05d}"),
 					vessel_meta["domain"] if vessel_meta else None,
 					vessel_meta["class"] if vessel_meta else "SIMULATED",
 					vessel_meta["type"] if vessel_meta else "SIM",
@@ -265,6 +275,9 @@ def inject_loitering_anomalies(
 				),
 			)
 
+			spike_indices = _choose_spike_indices(point_count, spike_count, rng)
+			spike_speeds: list[float] = []
+
 			end_time = start_time
 			for step in range(point_count):
 				ts = start_time + timedelta(minutes=step * interval_minutes)
@@ -274,7 +287,11 @@ def inject_loitering_anomalies(
 				radial_nm = rng.uniform(0.0, radius_nm)
 				lat, lon = nm_offset_to_lat_lon(center_lat, center_lon, radial_nm, angle)
 
-				sog = rng.uniform(0.0, max_sog_knots)
+				if step in spike_indices:
+					sog = rng.uniform(spike_min_sog_knots, spike_max_sog_knots)
+					spike_speeds.append(round(sog, 3))
+				else:
+					sog = rng.uniform(0.0, normal_max_sog_knots)
 				cog = rng.uniform(0.0, 359.9)
 
 				conn.execute(
@@ -295,7 +312,7 @@ def inject_loitering_anomalies(
 						int(cog),
 						vessel_name,
 						latest_position["imo"] if latest_position else None,
-						f"SL{anomaly_mmsi % 100000:05d}",
+						f"SS{anomaly_mmsi % 100000:05d}",
 						latest_position["vessel_type"] if latest_position else None,
 						latest_position["status"] if latest_position else 0,
 						latest_position["length"] if latest_position else None,
@@ -308,10 +325,11 @@ def inject_loitering_anomalies(
 
 			conn.execute(
 				"""
-				INSERT OR REPLACE INTO loitering_anomalies (
+				INSERT OR REPLACE INTO speeding_anomalies (
 					anomaly_id, mmsi, vessel_name, source_mmsi, source_vessel_name,
-					center_lat, center_lon, radius_nm, start_time, end_time, point_count
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+					center_lat, center_lon, start_time, end_time, point_count,
+					spike_indices, spike_speeds
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 				""",
 				(
 					anomaly_id,
@@ -321,15 +339,16 @@ def inject_loitering_anomalies(
 					source_name,
 					center_lat,
 					center_lon,
-					radius_nm,
 					start_time.strftime("%Y-%m-%dT%H:%M:%S"),
 					end_time.strftime("%Y-%m-%dT%H:%M:%S"),
 					point_count,
+					json.dumps(spike_indices),
+					json.dumps(spike_speeds),
 				),
 			)
 
 			anomalies.append(
-				InjectedLoiteringAnomaly(
+				InjectedSpeedingAnomaly(
 					anomaly_id=anomaly_id,
 					mmsi=anomaly_mmsi,
 					vessel_name=vessel_name,
@@ -337,10 +356,11 @@ def inject_loitering_anomalies(
 					source_vessel_name=source_name,
 					center_lat=center_lat,
 					center_lon=center_lon,
-					radius_nm=radius_nm,
 					start_time=start_time.strftime("%Y-%m-%dT%H:%M:%S"),
 					end_time=end_time.strftime("%Y-%m-%dT%H:%M:%S"),
 					point_count=point_count,
+					spike_indices=spike_indices,
+					spike_speeds=spike_speeds,
 				)
 			)
 
@@ -350,31 +370,34 @@ def inject_loitering_anomalies(
 		conn.close()
 
 
-def write_loitering_benchmark_config(config_path: Path, num_expected: int) -> None:
+def write_speeding_benchmark_config(config_path: Path, expected_mmsis: list[int]) -> None:
 	benchmark_config = {
 		"benchmarks": [
 			{
-				"id": "loitering_detection_injected",
+				"id": "speeding_detection_injected",
 				"description": (
-					"Detect synthetic loitering anomalies injected into the AIS database. "
-					"Success requires detecting all injected anomaly MMSIs; additional MMSIs are allowed."
+					"Detect synthetic speeding anomalies injected into the AIS database. "
+					"Success requires detecting all injected speeding anomaly MMSIs; additional MMSIs are allowed."
 				),
 				"runs": 1,
 				"prompt_template": (
-					"Use available MCP tools to identify loitering vessels in the AIS database.\\n"
-					"Loitering means vessels with minimal movement over time and low speed.\\n"
-					"You should use SQL via query_database to compute likely loitering ships.\\n\\n"
+					"Use available MCP tools to identify ships with sudden speed increases in the AIS database.\\n"
+					"A speeding anomaly is a vessel that has one or more abrupt spikes in Speed Over Ground.\\n"
+					"You should use SQL via query_database to compute likely speeding ships.\\n\\n"
 					"Return ONLY valid JSON with this exact shape:\\n"
-					"{\\\"loitering_mmsi\\\": [<int>, <int>, ...]}\\n\\n"
+					"{\\\"speeding_mmsi\\\": [<int>, <int>, ...]}\\n\\n"
 					"Expected injected anomalies in DB: {expected_count}"
 				),
 				"input_source": {
-					"type": "loitering_anomaly_targets_from_db",
-					"limit": num_expected,
+					"type": "fixed",
+					"values": {
+						"expected_loitering_mmsis": expected_mmsis,
+						"expected_count": len(expected_mmsis),
+					},
 				},
 				"validation": {
 					"method": "loitering_detection",
-					"minimum_detected": num_expected,
+					"minimum_detected": len(expected_mmsis),
 					"require_all_expected": True,
 				},
 			}
@@ -386,7 +409,7 @@ def write_loitering_benchmark_config(config_path: Path, num_expected: int) -> No
 		json.dump(benchmark_config, f, indent=2)
 
 
-def write_manifest(manifest_path: Path, source_db: Path, output_db: Path, anomalies: list[InjectedLoiteringAnomaly]) -> None:
+def write_manifest(manifest_path: Path, source_db: Path, output_db: Path, anomalies: list[InjectedSpeedingAnomaly]) -> None:
 	manifest_path.parent.mkdir(parents=True, exist_ok=True)
 	payload = {
 		"created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -413,7 +436,7 @@ def run_benchmark(
 		"--config",
 		str(main_config),
 		"--benchmark",
-		"loitering_detection_injected",
+		"speeding_detection_injected",
 		"--sqlite-path",
 		str(sqlite_path),
 		"--benchmark-catalog",
@@ -430,7 +453,7 @@ def run_benchmark(
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-	parser = argparse.ArgumentParser(description="Create and test loitering anomaly AIS databases")
+	parser = argparse.ArgumentParser(description="Create and test speeding anomaly AIS databases")
 	parser.add_argument(
 		"--source-db",
 		type=Path,
@@ -447,19 +470,19 @@ def build_arg_parser() -> argparse.ArgumentParser:
 		"--num-anomalies",
 		type=int,
 		default=5,
-		help="Number of existing ships to replace with synthetic loitering tracks.",
+		help="Number of existing ships to replace with synthetic speeding tracks.",
 	)
 	parser.add_argument(
 		"--points-per-anomaly",
 		type=int,
 		default=50,
-		help="Number of AIS position points generated per injected loitering vessel.",
+		help="Number of AIS position points generated per injected speeding vessel.",
 	)
 	parser.add_argument(
 		"--radius-nm",
 		type=float,
 		default=0.4,
-		help="Maximum loitering radius around the anomaly center in nautical miles.",
+		help="Maximum movement radius around anomaly center in nautical miles.",
 	)
 	parser.add_argument(
 		"--interval-minutes",
@@ -468,10 +491,28 @@ def build_arg_parser() -> argparse.ArgumentParser:
 		help="Time gap in minutes between successive synthetic AIS points.",
 	)
 	parser.add_argument(
-		"--max-sog-knots",
+		"--normal-max-sog-knots",
 		type=float,
-		default=0.8,
-		help="Upper bound for generated Speed Over Ground values (knots).",
+		default=10.0,
+		help="Upper bound for normal non-anomalous speeds in knots.",
+	)
+	parser.add_argument(
+		"--spike-min-sog-knots",
+		type=float,
+		default=30.0,
+		help="Lower bound for sudden speed spike values in knots.",
+	)
+	parser.add_argument(
+		"--spike-max-sog-knots",
+		type=float,
+		default=45.0,
+		help="Upper bound for sudden speed spike values in knots.",
+	)
+	parser.add_argument(
+		"--spike-count",
+		type=int,
+		default=2,
+		help="Number of abrupt speed spikes injected per vessel track.",
 	)
 	parser.add_argument(
 		"--min-source-positions",
@@ -496,7 +537,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 		"--manifest-output",
 		type=Path,
 		default=None,
-		help="Optional path for anomaly manifest JSON; defaults next to output DB.",
+		help="Optional path for anomaly manifest JSON; defaults in the scenario folder.",
 	)
 	parser.add_argument(
 		"--run-benchmark",
@@ -531,13 +572,16 @@ def main() -> int:
 	output_db = args.output_db.expanduser().resolve()
 
 	clone_database(source_db, output_db)
-	anomalies = inject_loitering_anomalies(
+	anomalies = inject_speeding_anomalies(
 		db_path=output_db,
 		num_anomalies=args.num_anomalies,
 		point_count=args.points_per_anomaly,
 		radius_nm=args.radius_nm,
 		interval_minutes=args.interval_minutes,
-		max_sog_knots=args.max_sog_knots,
+		normal_max_sog_knots=args.normal_max_sog_knots,
+		spike_min_sog_knots=args.spike_min_sog_knots,
+		spike_max_sog_knots=args.spike_max_sog_knots,
+		spike_count=args.spike_count,
 		min_source_positions=args.min_source_positions,
 		rng_seed=args.seed,
 	)
@@ -554,9 +598,9 @@ def main() -> int:
 		if args.benchmark_config_output
 		else output_db.parent / "benchmark_definitions.json"
 	)
-	write_loitering_benchmark_config(
+	write_speeding_benchmark_config(
 		benchmark_cfg_output,
-		num_expected=len(anomalies),
+		expected_mmsis=[a.mmsi for a in anomalies],
 	)
 
 	print(f"Cloned DB: {output_db}")
@@ -569,7 +613,7 @@ def main() -> int:
 		benchmark_output = (
 			args.benchmark_output.expanduser().resolve()
 			if args.benchmark_output
-			else BENCHMARK_DIR / "results" / f"loitering_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
+			else BENCHMARK_DIR / "results" / f"speeding_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
 		)
 		benchmark_output.parent.mkdir(parents=True, exist_ok=True)
 		aggregate_results_file = (

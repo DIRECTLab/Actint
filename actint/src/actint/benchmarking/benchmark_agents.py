@@ -32,6 +32,7 @@ DEFAULT_CONFIG_PATH = BENCHMARK_DIR / "benchmarks.yaml"
 DEFAULT_RESULTS_ROOT = BENCHMARK_DIR / "results"
 ACTINT_SQLITE_PATH_ENV = "ACTINT_SQLITE_PATH"
 DEFAULT_ANOMALIES_ROOT = Path(__file__).resolve().parents[3] / "data" / "db" / "anomalies"
+SIMULATIONS_DIR = BENCHMARK_DIR / "simulations"
 
 
 @dataclass
@@ -74,6 +75,197 @@ def _default_output_json_path() -> Path:
 	return timestamp_dir / "benchmark_results.json"
 
 
+def _default_aggregate_output_path() -> Path:
+	return DEFAULT_RESULTS_ROOT / "all_benchmarks_aggregate.json"
+
+
+def _discover_simulation_scripts() -> list[Path]:
+	if not SIMULATIONS_DIR.exists():
+		return []
+
+	scripts = [
+		path.resolve()
+		for path in SIMULATIONS_DIR.glob("*.py")
+		if path.is_file() and not path.name.startswith("__")
+	]
+	return sorted(scripts)
+
+
+def _benchmark_to_scenario_name(benchmark_id: str) -> str:
+	"""Infer scenario script stem from benchmark id naming convention."""
+	if "_detection_" in benchmark_id:
+		return benchmark_id.split("_detection_", 1)[0]
+	return benchmark_id.split("_", 1)[0]
+
+
+def _find_latest_catalog_for_benchmark(
+	benchmark_id: str,
+	anomalies_root: Path,
+) -> tuple[Path, Path] | None:
+	"""Find latest scenario catalog and DB pair that defines the requested benchmark id."""
+	catalog_candidates = _find_catalog_files_under(anomalies_root)
+	matches: list[tuple[float, Path, Path]] = []
+
+	for catalog in catalog_candidates:
+		try:
+			parsed = _read_yaml_or_json(catalog)
+		except Exception:
+			continue
+		benchmarks = parsed.get("benchmarks", []) if isinstance(parsed, dict) else []
+		if not isinstance(benchmarks, list):
+			continue
+		if not any(isinstance(b, dict) and b.get("id") == benchmark_id for b in benchmarks):
+			continue
+
+		catalog_dir = catalog.parent
+		db_candidates = sorted(catalog_dir.glob("ais_*.db"))
+		if not db_candidates:
+			continue
+
+		db_path = db_candidates[0].resolve()
+		mtime = catalog.stat().st_mtime
+		matches.append((mtime, catalog.resolve(), db_path))
+
+	if not matches:
+		return None
+
+	matches.sort(key=lambda x: x[0], reverse=True)
+	_, best_catalog, best_db = matches[0]
+	return best_catalog, best_db
+
+
+def _ensure_benchmark_artifacts(
+	benchmark_id: str,
+	anomalies_root: Path,
+	only_agent: str | None,
+) -> tuple[Path, Path]:
+	"""Ensure anomaly DB and catalog exist for benchmark id; create by scenario script if missing."""
+	existing = _find_latest_catalog_for_benchmark(benchmark_id, anomalies_root)
+	if existing is not None:
+		return existing
+
+	scenario = _benchmark_to_scenario_name(benchmark_id)
+	script_path = (SIMULATIONS_DIR / f"{scenario}.py").resolve()
+	if not script_path.exists():
+		raise RuntimeError(
+			f"No existing artifacts for benchmark '{benchmark_id}' and no scenario script found at {script_path}"
+		)
+
+	cmd = [sys.executable, str(script_path)]
+	if only_agent:
+		cmd.extend(["--agent", only_agent])
+
+	print(f"[run-all] Creating missing artifacts via scenario script: {script_path.name}")
+	proc = subprocess.run(cmd)
+	if proc.returncode != 0:
+		raise RuntimeError(
+			f"Scenario script failed while creating artifacts for benchmark '{benchmark_id}' (exit {proc.returncode})"
+		)
+
+	created = _find_latest_catalog_for_benchmark(benchmark_id, anomalies_root)
+	if created is None:
+		raise RuntimeError(
+			f"Scenario script ran but benchmark artifacts for '{benchmark_id}' were not found under {anomalies_root}"
+		)
+	return created
+
+
+def _safe_format_prompt(prompt_template: str, runtime_inputs: dict[str, Any]) -> str:
+	"""Format prompt while preserving unknown placeholders as literals."""
+
+	class _SafeDict(dict):
+		def __missing__(self, key: str) -> str:
+			return "{" + key + "}"
+
+	return prompt_template.format_map(_SafeDict(runtime_inputs))
+
+
+def run_all_benchmarks(
+	config_path: Path,
+	aggregate_output_path: Path,
+	only_agent: str | None,
+	anomalies_root: Path,
+) -> dict[str, Any]:
+	"""Run all configured benchmarks, creating missing anomaly artifacts as needed."""
+	config_data = _read_yaml_or_json(config_path)
+	names = config_data.get("benchmark_names", [])
+	if not isinstance(names, list) or not names:
+		raise ValueError("Config must define non-empty benchmark_names for --run-all-benchmarks")
+
+	aggregate_output_path.parent.mkdir(parents=True, exist_ok=True)
+	if aggregate_output_path.exists():
+		aggregate_output_path.unlink()
+
+	for benchmark_id in names:
+		if not isinstance(benchmark_id, str):
+			continue
+		catalog_path, db_path = _ensure_benchmark_artifacts(benchmark_id, anomalies_root, only_agent)
+
+		cmd = [
+			sys.executable,
+			str(Path(__file__).resolve()),
+			"--config",
+			str(config_path),
+			"--benchmark",
+			benchmark_id,
+			"--sqlite-path",
+			str(db_path),
+			"--benchmark-catalog",
+			str(catalog_path),
+			"--merge-into",
+			str(aggregate_output_path),
+		]
+		if only_agent:
+			cmd.extend(["--agent", only_agent])
+
+		print(f"[run-all] Running benchmark '{benchmark_id}' using DB {db_path.name}")
+		proc = subprocess.run(cmd)
+		if proc.returncode != 0:
+			raise RuntimeError(
+				f"Benchmark run failed for '{benchmark_id}' (exit {proc.returncode})"
+			)
+
+	with aggregate_output_path.open("r", encoding="utf-8") as f:
+		return json.load(f)
+
+
+def refresh_and_run_all_benchmarks(
+	aggregate_output_path: Path,
+	only_agent: str | None,
+) -> dict[str, Any]:
+	"""Regenerate all anomaly DBs via scenario scripts and run their benchmarks."""
+	scripts = _discover_simulation_scripts()
+	if not scripts:
+		raise RuntimeError(f"No simulation scripts found in {SIMULATIONS_DIR}")
+
+	aggregate_output_path.parent.mkdir(parents=True, exist_ok=True)
+	if aggregate_output_path.exists():
+		aggregate_output_path.unlink()
+
+	for script_path in scripts:
+		cmd = [
+			sys.executable,
+			str(script_path),
+			"--run-benchmark",
+			"--aggregate-results-file",
+			str(aggregate_output_path),
+		]
+		if only_agent:
+			cmd.extend(["--agent", only_agent])
+
+		print(f"[refresh-and-run] Running scenario script: {script_path.name}")
+		proc = subprocess.run(cmd)
+		if proc.returncode != 0:
+			raise RuntimeError(
+				f"Scenario script failed: {script_path} (exit {proc.returncode})"
+			)
+
+	with aggregate_output_path.open("r", encoding="utf-8") as f:
+		aggregated = json.load(f)
+
+	return aggregated
+
+
 def _read_yaml_or_json(path: Path) -> dict[str, Any]:
 	with path.open("r", encoding="utf-8") as f:
 		return yaml.safe_load(f) or {}
@@ -109,16 +301,13 @@ def _load_benchmark_catalogs(
 	if anomalies_root is not None:
 		default_catalog_dirs.append(anomalies_root)
 
-	catalog_files: set[Path] = set()
+	# Load discovered catalogs first (best-effort, tolerant of duplicate ids).
+	discovered_catalog_files: set[Path] = set()
 	for directory in default_catalog_dirs:
 		for file_path in _find_catalog_files_under(directory):
-			catalog_files.add(file_path)
+			discovered_catalog_files.add(file_path)
 
-	for file_path in extra_catalog_files:
-		if file_path.exists() and file_path.is_file():
-			catalog_files.add(file_path.resolve())
-
-	for file_path in sorted(catalog_files):
+	for file_path in sorted(discovered_catalog_files):
 		try:
 			parsed = _read_yaml_or_json(file_path)
 		except Exception:
@@ -134,12 +323,30 @@ def _load_benchmark_catalogs(
 			benchmark_id = benchmark.get("id")
 			if not benchmark_id:
 				continue
-			if benchmark_id in catalog_map:
-				raise ValueError(
-					f"Duplicate benchmark id '{benchmark_id}' found in catalog files. "
-					"Ensure benchmark ids are globally unique."
-				)
-			catalog_map[benchmark_id] = benchmark
+			# Duplicate ids are expected across historical anomaly runs; keep first discovered.
+			catalog_map.setdefault(str(benchmark_id), benchmark)
+
+	# Load explicit catalog files last and let them override discovered definitions.
+	for file_path in extra_catalog_files:
+		resolved = file_path.resolve()
+		if not resolved.exists() or not resolved.is_file():
+			continue
+		try:
+			parsed = _read_yaml_or_json(resolved)
+		except Exception:
+			continue
+
+		benchmarks = parsed.get("benchmarks", []) if isinstance(parsed, dict) else []
+		if not isinstance(benchmarks, list):
+			continue
+
+		for benchmark in benchmarks:
+			if not isinstance(benchmark, dict):
+				continue
+			benchmark_id = benchmark.get("id")
+			if not benchmark_id:
+				continue
+			catalog_map[str(benchmark_id)] = benchmark
 
 	return catalog_map
 
@@ -149,19 +356,19 @@ def _resolve_requested_benchmarks(
 	catalog_map: dict[str, dict[str, Any]],
 	only_benchmark: str | None,
 ) -> list[dict[str, Any]]:
-	requested_names: list[str] = []
-	for key in ("benchmark_names", "benchmarks"):
-		value = base_config.get(key)
-		if not isinstance(value, list):
-			continue
-		for item in value:
-			if isinstance(item, str):
-				requested_names.append(item)
-			elif isinstance(item, dict) and item.get("id"):
-				requested_names.append(str(item["id"]))
-
-	if only_benchmark and only_benchmark not in requested_names:
-		requested_names.append(only_benchmark)
+	if only_benchmark:
+		requested_names = [only_benchmark]
+	else:
+		requested_names = []
+		for key in ("benchmark_names", "benchmarks"):
+			value = base_config.get(key)
+			if not isinstance(value, list):
+				continue
+			for item in value:
+				if isinstance(item, str):
+					requested_names.append(item)
+				elif isinstance(item, dict) and item.get("id"):
+					requested_names.append(str(item["id"]))
 
 	# Include inline full benchmark definitions from config for backward compatibility.
 	inline_benchmarks = [
@@ -201,10 +408,8 @@ def _resolve_requested_benchmarks(
 			"ensure matching catalog files are discoverable."
 		)
 
-	if only_benchmark:
-		resolved = [b for b in resolved if b.get("id") == only_benchmark]
-		if not resolved:
-			raise ValueError(f"Benchmark '{only_benchmark}' was requested but no definition was resolved")
+	if only_benchmark and not resolved:
+		raise ValueError(f"Benchmark '{only_benchmark}' was requested but no definition was resolved")
 
 	return resolved
 
@@ -641,7 +846,7 @@ def run_benchmarks(config: dict[str, Any], only_agent: str | None, only_benchmar
 
 					for run_idx in range(runs):
 						runtime_inputs = build_runtime_inputs(benchmark.get("input_source", {}))
-						prompt = prompt_template.format(**runtime_inputs)
+						prompt = _safe_format_prompt(prompt_template, runtime_inputs)
 
 						started = time.perf_counter()
 						agent_error = None
@@ -999,12 +1204,48 @@ def parse_args() -> argparse.Namespace:
 		action="store_true",
 		help="Disable running each agent in a fresh subprocess",
 	)
+	parser.add_argument(
+		"--refresh-and-run-all-benchmarks",
+		action="store_true",
+		help=(
+			"Regenerate all anomaly databases by running every simulation script in benchmarking/simulations, "
+			"then run all scenario benchmarks and aggregate results into one JSON file."
+		),
+	)
+	parser.add_argument(
+		"--run-all-benchmarks",
+		action="store_true",
+		help=(
+			"Run all benchmarks listed in benchmark_names. For each benchmark, reuse existing anomaly artifacts "
+			"if present under anomalies root; otherwise create them via the matching scenario script. "
+			"Results are always merged into one aggregate JSON file (default: benchmarking/results/all_benchmarks_aggregate.json)."
+		),
+	)
 	return parser.parse_args()
 
 
 def main() -> int:
 	global SQLITE_PATH
 	args = parse_args()
+
+	if args.refresh_and_run_all_benchmarks:
+		aggregate_path = (args.merge_into or _default_aggregate_output_path()).expanduser().resolve()
+		results = refresh_and_run_all_benchmarks(aggregate_path, args.agent)
+		print_human_summary(results["summary"])
+		print(f"\nSaved JSON results to: {aggregate_path}")
+		return 0
+
+	if args.run_all_benchmarks:
+		# Run-all mode always writes/merges into a single aggregate JSON output.
+		if args.merge_into is None:
+			args.merge_into = _default_aggregate_output_path()
+		aggregate_path = args.merge_into.expanduser().resolve()
+		anomalies_root = args.anomalies_root.expanduser().resolve() if args.anomalies_root else DEFAULT_ANOMALIES_ROOT
+		results = run_all_benchmarks(args.config, aggregate_path, args.agent, anomalies_root)
+		print_human_summary(results["summary"])
+		print(f"\nSaved JSON results to: {aggregate_path}")
+		return 0
+
 	if args.sqlite_path is not None:
 		sqlite_override = args.sqlite_path.expanduser().resolve()
 		os.environ[ACTINT_SQLITE_PATH_ENV] = str(sqlite_override)
