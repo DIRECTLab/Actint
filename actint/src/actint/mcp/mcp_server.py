@@ -15,6 +15,7 @@ Tools provided:
 
 import json
 import sqlite3
+import os
 from pathlib import Path
 from fastmcp import FastMCP
 
@@ -22,6 +23,14 @@ from fastmcp import FastMCP
 DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
 DB_DIR = DATA_DIR / "db"
 SQLITE_PATH = DB_DIR / "ais.db"
+
+
+def _resolve_sqlite_path() -> Path:
+    """Resolve SQLite path, allowing benchmark overrides via env var."""
+    override = os.getenv("ACTINT_SQLITE_PATH")
+    if override:
+        return Path(override).expanduser().resolve()
+    return SQLITE_PATH
 
 # Import tool functions from parent package
 from actint.tools.previous_locations import get_vehicle_locations, ship_following
@@ -365,10 +374,11 @@ def get_database_info() -> str:
         str: JSON object containing database path and a list of tables with columns.
     """
     try:
-        if not SQLITE_PATH.exists():
-            return json.dumps({"error": f"SQLite database not found at {SQLITE_PATH}"})
+        sqlite_path = _resolve_sqlite_path()
+        if not sqlite_path.exists():
+            return json.dumps({"error": f"SQLite database not found at {sqlite_path}"})
 
-        conn = sqlite3.connect(str(SQLITE_PATH))
+        conn = sqlite3.connect(str(sqlite_path))
         cursor = conn.cursor()
 
         cursor.execute(
@@ -402,7 +412,7 @@ def get_database_info() -> str:
 
         return json.dumps(
             {
-                "db_path": str(SQLITE_PATH),
+                "db_path": str(sqlite_path),
                 "table_count": len(tables),
                 "tables": tables,
             },
@@ -457,7 +467,7 @@ def query_database(sql_query: str, max_rows: int | str = 200) -> str:
         if max_rows > 5000:
             max_rows = 5000
 
-        conn = sqlite3.connect(str(SQLITE_PATH))
+        conn = sqlite3.connect(str(_resolve_sqlite_path()))
         cursor = conn.cursor()
 
         cursor.execute(query)

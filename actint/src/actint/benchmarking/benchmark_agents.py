@@ -30,6 +30,8 @@ from actint.mcp import mcp_server
 BENCHMARK_DIR = Path(__file__).resolve().parent
 DEFAULT_CONFIG_PATH = BENCHMARK_DIR / "benchmarks.yaml"
 DEFAULT_RESULTS_ROOT = BENCHMARK_DIR / "results"
+ACTINT_SQLITE_PATH_ENV = "ACTINT_SQLITE_PATH"
+DEFAULT_ANOMALIES_ROOT = Path(__file__).resolve().parents[3] / "data" / "db" / "anomalies"
 
 
 @dataclass
@@ -42,6 +44,10 @@ class PositionRecord:
 
 def _resolve_sqlite_path() -> Path:
 	"""Resolve SQLite path from likely workspace locations."""
+	override = os.getenv(ACTINT_SQLITE_PATH_ENV)
+	if override:
+		return Path(override).expanduser().resolve()
+
 	candidates = [
 		Path(__file__).resolve().parents[3] / "data" / "db" / "ais.db",
 		Path(__file__).resolve().parents[4] / "data" / "db" / "ais.db",
@@ -68,14 +74,161 @@ def _default_output_json_path() -> Path:
 	return timestamp_dir / "benchmark_results.json"
 
 
-def load_config(path: Path) -> dict[str, Any]:
+def _read_yaml_or_json(path: Path) -> dict[str, Any]:
 	with path.open("r", encoding="utf-8") as f:
-		data = yaml.safe_load(f) or {}
+		return yaml.safe_load(f) or {}
+
+
+def _find_catalog_files_under(root: Path) -> list[Path]:
+	if not root.exists():
+		return []
+
+	patterns = [
+		"**/*benchmark*.yaml",
+		"**/*benchmark*.yml",
+		"**/*benchmark*.json",
+	]
+	files: set[Path] = set()
+	for pattern in patterns:
+		for file_path in root.glob(pattern):
+			if file_path.is_file():
+				files.add(file_path.resolve())
+	return sorted(files)
+
+
+def _load_benchmark_catalogs(
+	config_path: Path,
+	anomalies_root: Path | None,
+	extra_catalog_files: list[Path],
+) -> dict[str, dict[str, Any]]:
+	catalog_map: dict[str, dict[str, Any]] = {}
+
+	default_catalog_dirs = [
+		config_path.parent / "benchmark_definitions",
+	]
+	if anomalies_root is not None:
+		default_catalog_dirs.append(anomalies_root)
+
+	catalog_files: set[Path] = set()
+	for directory in default_catalog_dirs:
+		for file_path in _find_catalog_files_under(directory):
+			catalog_files.add(file_path)
+
+	for file_path in extra_catalog_files:
+		if file_path.exists() and file_path.is_file():
+			catalog_files.add(file_path.resolve())
+
+	for file_path in sorted(catalog_files):
+		try:
+			parsed = _read_yaml_or_json(file_path)
+		except Exception:
+			continue
+
+		benchmarks = parsed.get("benchmarks", []) if isinstance(parsed, dict) else []
+		if not isinstance(benchmarks, list):
+			continue
+
+		for benchmark in benchmarks:
+			if not isinstance(benchmark, dict):
+				continue
+			benchmark_id = benchmark.get("id")
+			if not benchmark_id:
+				continue
+			if benchmark_id in catalog_map:
+				raise ValueError(
+					f"Duplicate benchmark id '{benchmark_id}' found in catalog files. "
+					"Ensure benchmark ids are globally unique."
+				)
+			catalog_map[benchmark_id] = benchmark
+
+	return catalog_map
+
+
+def _resolve_requested_benchmarks(
+	base_config: dict[str, Any],
+	catalog_map: dict[str, dict[str, Any]],
+	only_benchmark: str | None,
+) -> list[dict[str, Any]]:
+	requested_names: list[str] = []
+	for key in ("benchmark_names", "benchmarks"):
+		value = base_config.get(key)
+		if not isinstance(value, list):
+			continue
+		for item in value:
+			if isinstance(item, str):
+				requested_names.append(item)
+			elif isinstance(item, dict) and item.get("id"):
+				requested_names.append(str(item["id"]))
+
+	if only_benchmark and only_benchmark not in requested_names:
+		requested_names.append(only_benchmark)
+
+	# Include inline full benchmark definitions from config for backward compatibility.
+	inline_benchmarks = [
+		item
+		for item in base_config.get("benchmarks", [])
+		if isinstance(item, dict) and item.get("prompt_template")
+	]
+	inline_ids = {str(item["id"]): item for item in inline_benchmarks if item.get("id")}
+
+	resolved: list[dict[str, Any]] = []
+	missing: list[str] = []
+	seen: set[str] = set()
+	for benchmark_id in requested_names:
+		if benchmark_id in seen:
+			continue
+		seen.add(benchmark_id)
+
+		if benchmark_id in inline_ids:
+			resolved.append(inline_ids[benchmark_id])
+			continue
+
+		definition = catalog_map.get(benchmark_id)
+		if definition is None:
+			missing.append(benchmark_id)
+			continue
+		resolved.append(definition)
+
+	if missing:
+		print(
+			"Warning: benchmark definitions not found for ids: "
+			+ ", ".join(sorted(set(missing)))
+		)
+
+	if not resolved:
+		raise ValueError(
+			"No benchmark definitions resolved. Check benchmark_names/benchmarks in config and "
+			"ensure matching catalog files are discoverable."
+		)
+
+	if only_benchmark:
+		resolved = [b for b in resolved if b.get("id") == only_benchmark]
+		if not resolved:
+			raise ValueError(f"Benchmark '{only_benchmark}' was requested but no definition was resolved")
+
+	return resolved
+
+
+def load_config(
+	path: Path,
+	only_benchmark: str | None = None,
+	anomalies_root: Path | None = None,
+	extra_catalog_files: list[Path] | None = None,
+) -> dict[str, Any]:
+	data = _read_yaml_or_json(path)
 
 	if "agents" not in data or not isinstance(data["agents"], list):
 		raise ValueError("Config must contain an 'agents' list")
-	if "benchmarks" not in data or not isinstance(data["benchmarks"], list):
-		raise ValueError("Config must contain a 'benchmarks' list")
+
+	extra_catalog_files = extra_catalog_files or []
+	catalog_map = _load_benchmark_catalogs(
+		config_path=path,
+		anomalies_root=anomalies_root,
+		extra_catalog_files=extra_catalog_files,
+	)
+	resolved_benchmarks = _resolve_requested_benchmarks(data, catalog_map, only_benchmark)
+
+	data["benchmarks"] = resolved_benchmarks
 
 	return data
 
@@ -181,6 +334,28 @@ def build_runtime_inputs(input_source: dict[str, Any]) -> dict[str, Any]:
 			raise ValueError("fixed input_source requires a dict under values")
 		return values
 
+	if source_type == "loitering_anomaly_targets_from_db":
+		limit = int((input_source or {}).get("limit", 5))
+		if limit <= 0:
+			limit = 5
+		with _get_connection() as conn:
+			rows = conn.execute(
+				"SELECT mmsi FROM loitering_anomalies ORDER BY mmsi LIMIT ?",
+				(limit,),
+			).fetchall()
+
+		targets = [int(row[0]) for row in rows]
+		if not targets:
+			raise RuntimeError(
+				"No loitering anomaly targets found. Ensure loitering_anomalies table is populated "
+				"in the benchmark SQLite database."
+			)
+
+		return {
+			"expected_loitering_mmsis": targets,
+			"expected_count": len(targets),
+		}
+
 	raise ValueError(f"Unsupported input_source type: {source_type}")
 
 
@@ -246,6 +421,42 @@ def parse_position_prediction(agent_output: Any) -> dict[str, Any]:
 	}
 
 
+def _coerce_mmsi_list(value: Any) -> list[int]:
+	if value is None:
+		return []
+	if isinstance(value, (int, str)):
+		try:
+			return [int(value)]
+		except Exception:
+			return []
+	if isinstance(value, list):
+		output: list[int] = []
+		for item in value:
+			try:
+				output.append(int(item))
+			except Exception:
+				continue
+		return output
+	return []
+
+
+def parse_loitering_prediction(agent_output: Any) -> dict[str, Any]:
+	if isinstance(agent_output, dict):
+		payload = agent_output
+	else:
+		payload = _extract_json_object(str(agent_output))
+
+	if payload:
+		for key in ["loitering_mmsi", "loitering_mmsis", "mmsis", "ships", "vessels"]:
+			if key in payload:
+				mmsis = sorted(set(_coerce_mmsi_list(payload.get(key))))
+				return {"mmsis": mmsis}
+
+	text = str(agent_output)
+	mmsis = sorted(set(int(m.group(0)) for m in re.finditer(r"\b\d{9}\b", text)))
+	return {"mmsis": mmsis}
+
+
 def validate_current_position_from_db(
 	runtime_inputs: dict[str, Any],
 	agent_output: Any,
@@ -286,6 +497,51 @@ def validate_current_position_from_db(
 	}
 
 
+def validate_loitering_detection(
+	runtime_inputs: dict[str, Any],
+	agent_output: Any,
+	validation_config: dict[str, Any],
+) -> dict[str, Any]:
+	expected = [int(x) for x in runtime_inputs.get("expected_loitering_mmsis", [])]
+	if not expected:
+		raise ValueError("Runtime inputs missing expected_loitering_mmsis")
+
+	predicted = parse_loitering_prediction(agent_output)
+	found = sorted(set(int(x) for x in predicted.get("mmsis", [])))
+
+	expected_set = set(expected)
+	found_set = set(found)
+	detected_expected = sorted(expected_set.intersection(found_set))
+	missed_expected = sorted(expected_set.difference(found_set))
+	false_positives = sorted(found_set.difference(expected_set))
+
+	minimum_detected = int(validation_config.get("minimum_detected", len(expected)))
+	require_all_expected = bool(validation_config.get("require_all_expected", False))
+
+	success = len(detected_expected) >= minimum_detected
+	if require_all_expected:
+		success = success and not missed_expected
+
+	return {
+		"success": success,
+		"expected": {
+			"expected_loitering_mmsis": expected,
+			"expected_count": len(expected),
+		},
+		"predicted": {
+			"reported_mmsis": found,
+			"reported_count": len(found),
+		},
+		"metrics": {
+			"minimum_detected": minimum_detected,
+			"detected_expected_count": len(detected_expected),
+			"detected_expected_mmsis": detected_expected,
+			"missed_expected_mmsis": missed_expected,
+			"false_positive_mmsis": false_positives,
+		},
+	}
+
+
 def validate_result(
 	benchmark: dict[str, Any],
 	runtime_inputs: dict[str, Any],
@@ -296,6 +552,9 @@ def validate_result(
 
 	if method == "current_position_from_db":
 		return validate_current_position_from_db(runtime_inputs, agent_output, validation)
+
+	if method == "loitering_detection":
+		return validate_loitering_detection(runtime_inputs, agent_output, validation)
 
 	raise ValueError(f"Unsupported validation method: {method}")
 
@@ -495,11 +754,50 @@ def summarize_results(run_results: list[dict[str, Any]]) -> dict[str, Any]:
 	}
 
 
+def _merge_with_existing_results(
+	new_results: dict[str, Any],
+	aggregate_path: Path,
+) -> dict[str, Any]:
+	"""Merge newly produced benchmark results into an existing aggregate file."""
+	if not aggregate_path.exists():
+		return new_results
+
+	with aggregate_path.open("r", encoding="utf-8") as f:
+		existing = json.load(f)
+
+	existing_runs = existing.get("results", []) if isinstance(existing, dict) else []
+	new_runs = new_results.get("results", [])
+	merged_runs = [*existing_runs, *new_runs]
+
+	started_at = (
+		existing.get("started_at")
+		if isinstance(existing, dict) and existing.get("started_at")
+		else new_results.get("started_at")
+	)
+	sqlite_paths = []
+	if isinstance(existing, dict) and existing.get("sqlite_path"):
+		sqlite_paths.append(existing["sqlite_path"])
+	if new_results.get("sqlite_path"):
+		sqlite_paths.append(new_results["sqlite_path"])
+	sqlite_paths = sorted(set(sqlite_paths))
+
+	return {
+		"started_at": started_at,
+		"finished_at": _now_utc(),
+		"sqlite_path": new_results.get("sqlite_path"),
+		"sqlite_paths": sqlite_paths,
+		"summary": summarize_results(merged_runs),
+		"results": merged_runs,
+	}
+
+
 def run_benchmarks_isolated_by_agent(
 	config: dict[str, Any],
 	config_path: Path,
 	only_agent: str | None,
 	only_benchmark: str | None,
+	anomalies_root: Path | None,
+	benchmark_catalogs: list[Path],
 ) -> dict[str, Any]:
 	"""Run each agent in a fresh subprocess so GPU memory is fully released between models."""
 	started_at = _now_utc()
@@ -527,6 +825,10 @@ def run_benchmarks_isolated_by_agent(
 		]
 		if only_benchmark:
 			cmd.extend(["--benchmark", only_benchmark])
+		if anomalies_root is not None:
+			cmd.extend(["--anomalies-root", str(anomalies_root)])
+		for catalog in benchmark_catalogs:
+			cmd.extend(["--benchmark-catalog", str(catalog)])
 
 		proc = subprocess.run(cmd)
 		if proc.returncode != 0:
@@ -656,6 +958,12 @@ def parse_args() -> argparse.Namespace:
 		help="Path to write benchmark JSON results (default: benchmarking/results/<timestamp>/benchmark_results.json)",
 	)
 	parser.add_argument(
+		"--merge-into",
+		type=Path,
+		default=None,
+		help="Optional aggregate JSON path; when provided, append new runs into that file and recompute summary.",
+	)
+	parser.add_argument(
 		"--agent",
 		type=str,
 		default=None,
@@ -668,6 +976,25 @@ def parse_args() -> argparse.Namespace:
 		help="Run only one benchmark by id",
 	)
 	parser.add_argument(
+		"--anomalies-root",
+		type=Path,
+		default=DEFAULT_ANOMALIES_ROOT,
+		help="Root folder for anomaly scenario benchmark definition discovery.",
+	)
+	parser.add_argument(
+		"--benchmark-catalog",
+		type=Path,
+		action="append",
+		default=[],
+		help="Additional benchmark definition file(s) to load. Repeat for multiple files.",
+	)
+	parser.add_argument(
+		"--sqlite-path",
+		type=Path,
+		default=None,
+		help="Override SQLite database path for benchmark and MCP tool server",
+	)
+	parser.add_argument(
 		"--no-isolate-agents",
 		action="store_true",
 		help="Disable running each agent in a fresh subprocess",
@@ -676,18 +1003,44 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+	global SQLITE_PATH
 	args = parse_args()
+	if args.sqlite_path is not None:
+		sqlite_override = args.sqlite_path.expanduser().resolve()
+		os.environ[ACTINT_SQLITE_PATH_ENV] = str(sqlite_override)
+		SQLITE_PATH = sqlite_override
+
 	output_json_path = args.output or _default_output_json_path()
 	output_csv_path = output_json_path.with_suffix(".csv")
+	anomalies_root = args.anomalies_root.expanduser().resolve() if args.anomalies_root else None
+	benchmark_catalogs = [p.expanduser().resolve() for p in args.benchmark_catalog]
 
-	config = load_config(args.config)
+	config = load_config(
+		args.config,
+		only_benchmark=args.benchmark,
+		anomalies_root=anomalies_root,
+		extra_catalog_files=benchmark_catalogs,
+	)
 
 	isolate_agents = not args.no_isolate_agents
 	agent_count = len(config.get("agents", []))
 	if isolate_agents and args.agent is None and agent_count > 1:
-		results = run_benchmarks_isolated_by_agent(config, args.config, args.agent, args.benchmark)
+		results = run_benchmarks_isolated_by_agent(
+			config,
+			args.config,
+			args.agent,
+			args.benchmark,
+			anomalies_root,
+			benchmark_catalogs,
+		)
 	else:
 		results = run_benchmarks(config, args.agent, args.benchmark)
+
+	if args.merge_into is not None:
+		aggregate_path = args.merge_into.expanduser().resolve()
+		aggregate_path.parent.mkdir(parents=True, exist_ok=True)
+		results = _merge_with_existing_results(results, aggregate_path)
+		output_json_path = aggregate_path
 
 	output_json_path.parent.mkdir(parents=True, exist_ok=True)
 	with output_json_path.open("w", encoding="utf-8") as f:

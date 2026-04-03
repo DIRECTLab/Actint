@@ -15,24 +15,7 @@ agents:
     model_id: mistralai/Mistral-7B-v0.1
     structured_output: false
     model_kwargs:
-    max_new_tokens: 512
+      max_new_tokens: 512
 
-benchmarks:
-  - id: current_ship_location_latest_record
-    description: >
-      Ask the agent for the current location of a ship MMSI selected from the most
-      recent AIS detection, then validate the latitude/longitude against DB truth.
-    runs: 1
-    prompt_template: |
-      Use available MCP tools to find the vessel's most recent AIS position.
-      MMSI: {mmsi}
-
-      Return ONLY valid JSON with this exact shape:
-      {{"mmsi": <int>, "latitude": <float>, "longitude": <float>, "timestamp": "<iso8601>"}}
-    input_source:
-      type: latest_record_mmsi
-    validation:
-      method: current_position_from_db
-      latitude_tolerance: 0.02
-      longitude_tolerance: 0.02
-      require_timestamp_match: false
+benchmark_names:
+  - loitering_detection_injected
