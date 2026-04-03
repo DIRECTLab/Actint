@@ -510,7 +510,8 @@ def run_benchmarks_isolated_by_agent(
 		if only_agent and agent_name != only_agent:
 			continue
 
-		with tempfile.NamedTemporaryFile(prefix=f"bench_{agent_name}_", suffix=".json", delete=False) as tmp:
+		safe_agent_name = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(agent_name or "agent"))
+		with tempfile.NamedTemporaryFile(prefix=f"bench_{safe_agent_name}_", suffix=".json", delete=False) as tmp:
 			tmp_path = Path(tmp.name)
 
 		cmd = [

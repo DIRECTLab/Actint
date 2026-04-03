@@ -10,6 +10,12 @@ agents:
     structured_output: false
     model_kwargs:
       max_new_tokens: 512
+      
+  - name: mistralai/Mistral-7B-v0.1
+    model_id: mistralai/Mistral-7B-v0.1
+    structured_output: false
+    model_kwargs:
+    max_new_tokens: 512
 
 benchmarks:
   - id: current_ship_location_latest_record
