@@ -171,13 +171,21 @@ def _ensure_benchmark_artifacts(
 
 
 def _safe_format_prompt(prompt_template: str, runtime_inputs: dict[str, Any]) -> str:
-	"""Format prompt while preserving unknown placeholders as literals."""
+	"""Substitute only simple placeholders like {mmsi}, leaving all other braces untouched."""
 
-	class _SafeDict(dict):
-		def __missing__(self, key: str) -> str:
-			return "{" + key + "}"
+	def _render_value(value: Any) -> str:
+		if isinstance(value, (dict, list)):
+			return json.dumps(value)
+		return str(value)
 
-	return prompt_template.format_map(_SafeDict(runtime_inputs))
+	def _replace(match: re.Match[str]) -> str:
+		key = match.group(1)
+		if key in runtime_inputs:
+			return _render_value(runtime_inputs[key])
+		return match.group(0)
+
+	# Only replace identifier-shaped placeholders so JSON/object examples remain intact.
+	return re.sub(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}", _replace, prompt_template)
 
 
 def run_all_benchmarks(
