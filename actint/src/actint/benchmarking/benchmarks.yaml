@@ -39,3 +39,4 @@ agents:
 benchmark_names:
   - loitering_detection_injected
   - speeding_detection_injected
+  - disappearance_detection_injected

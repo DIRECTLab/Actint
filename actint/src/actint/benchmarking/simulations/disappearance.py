@@ -1,9 +1,9 @@
-"""Speeding anomaly simulation for AIS benchmarking.
+"""Disappearance anomaly simulation for AIS benchmarking.
 
 Pipeline:
 1. Clone a baseline SQLite AIS database.
-2. Select existing ships, remove original records, and inject synthetic tracks with sudden speed spikes.
-3. Emit a benchmark definition file for speeding anomaly detection.
+2. Select existing ships, remove original records, and inject highly regular tracks that abruptly stop.
+3. Emit a benchmark definition file for disappearance anomaly detection.
 4. Optionally run the benchmark harness against the generated anomaly database.
 """
 
@@ -29,19 +29,18 @@ ANOMALIES_ROOT = Path(__file__).resolve().parents[4] / "data" / "db" / "anomalie
 
 
 @dataclass
-class InjectedSpeedingAnomaly:
+class InjectedDisappearanceAnomaly:
 	anomaly_id: str
 	mmsi: int
 	vessel_name: str
 	source_mmsi: int
 	source_vessel_name: str
-	center_lat: float
-	center_lon: float
 	start_time: str
 	end_time: str
 	point_count: int
-	spike_indices: list[int]
-	spike_speeds: list[float]
+	interval_minutes: int
+	expected_gap_minutes: int
+	mean_sog_knots: float
 
 
 def resolve_default_source_db() -> Path:
@@ -58,8 +57,8 @@ def resolve_default_source_db() -> Path:
 
 def default_output_db_path() -> Path:
 	stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-	scenario_dir = ANOMALIES_ROOT / "speeding" / stamp
-	return scenario_dir / "ais_speeding.db"
+	scenario_dir = ANOMALIES_ROOT / "disappearance" / stamp
+	return scenario_dir / "ais_disappearance.db"
 
 
 def parse_iso_timestamp(value: str | None) -> datetime:
@@ -156,30 +155,23 @@ def nm_offset_to_lat_lon(center_lat: float, center_lon: float, radius_nm: float,
 	return center_lat + dlat, center_lon + dlon
 
 
-def _choose_spike_indices(point_count: int, spike_count: int, rng: random.Random) -> list[int]:
-	if point_count < 4:
-		return [max(0, point_count - 1)]
-
-	start_idx = max(1, point_count // 5)
-	end_idx = max(start_idx + 1, point_count - 2)
-	candidates = list(range(start_idx, end_idx))
-	spike_count = max(1, min(spike_count, len(candidates)))
-	return sorted(rng.sample(candidates, k=spike_count))
+def advance_position_by_heading(lat: float, lon: float, heading_deg: float, distance_nm: float) -> tuple[float, float]:
+	angle_rad = math.radians(heading_deg)
+	return nm_offset_to_lat_lon(lat, lon, distance_nm, angle_rad)
 
 
-def inject_speeding_anomalies(
+def inject_disappearance_anomalies(
 	db_path: Path,
 	num_anomalies: int,
 	point_count: int,
-	radius_nm: float,
 	interval_minutes: int,
-	normal_max_sog_knots: float,
-	spike_min_sog_knots: float,
-	spike_max_sog_knots: float,
-	spike_count: int,
+	consistency_sog_knots: float,
+	sog_jitter_knots: float,
+	cog_jitter_deg: float,
+	disappearance_gap_hours: float,
 	min_source_positions: int,
 	rng_seed: int,
-) -> list[InjectedSpeedingAnomaly]:
+) -> list[InjectedDisappearanceAnomaly]:
 	conn = sqlite3.connect(str(db_path))
 	conn.row_factory = sqlite3.Row
 
@@ -196,7 +188,7 @@ def inject_speeding_anomalies(
 			)
 
 		rng = random.Random(rng_seed)
-		anomalies: list[InjectedSpeedingAnomaly] = []
+		anomalies: list[InjectedDisappearanceAnomaly] = []
 
 		for i in range(num_anomalies):
 			source = source_candidates[i]
@@ -215,10 +207,12 @@ def inject_speeding_anomalies(
 
 			remove_ship_data(conn, source_mmsi)
 
-			start_time = latest_time + timedelta(hours=1)
+			track_duration_minutes = max(0, (point_count - 1) * interval_minutes)
+			gap_delta = timedelta(hours=max(1.0, disappearance_gap_hours))
+			start_time = latest_time - gap_delta - timedelta(minutes=track_duration_minutes)
 			anomaly_mmsi = source_mmsi
 			vessel_name = source_name
-			anomaly_id = f"SPEED-{source_mmsi}"
+			anomaly_id = f"DISAPPEAR-{source_mmsi}"
 
 			conn.execute(
 				"""
@@ -232,7 +226,7 @@ def inject_speeding_anomalies(
 				(
 					anomaly_mmsi,
 					vessel_name,
-					(f"SS{anomaly_mmsi % 100000:05d}"),
+					(f"SD{anomaly_mmsi % 100000:05d}"),
 					vessel_meta["domain"] if vessel_meta else None,
 					vessel_meta["class"] if vessel_meta else "SIMULATED",
 					vessel_meta["type"] if vessel_meta else "SIM",
@@ -244,30 +238,31 @@ def inject_speeding_anomalies(
 					vessel_meta["fleet"] if vessel_meta else "SIM_FLEET",
 					vessel_meta["fleet_original"] if vessel_meta else "SIM_FLEET",
 					start_time.strftime("%Y-%m-%dT%H:%M:%S"),
-					(start_time + timedelta(minutes=(point_count - 1) * interval_minutes)).strftime(
-						"%Y-%m-%dT%H:%M:%S"
-					),
+					(start_time + timedelta(minutes=track_duration_minutes)).strftime("%Y-%m-%dT%H:%M:%S"),
 				),
 			)
 
-			spike_indices = _choose_spike_indices(point_count, spike_count, rng)
-			spike_speeds: list[float] = []
+			base_heading = rng.uniform(0.0, 359.9)
+			lat, lon = nm_offset_to_lat_lon(
+				center_lat,
+				center_lon,
+				radius_nm=0.1,
+				angle_rad=rng.uniform(0.0, 2.0 * math.pi),
+			)
+			generated_sogs: list[float] = []
 
 			end_time = start_time
 			for step in range(point_count):
 				ts = start_time + timedelta(minutes=step * interval_minutes)
 				end_time = ts
 
-				angle = rng.uniform(0.0, 2.0 * math.pi)
-				radial_nm = rng.uniform(0.0, radius_nm)
-				lat, lon = nm_offset_to_lat_lon(center_lat, center_lon, radial_nm, angle)
+				sog = max(0.0, rng.gauss(consistency_sog_knots, sog_jitter_knots))
+				generated_sogs.append(sog)
+				cog = (base_heading + rng.uniform(-cog_jitter_deg, cog_jitter_deg)) % 360.0
 
-				if step in spike_indices:
-					sog = rng.uniform(spike_min_sog_knots, spike_max_sog_knots)
-					spike_speeds.append(round(sog, 3))
-				else:
-					sog = rng.uniform(0.0, normal_max_sog_knots)
-				cog = rng.uniform(0.0, 359.9)
+				if step > 0:
+					distance_nm = sog * (interval_minutes / 60.0)
+					lat, lon = advance_position_by_heading(lat, lon, cog, distance_nm)
 
 				conn.execute(
 					"""
@@ -287,7 +282,7 @@ def inject_speeding_anomalies(
 						int(cog),
 						vessel_name,
 						latest_position["imo"] if latest_position else None,
-						f"SS{anomaly_mmsi % 100000:05d}",
+						f"SD{anomaly_mmsi % 100000:05d}",
 						latest_position["vessel_type"] if latest_position else None,
 						latest_position["status"] if latest_position else 0,
 						latest_position["length"] if latest_position else None,
@@ -298,20 +293,22 @@ def inject_speeding_anomalies(
 					),
 				)
 
+			expected_gap_minutes = int(gap_delta.total_seconds() // 60)
+			mean_sog = sum(generated_sogs) / len(generated_sogs) if generated_sogs else 0.0
+
 			anomalies.append(
-				InjectedSpeedingAnomaly(
+				InjectedDisappearanceAnomaly(
 					anomaly_id=anomaly_id,
 					mmsi=anomaly_mmsi,
 					vessel_name=vessel_name,
 					source_mmsi=source_mmsi,
 					source_vessel_name=source_name,
-					center_lat=center_lat,
-					center_lon=center_lon,
 					start_time=start_time.strftime("%Y-%m-%dT%H:%M:%S"),
 					end_time=end_time.strftime("%Y-%m-%dT%H:%M:%S"),
 					point_count=point_count,
-					spike_indices=spike_indices,
-					spike_speeds=spike_speeds,
+					interval_minutes=interval_minutes,
+					expected_gap_minutes=expected_gap_minutes,
+					mean_sog_knots=round(mean_sog, 3),
 				)
 			)
 
@@ -321,33 +318,33 @@ def inject_speeding_anomalies(
 		conn.close()
 
 
-def write_speeding_benchmark_config(config_path: Path, expected_mmsis: list[int]) -> None:
+def write_disappearance_benchmark_config(config_path: Path, expected_mmsis: list[int]) -> None:
 	benchmark_config = {
 		"benchmarks": [
 			{
-				"id": "speeding_detection_injected",
+				"id": "disappearance_detection_injected",
 				"description": (
-					"Detect synthetic speeding anomalies injected into the AIS database. "
-					"Success requires detecting all injected speeding anomaly MMSIs; additional MMSIs are allowed."
+					"Detect synthetic disappearance anomalies injected into the AIS database. "
+					"Success requires detecting all injected disappearance anomaly MMSIs; additional MMSIs are allowed."
 				),
 				"runs": 1,
 				"prompt_template": (
-					"Use available MCP tools to identify ships with sudden speed increases in the AIS database.\\n"
-					"A speeding anomaly is a vessel that has one or more abrupt spikes in Speed Over Ground.\\n"
-					"You should use SQL via query_database to compute likely speeding ships.\\n\\n"
+					"Use available MCP tools to identify ships that suddenly stop reporting after a very regular ping pattern.\\n"
+					"A disappearance anomaly has consistent time intervals between historical pings, then a long reporting gap.\\n"
+					"You should use SQL via query_database to compute likely disappearance ships.\\n\\n"
 					"Return ONLY valid JSON with this exact shape:\\n"
-					"{\\\"speeding_mmsi\\\": [<int>, <int>, ...]}\\n\\n"
+					"{\\\"disappearance_mmsi\\\": [<int>, <int>, ...]}\\n\\n"
 					"Expected injected anomalies in DB: {expected_count}"
 				),
 				"input_source": {
 					"type": "fixed",
 					"values": {
-						"expected_speeding_mmsis": expected_mmsis,
+						"expected_disappearance_mmsis": expected_mmsis,
 						"expected_count": len(expected_mmsis),
 					},
 				},
 				"validation": {
-					"method": "speeding_detection",
+					"method": "disappearance_detection",
 					"minimum_detected": len(expected_mmsis),
 					"require_all_expected": True,
 				},
@@ -360,7 +357,12 @@ def write_speeding_benchmark_config(config_path: Path, expected_mmsis: list[int]
 		json.dump(benchmark_config, f, indent=2)
 
 
-def write_manifest(manifest_path: Path, source_db: Path, output_db: Path, anomalies: list[InjectedSpeedingAnomaly]) -> None:
+def write_manifest(
+	manifest_path: Path,
+	source_db: Path,
+	output_db: Path,
+	anomalies: list[InjectedDisappearanceAnomaly],
+) -> None:
 	manifest_path.parent.mkdir(parents=True, exist_ok=True)
 	payload = {
 		"created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -387,7 +389,7 @@ def run_benchmark(
 		"--config",
 		str(main_config),
 		"--benchmark",
-		"speeding_detection_injected",
+		"disappearance_detection_injected",
 		"--sqlite-path",
 		str(sqlite_path),
 		"--benchmark-catalog",
@@ -404,7 +406,7 @@ def run_benchmark(
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-	parser = argparse.ArgumentParser(description="Create and test speeding anomaly AIS databases")
+	parser = argparse.ArgumentParser(description="Create and test disappearance anomaly AIS databases")
 	parser.add_argument(
 		"--source-db",
 		type=Path,
@@ -421,49 +423,43 @@ def build_arg_parser() -> argparse.ArgumentParser:
 		"--num-anomalies",
 		type=int,
 		default=5,
-		help="Number of existing ships to replace with synthetic speeding tracks.",
+		help="Number of existing ships to replace with disappearance tracks.",
 	)
 	parser.add_argument(
 		"--points-per-anomaly",
 		type=int,
-		default=50,
-		help="Number of AIS position points generated per injected speeding vessel.",
-	)
-	parser.add_argument(
-		"--radius-nm",
-		type=float,
-		default=0.4,
-		help="Maximum movement radius around anomaly center in nautical miles.",
+		default=40,
+		help="Number of regular AIS position points generated before each vessel disappears.",
 	)
 	parser.add_argument(
 		"--interval-minutes",
 		type=int,
-		default=15,
+		default=10,
 		help="Time gap in minutes between successive synthetic AIS points.",
 	)
 	parser.add_argument(
-		"--normal-max-sog-knots",
+		"--consistency-sog-knots",
 		type=float,
-		default=10.0,
-		help="Upper bound for normal non-anomalous speeds in knots.",
+		default=12.0,
+		help="Target SOG for regular pre-disappearance movement.",
 	)
 	parser.add_argument(
-		"--spike-min-sog-knots",
+		"--sog-jitter-knots",
 		type=float,
-		default=30.0,
-		help="Lower bound for sudden speed spike values in knots.",
+		default=0.3,
+		help="Small random SOG variance to keep pings highly consistent.",
 	)
 	parser.add_argument(
-		"--spike-max-sog-knots",
+		"--cog-jitter-deg",
 		type=float,
-		default=45.0,
-		help="Upper bound for sudden speed spike values in knots.",
+		default=3.0,
+		help="Small heading variance in degrees for near-straight movement.",
 	)
 	parser.add_argument(
-		"--spike-count",
-		type=int,
-		default=2,
-		help="Number of abrupt speed spikes injected per vessel track.",
+		"--disappearance-gap-hours",
+		type=float,
+		default=24.0,
+		help="Gap length after the final ping to create abrupt disappearance behavior.",
 	)
 	parser.add_argument(
 		"--min-source-positions",
@@ -523,16 +519,15 @@ def main() -> int:
 	output_db = args.output_db.expanduser().resolve()
 
 	clone_database(source_db, output_db)
-	anomalies = inject_speeding_anomalies(
+	anomalies = inject_disappearance_anomalies(
 		db_path=output_db,
 		num_anomalies=args.num_anomalies,
 		point_count=args.points_per_anomaly,
-		radius_nm=args.radius_nm,
 		interval_minutes=args.interval_minutes,
-		normal_max_sog_knots=args.normal_max_sog_knots,
-		spike_min_sog_knots=args.spike_min_sog_knots,
-		spike_max_sog_knots=args.spike_max_sog_knots,
-		spike_count=args.spike_count,
+		consistency_sog_knots=args.consistency_sog_knots,
+		sog_jitter_knots=args.sog_jitter_knots,
+		cog_jitter_deg=args.cog_jitter_deg,
+		disappearance_gap_hours=args.disappearance_gap_hours,
 		min_source_positions=args.min_source_positions,
 		rng_seed=args.seed,
 	)
@@ -549,7 +544,7 @@ def main() -> int:
 		if args.benchmark_config_output
 		else output_db.parent / "benchmark_definitions.json"
 	)
-	write_speeding_benchmark_config(
+	write_disappearance_benchmark_config(
 		benchmark_cfg_output,
 		expected_mmsis=[a.mmsi for a in anomalies],
 	)
@@ -564,7 +559,7 @@ def main() -> int:
 		benchmark_output = (
 			args.benchmark_output.expanduser().resolve()
 			if args.benchmark_output
-			else BENCHMARK_DIR / "results" / f"speeding_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
+			else BENCHMARK_DIR / "results" / f"disappearance_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
 		)
 		benchmark_output.parent.mkdir(parents=True, exist_ok=True)
 		aggregate_results_file = (

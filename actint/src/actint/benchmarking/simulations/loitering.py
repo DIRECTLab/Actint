@@ -123,28 +123,6 @@ def remove_ship_data(conn: sqlite3.Connection, mmsi: int) -> int:
 	return removed_positions
 
 
-def create_loitering_table(conn: sqlite3.Connection) -> None:
-	conn.execute(
-		"""
-		CREATE TABLE IF NOT EXISTS loitering_anomalies (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			anomaly_id TEXT UNIQUE NOT NULL,
-			mmsi INTEGER UNIQUE NOT NULL,
-			vessel_name TEXT,
-			source_mmsi INTEGER,
-			source_vessel_name TEXT,
-			center_lat REAL,
-			center_lon REAL,
-			radius_nm REAL,
-			start_time TEXT,
-			end_time TEXT,
-			point_count INTEGER,
-			created_at TEXT DEFAULT CURRENT_TIMESTAMP
-		)
-		"""
-	)
-
-
 def get_latest_source_position(conn: sqlite3.Connection, source_mmsi: int) -> sqlite3.Row | None:
 	return conn.execute(
 		"""
@@ -195,8 +173,6 @@ def inject_loitering_anomalies(
 	conn.row_factory = sqlite3.Row
 
 	try:
-		create_loitering_table(conn)
-
 		source_candidates = get_source_vessels(
 			conn,
 			min_positions=min_source_positions,
@@ -306,28 +282,6 @@ def inject_loitering_anomalies(
 					),
 				)
 
-			conn.execute(
-				"""
-				INSERT OR REPLACE INTO loitering_anomalies (
-					anomaly_id, mmsi, vessel_name, source_mmsi, source_vessel_name,
-					center_lat, center_lon, radius_nm, start_time, end_time, point_count
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-				""",
-				(
-					anomaly_id,
-					anomaly_mmsi,
-					vessel_name,
-					source_mmsi,
-					source_name,
-					center_lat,
-					center_lon,
-					radius_nm,
-					start_time.strftime("%Y-%m-%dT%H:%M:%S"),
-					end_time.strftime("%Y-%m-%dT%H:%M:%S"),
-					point_count,
-				),
-			)
-
 			anomalies.append(
 				InjectedLoiteringAnomaly(
 					anomaly_id=anomaly_id,
@@ -350,7 +304,7 @@ def inject_loitering_anomalies(
 		conn.close()
 
 
-def write_loitering_benchmark_config(config_path: Path, num_expected: int) -> None:
+def write_loitering_benchmark_config(config_path: Path, expected_mmsis: list[int]) -> None:
 	benchmark_config = {
 		"benchmarks": [
 			{
@@ -369,12 +323,15 @@ def write_loitering_benchmark_config(config_path: Path, num_expected: int) -> No
 					"Expected injected anomalies in DB: {expected_count}"
 				),
 				"input_source": {
-					"type": "loitering_anomaly_targets_from_db",
-					"limit": num_expected,
+					"type": "fixed",
+					"values": {
+						"expected_loitering_mmsis": expected_mmsis,
+						"expected_count": len(expected_mmsis),
+					},
 				},
 				"validation": {
 					"method": "loitering_detection",
-					"minimum_detected": num_expected,
+					"minimum_detected": len(expected_mmsis),
 					"require_all_expected": True,
 				},
 			}
@@ -556,7 +513,7 @@ def main() -> int:
 	)
 	write_loitering_benchmark_config(
 		benchmark_cfg_output,
-		num_expected=len(anomalies),
+		expected_mmsis=[a.mmsi for a in anomalies],
 	)
 
 	print(f"Cloned DB: {output_db}")

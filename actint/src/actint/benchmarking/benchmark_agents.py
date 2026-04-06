@@ -547,28 +547,6 @@ def build_runtime_inputs(input_source: dict[str, Any]) -> dict[str, Any]:
 			raise ValueError("fixed input_source requires a dict under values")
 		return values
 
-	if source_type == "loitering_anomaly_targets_from_db":
-		limit = int((input_source or {}).get("limit", 5))
-		if limit <= 0:
-			limit = 5
-		with _get_connection() as conn:
-			rows = conn.execute(
-				"SELECT mmsi FROM loitering_anomalies ORDER BY mmsi LIMIT ?",
-				(limit,),
-			).fetchall()
-
-		targets = [int(row[0]) for row in rows]
-		if not targets:
-			raise RuntimeError(
-				"No loitering anomaly targets found. Ensure loitering_anomalies table is populated "
-				"in the benchmark SQLite database."
-			)
-
-		return {
-			"expected_loitering_mmsis": targets,
-			"expected_count": len(targets),
-		}
-
 	raise ValueError(f"Unsupported input_source type: {source_type}")
 
 
@@ -670,6 +648,40 @@ def parse_loitering_prediction(agent_output: Any) -> dict[str, Any]:
 	return {"mmsis": mmsis}
 
 
+def parse_disappearance_prediction(agent_output: Any) -> dict[str, Any]:
+	if isinstance(agent_output, dict):
+		payload = agent_output
+	else:
+		payload = _extract_json_object(str(agent_output))
+
+	if payload:
+		for key in ["disappearance_mmsi", "disappearance_mmsis", "mmsis", "ships", "vessels"]:
+			if key in payload:
+				mmsis = sorted(set(_coerce_mmsi_list(payload.get(key))))
+				return {"mmsis": mmsis}
+
+	text = str(agent_output)
+	mmsis = sorted(set(int(m.group(0)) for m in re.finditer(r"\b\d{9}\b", text)))
+	return {"mmsis": mmsis}
+
+
+def parse_speeding_prediction(agent_output: Any) -> dict[str, Any]:
+	if isinstance(agent_output, dict):
+		payload = agent_output
+	else:
+		payload = _extract_json_object(str(agent_output))
+
+	if payload:
+		for key in ["speeding_mmsi", "speeding_mmsis", "mmsis", "ships", "vessels"]:
+			if key in payload:
+				mmsis = sorted(set(_coerce_mmsi_list(payload.get(key))))
+				return {"mmsis": mmsis}
+
+	text = str(agent_output)
+	mmsis = sorted(set(int(m.group(0)) for m in re.finditer(r"\b\d{9}\b", text)))
+	return {"mmsis": mmsis}
+
+
 def validate_current_position_from_db(
 	runtime_inputs: dict[str, Any],
 	agent_output: Any,
@@ -755,6 +767,96 @@ def validate_loitering_detection(
 	}
 
 
+def validate_disappearance_detection(
+	runtime_inputs: dict[str, Any],
+	agent_output: Any,
+	validation_config: dict[str, Any],
+) -> dict[str, Any]:
+	expected = [int(x) for x in runtime_inputs.get("expected_disappearance_mmsis", [])]
+	if not expected:
+		raise ValueError("Runtime inputs missing expected_disappearance_mmsis")
+
+	predicted = parse_disappearance_prediction(agent_output)
+	found = sorted(set(int(x) for x in predicted.get("mmsis", [])))
+
+	expected_set = set(expected)
+	found_set = set(found)
+	detected_expected = sorted(expected_set.intersection(found_set))
+	missed_expected = sorted(expected_set.difference(found_set))
+	false_positives = sorted(found_set.difference(expected_set))
+
+	minimum_detected = int(validation_config.get("minimum_detected", len(expected)))
+	require_all_expected = bool(validation_config.get("require_all_expected", False))
+
+	success = len(detected_expected) >= minimum_detected
+	if require_all_expected:
+		success = success and not missed_expected
+
+	return {
+		"success": success,
+		"expected": {
+			"expected_disappearance_mmsis": expected,
+			"expected_count": len(expected),
+		},
+		"predicted": {
+			"reported_mmsis": found,
+			"reported_count": len(found),
+		},
+		"metrics": {
+			"minimum_detected": minimum_detected,
+			"detected_expected_count": len(detected_expected),
+			"detected_expected_mmsis": detected_expected,
+			"missed_expected_mmsis": missed_expected,
+			"false_positive_mmsis": false_positives,
+		},
+	}
+
+
+def validate_speeding_detection(
+	runtime_inputs: dict[str, Any],
+	agent_output: Any,
+	validation_config: dict[str, Any],
+) -> dict[str, Any]:
+	expected = [int(x) for x in runtime_inputs.get("expected_speeding_mmsis", [])]
+	if not expected:
+		raise ValueError("Runtime inputs missing expected_speeding_mmsis")
+
+	predicted = parse_speeding_prediction(agent_output)
+	found = sorted(set(int(x) for x in predicted.get("mmsis", [])))
+
+	expected_set = set(expected)
+	found_set = set(found)
+	detected_expected = sorted(expected_set.intersection(found_set))
+	missed_expected = sorted(expected_set.difference(found_set))
+	false_positives = sorted(found_set.difference(expected_set))
+
+	minimum_detected = int(validation_config.get("minimum_detected", len(expected)))
+	require_all_expected = bool(validation_config.get("require_all_expected", False))
+
+	success = len(detected_expected) >= minimum_detected
+	if require_all_expected:
+		success = success and not missed_expected
+
+	return {
+		"success": success,
+		"expected": {
+			"expected_speeding_mmsis": expected,
+			"expected_count": len(expected),
+		},
+		"predicted": {
+			"reported_mmsis": found,
+			"reported_count": len(found),
+		},
+		"metrics": {
+			"minimum_detected": minimum_detected,
+			"detected_expected_count": len(detected_expected),
+			"detected_expected_mmsis": detected_expected,
+			"missed_expected_mmsis": missed_expected,
+			"false_positive_mmsis": false_positives,
+		},
+	}
+
+
 def validate_result(
 	benchmark: dict[str, Any],
 	runtime_inputs: dict[str, Any],
@@ -768,6 +870,12 @@ def validate_result(
 
 	if method == "loitering_detection":
 		return validate_loitering_detection(runtime_inputs, agent_output, validation)
+
+	if method == "disappearance_detection":
+		return validate_disappearance_detection(runtime_inputs, agent_output, validation)
+
+	if method == "speeding_detection":
+		return validate_speeding_detection(runtime_inputs, agent_output, validation)
 
 	raise ValueError(f"Unsupported validation method: {method}")
 
@@ -830,6 +938,11 @@ def run_benchmarks(config: dict[str, Any], only_agent: str | None, only_benchmar
 			model = None
 			agent = None
 			try:
+				from phoenix.otel import register
+				from openinference.instrumentation.smolagents import SmolagentsInstrumentor
+
+				register(project_name="actint")
+				SmolagentsInstrumentor().instrument()
 				model = TransformersModel(model_id=model_id, **model_kwargs)
 
 				agent_kwargs: dict[str, Any] = {
