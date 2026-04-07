@@ -1034,7 +1034,9 @@ def summarize_results(run_results: list[dict[str, Any]]) -> dict[str, Any]:
 		return {
 			"total_runs": 0,
 			"successful_runs": 0,
-			"success_rate": 0.0,
+			"detected_expected_count": 0,
+			"expected_count": 0,
+			"detection_rate": 0.0,
 			"average_duration_sec": 0.0,
 			"by_agent": {},
 			"by_benchmark": {},
@@ -1043,6 +1045,8 @@ def summarize_results(run_results: list[dict[str, Any]]) -> dict[str, Any]:
 	total_runs = len(run_results)
 	successful = sum(1 for r in run_results if bool(r.get("validation", {}).get("success")))
 	avg_duration = sum(float(r.get("duration_sec", 0.0)) for r in run_results) / total_runs
+	identified_total = 0
+	expected_total = 0
 
 	by_agent: dict[str, dict[str, Any]] = {}
 	by_benchmark: dict[str, dict[str, Any]] = {}
@@ -1052,31 +1056,66 @@ def summarize_results(run_results: list[dict[str, Any]]) -> dict[str, Any]:
 		benchmark_id = result["benchmark_id"]
 		success = bool(result.get("validation", {}).get("success"))
 		duration = float(result.get("duration_sec", 0.0))
+		metrics = result.get("validation", {}).get("metrics", {}) or {}
+		expected = result.get("validation", {}).get("expected", {}) or {}
+		detected_count = int(metrics.get("detected_expected_count", 0) or 0)
+		expected_count = int(expected.get("expected_count", 0) or 0)
+
+		identified_total += detected_count
+		expected_total += expected_count
 
 		if agent not in by_agent:
-			by_agent[agent] = {"runs": 0, "successes": 0, "avg_duration_sec": 0.0}
+			by_agent[agent] = {
+				"runs": 0,
+				"successes": 0,
+				"avg_duration_sec": 0.0,
+				"detected_expected_count": 0,
+				"expected_count": 0,
+			}
 		by_agent[agent]["runs"] += 1
 		by_agent[agent]["successes"] += int(success)
 		by_agent[agent]["avg_duration_sec"] += duration
+		by_agent[agent]["detected_expected_count"] += detected_count
+		by_agent[agent]["expected_count"] += expected_count
 
 		if benchmark_id not in by_benchmark:
-			by_benchmark[benchmark_id] = {"runs": 0, "successes": 0, "avg_duration_sec": 0.0}
+			by_benchmark[benchmark_id] = {
+				"runs": 0,
+				"successes": 0,
+				"avg_duration_sec": 0.0,
+				"detected_expected_count": 0,
+				"expected_count": 0,
+			}
 		by_benchmark[benchmark_id]["runs"] += 1
 		by_benchmark[benchmark_id]["successes"] += int(success)
 		by_benchmark[benchmark_id]["avg_duration_sec"] += duration
+		by_benchmark[benchmark_id]["detected_expected_count"] += detected_count
+		by_benchmark[benchmark_id]["expected_count"] += expected_count
 
 	for stats in by_agent.values():
 		stats["avg_duration_sec"] /= stats["runs"]
 		stats["success_rate"] = stats["successes"] / stats["runs"]
+		stats["detection_rate"] = (
+			stats["detected_expected_count"] / stats["expected_count"]
+			if stats["expected_count"]
+			else 0.0
+		)
 
 	for stats in by_benchmark.values():
 		stats["avg_duration_sec"] /= stats["runs"]
 		stats["success_rate"] = stats["successes"] / stats["runs"]
+		stats["detection_rate"] = (
+			stats["detected_expected_count"] / stats["expected_count"]
+			if stats["expected_count"]
+			else 0.0
+		)
 
 	return {
 		"total_runs": total_runs,
 		"successful_runs": successful,
-		"success_rate": successful / total_runs,
+		"detected_expected_count": identified_total,
+		"expected_count": expected_total,
+		"detection_rate": (identified_total / expected_total) if expected_total else 0.0,
 		"average_duration_sec": avg_duration,
 		"by_agent": by_agent,
 		"by_benchmark": by_benchmark,
@@ -1256,21 +1295,26 @@ def print_human_summary(summary: dict[str, Any]) -> None:
 	print("=" * 80)
 	print(f"Total runs: {summary['total_runs']}")
 	print(f"Successful runs: {summary['successful_runs']}")
-	print(f"Success rate: {summary['success_rate']:.2%}")
+	print(
+		f"Detected ships: {summary.get('detected_expected_count', 0)}"
+		f"/{summary.get('expected_count', 0)}"
+	)
 	print(f"Average duration: {summary['average_duration_sec']:.2f}s")
 
 	print("\nPer-agent:")
 	for agent, stats in summary["by_agent"].items():
 		print(
 			f"  - {agent}: runs={stats['runs']}, "
-			f"success_rate={stats['success_rate']:.2%}, avg_duration={stats['avg_duration_sec']:.2f}s"
+			f"detected={stats.get('detected_expected_count', 0)}/{stats.get('expected_count', 0)}, "
+			f"avg_duration={stats['avg_duration_sec']:.2f}s"
 		)
 
 	print("\nPer-benchmark:")
 	for benchmark_id, stats in summary["by_benchmark"].items():
 		print(
 			f"  - {benchmark_id}: runs={stats['runs']}, "
-			f"success_rate={stats['success_rate']:.2%}, avg_duration={stats['avg_duration_sec']:.2f}s"
+			f"detected={stats.get('detected_expected_count', 0)}/{stats.get('expected_count', 0)}, "
+			f"avg_duration={stats['avg_duration_sec']:.2f}s"
 		)
 
 

@@ -26,8 +26,8 @@ class InjectedDisappearanceAnomaly:
 	start_time: str
 	end_time: str
 	point_count: int
-	interval_minutes: int
-	expected_gap_minutes: int
+	interval_seconds: float
+	expected_gap_seconds: int
 	mean_sog_knots: float
 
 
@@ -46,7 +46,7 @@ class DisappearanceSimulation(BaseSimulation):
 		ships_to_replace: int,
 		mean_new_data_count: float,
 		std_new_data_count: float,
-		interval_minutes: int,
+		interval_seconds: float,
 		consistency_sog_knots: float,
 		sog_jitter_knots: float,
 		cog_jitter_deg: float,
@@ -90,9 +90,9 @@ class DisappearanceSimulation(BaseSimulation):
 
 				self.remove_ship_data(conn, source_mmsi)
 
-				track_duration_minutes = max(0, (point_count - 1) * interval_minutes)
+				track_duration_seconds = max(0.0, (point_count - 1) * interval_seconds)
 				gap_delta = timedelta(hours=max(1.0, disappearance_gap_hours))
-				start_time = latest_time - gap_delta - timedelta(minutes=track_duration_minutes)
+				start_time = latest_time - gap_delta - timedelta(seconds=track_duration_seconds)
 				anomaly_mmsi = source_mmsi
 				vessel_name = source_name
 				anomaly_id = f"DISAPPEAR-{source_mmsi}"
@@ -121,7 +121,7 @@ class DisappearanceSimulation(BaseSimulation):
 						vessel_meta["fleet"] if vessel_meta else "SIM_FLEET",
 						vessel_meta["fleet_original"] if vessel_meta else "SIM_FLEET",
 						start_time.strftime("%Y-%m-%dT%H:%M:%S"),
-						(start_time + timedelta(minutes=track_duration_minutes)).strftime("%Y-%m-%dT%H:%M:%S"),
+						(start_time + timedelta(seconds=track_duration_seconds)).strftime("%Y-%m-%dT%H:%M:%S"),
 					),
 				)
 
@@ -136,7 +136,7 @@ class DisappearanceSimulation(BaseSimulation):
 
 				end_time = start_time
 				for step in range(point_count):
-					ts = start_time + timedelta(minutes=step * interval_minutes)
+					ts = start_time + timedelta(seconds=step * interval_seconds)
 					end_time = ts
 
 					sog = max(0.0, rng.gauss(consistency_sog_knots, sog_jitter_knots))
@@ -144,7 +144,7 @@ class DisappearanceSimulation(BaseSimulation):
 					cog = (base_heading + rng.uniform(-cog_jitter_deg, cog_jitter_deg)) % 360.0
 
 					if step > 0:
-						distance_nm = sog * (interval_minutes / 60.0)
+						distance_nm = sog * (interval_seconds / 3600.0)
 						lat, lon = advance_position_by_heading(lat, lon, cog, distance_nm)
 
 					conn.execute(
@@ -176,7 +176,7 @@ class DisappearanceSimulation(BaseSimulation):
 						),
 					)
 
-				expected_gap_minutes = int(gap_delta.total_seconds() // 60)
+				expected_gap_seconds = int(gap_delta.total_seconds())
 				mean_sog = sum(generated_sogs) / len(generated_sogs) if generated_sogs else 0.0
 
 				anomalies.append(
@@ -189,8 +189,8 @@ class DisappearanceSimulation(BaseSimulation):
 						start_time=start_time.strftime("%Y-%m-%dT%H:%M:%S"),
 						end_time=end_time.strftime("%Y-%m-%dT%H:%M:%S"),
 						point_count=point_count,
-						interval_minutes=interval_minutes,
-						expected_gap_minutes=expected_gap_minutes,
+						interval_seconds=interval_seconds,
+						expected_gap_seconds=expected_gap_seconds,
 						mean_sog_knots=round(mean_sog, 3),
 					)
 				)
@@ -207,8 +207,6 @@ class DisappearanceSimulation(BaseSimulation):
 		)
 		prompt_template = (
 			"Use available MCP tools to identify ships that suddenly stop reporting after a very regular ping pattern.\\n"
-			"A disappearance anomaly has consistent time intervals between historical pings, then a long reporting gap.\\n"
-			"You should use SQL via query_database to compute likely disappearance ships.\\n\\n"
 			"Return ONLY valid JSON with this exact shape:\\n"
 			"{\\\"disappearance_mmsi\\\": [<int>, <int>, ...]}"
 		)
@@ -229,10 +227,10 @@ class DisappearanceSimulation(BaseSimulation):
 			manifest_help="Optional path for anomaly manifest JSON; defaults in the scenario folder.",
 		)
 		parser.add_argument(
-			"--interval-minutes",
-			type=int,
+			"--interval-seconds",
+			type=float,
 			default=10,
-			help="Time gap in minutes between successive synthetic AIS points.",
+			help="Time gap in seconds between successive synthetic AIS points.",
 		)
 		parser.add_argument(
 			"--consistency-sog-knots",
@@ -275,7 +273,7 @@ class DisappearanceSimulation(BaseSimulation):
 			ships_to_replace=ships_to_replace,
 			mean_new_data_count=args.mean_new_data_count,
 			std_new_data_count=args.std_new_data_count,
-			interval_minutes=args.interval_minutes,
+			interval_seconds=args.interval_seconds,
 			consistency_sog_knots=args.consistency_sog_knots,
 			sog_jitter_knots=args.sog_jitter_knots,
 			cog_jitter_deg=args.cog_jitter_deg,

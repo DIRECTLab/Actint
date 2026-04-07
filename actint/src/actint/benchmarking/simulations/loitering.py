@@ -41,7 +41,7 @@ class LoiteringSimulation(BaseSimulation):
 		mean_new_data_count: float,
 		std_new_data_count: float,
 		radius_nm: float,
-		interval_minutes: int,
+		interval_seconds: float,
 		max_sog_knots: float,
 		min_source_positions: int,
 		rng_seed: int,
@@ -111,7 +111,7 @@ class LoiteringSimulation(BaseSimulation):
 						vessel_meta["fleet"] if vessel_meta else "SIM_FLEET",
 						vessel_meta["fleet_original"] if vessel_meta else "SIM_FLEET",
 						start_time.strftime("%Y-%m-%dT%H:%M:%S"),
-						(start_time + timedelta(minutes=(point_count - 1) * interval_minutes)).strftime(
+						(start_time + timedelta(seconds=(point_count - 1) * interval_seconds)).strftime(
 							"%Y-%m-%dT%H:%M:%S"
 						),
 					),
@@ -119,7 +119,7 @@ class LoiteringSimulation(BaseSimulation):
 
 				end_time = start_time
 				for step in range(point_count):
-					ts = start_time + timedelta(minutes=step * interval_minutes)
+					ts = start_time + timedelta(seconds=step * interval_seconds)
 					end_time = ts
 
 					angle = rng.uniform(0.0, 2.0 * math.pi)
@@ -214,10 +214,10 @@ class LoiteringSimulation(BaseSimulation):
 			help="Maximum loitering radius around the anomaly center in nautical miles.",
 		)
 		parser.add_argument(
-			"--interval-minutes",
-			type=int,
-			default=15,
-			help="Time gap in minutes between successive synthetic AIS points.",
+			"--interval-seconds",
+			type=float,
+			default=180,
+			help="Time gap in seconds between successive synthetic AIS points.",
 		)
 		parser.add_argument(
 			"--max-sog-knots",
@@ -243,7 +243,7 @@ class LoiteringSimulation(BaseSimulation):
 			mean_new_data_count=args.mean_new_data_count,
 			std_new_data_count=args.std_new_data_count,
 			radius_nm=args.radius_nm,
-			interval_minutes=args.interval_minutes,
+			interval_seconds=args.interval_seconds,
 			max_sog_knots=args.max_sog_knots,
 			min_source_positions=args.min_source_positions,
 			rng_seed=args.seed,

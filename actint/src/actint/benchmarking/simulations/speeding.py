@@ -55,7 +55,7 @@ class SpeedingSimulation(BaseSimulation):
 		mean_new_data_count: float,
 		std_new_data_count: float,
 		radius_nm: float,
-		interval_minutes: int,
+		interval_seconds: float,
 		normal_max_sog_knots: float,
 		spike_min_sog_knots: float,
 		spike_max_sog_knots: float,
@@ -128,7 +128,7 @@ class SpeedingSimulation(BaseSimulation):
 						vessel_meta["fleet"] if vessel_meta else "SIM_FLEET",
 						vessel_meta["fleet_original"] if vessel_meta else "SIM_FLEET",
 						start_time.strftime("%Y-%m-%dT%H:%M:%S"),
-						(start_time + timedelta(minutes=(point_count - 1) * interval_minutes)).strftime(
+						(start_time + timedelta(seconds=(point_count - 1) * interval_seconds)).strftime(
 							"%Y-%m-%dT%H:%M:%S"
 						),
 					),
@@ -139,7 +139,7 @@ class SpeedingSimulation(BaseSimulation):
 
 				end_time = start_time
 				for step in range(point_count):
-					ts = start_time + timedelta(minutes=step * interval_minutes)
+					ts = start_time + timedelta(seconds=step * interval_seconds)
 					end_time = ts
 
 					angle = rng.uniform(0.0, 2.0 * np.pi)
@@ -239,10 +239,10 @@ class SpeedingSimulation(BaseSimulation):
 			help="Maximum movement radius around anomaly center in nautical miles.",
 		)
 		parser.add_argument(
-			"--interval-minutes",
-			type=int,
-			default=15,
-			help="Time gap in minutes between successive synthetic AIS points.",
+			"--interval-seconds",
+			type=float,
+			default=180,
+			help="Time gap in seconds between successive synthetic AIS points.",
 		)
 		parser.add_argument(
 			"--normal-max-sog-knots",
@@ -286,7 +286,7 @@ class SpeedingSimulation(BaseSimulation):
 			mean_new_data_count=args.mean_new_data_count,
 			std_new_data_count=args.std_new_data_count,
 			radius_nm=args.radius_nm,
-			interval_minutes=args.interval_minutes,
+			interval_seconds=args.interval_seconds,
 			normal_max_sog_knots=args.normal_max_sog_knots,
 			spike_min_sog_knots=args.spike_min_sog_knots,
 			spike_max_sog_knots=args.spike_max_sog_knots,
