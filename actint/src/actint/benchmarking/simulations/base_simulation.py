@@ -273,7 +273,7 @@ class BaseSimulation:
 		parser.add_argument(
 			"--ships-to-replace",
 			type=int,
-			default=10,
+			default=3,
 			help="Number of ships to replace with synthetic anomaly records.",
 		)
 		parser.add_argument(

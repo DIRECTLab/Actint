@@ -9,12 +9,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-
-try:
-	from actint.benchmarking.simulations.base_simulation import BaseSimulation
-except ModuleNotFoundError:
-	from base_simulation import BaseSimulation
-
+from actint.benchmarking.simulations.base_simulation import BaseSimulation
 
 @dataclass
 class InjectedDisappearanceAnomaly:
@@ -47,6 +42,7 @@ class DisappearanceSimulation(BaseSimulation):
 		mean_new_data_count: float,
 		std_new_data_count: float,
 		interval_seconds: float,
+		interval_jitter_seconds: float,
 		consistency_sog_knots: float,
 		sog_jitter_knots: float,
 		cog_jitter_deg: float,
@@ -90,7 +86,13 @@ class DisappearanceSimulation(BaseSimulation):
 
 				self.remove_ship_data(conn, source_mmsi)
 
-				track_duration_seconds = max(0.0, (point_count - 1) * interval_seconds)
+				interval_samples_seconds: list[float] = []
+				for _ in range(max(0, point_count - 1)):
+					step_interval = rng.gauss(interval_seconds, interval_jitter_seconds)
+					# Keep timestamps monotonic and avoid near-zero intervals.
+					interval_samples_seconds.append(max(1.0, step_interval))
+
+				track_duration_seconds = sum(interval_samples_seconds)
 				gap_delta = timedelta(hours=max(1.0, disappearance_gap_hours))
 				start_time = latest_time - gap_delta - timedelta(seconds=track_duration_seconds)
 				anomaly_mmsi = source_mmsi
@@ -135,8 +137,9 @@ class DisappearanceSimulation(BaseSimulation):
 				generated_sogs: list[float] = []
 
 				end_time = start_time
+				current_time = start_time
 				for step in range(point_count):
-					ts = start_time + timedelta(seconds=step * interval_seconds)
+					ts = current_time
 					end_time = ts
 
 					sog = max(0.0, rng.gauss(consistency_sog_knots, sog_jitter_knots))
@@ -144,7 +147,8 @@ class DisappearanceSimulation(BaseSimulation):
 					cog = (base_heading + rng.uniform(-cog_jitter_deg, cog_jitter_deg)) % 360.0
 
 					if step > 0:
-						distance_nm = sog * (interval_seconds / 3600.0)
+						step_interval = interval_samples_seconds[step - 1]
+						distance_nm = sog * (step_interval / 3600.0)
 						lat, lon = advance_position_by_heading(lat, lon, cog, distance_nm)
 
 					conn.execute(
@@ -176,8 +180,16 @@ class DisappearanceSimulation(BaseSimulation):
 						),
 					)
 
+					if step < point_count - 1:
+						current_time = current_time + timedelta(seconds=interval_samples_seconds[step])
+
 				expected_gap_seconds = int(gap_delta.total_seconds())
 				mean_sog = sum(generated_sogs) / len(generated_sogs) if generated_sogs else 0.0
+				mean_interval_seconds = (
+					sum(interval_samples_seconds) / len(interval_samples_seconds)
+					if interval_samples_seconds
+					else interval_seconds
+				)
 
 				anomalies.append(
 					InjectedDisappearanceAnomaly(
@@ -189,7 +201,7 @@ class DisappearanceSimulation(BaseSimulation):
 						start_time=start_time.strftime("%Y-%m-%dT%H:%M:%S"),
 						end_time=end_time.strftime("%Y-%m-%dT%H:%M:%S"),
 						point_count=point_count,
-						interval_seconds=interval_seconds,
+						interval_seconds=mean_interval_seconds,
 						expected_gap_seconds=expected_gap_seconds,
 						mean_sog_knots=round(mean_sog, 3),
 					)
@@ -229,8 +241,14 @@ class DisappearanceSimulation(BaseSimulation):
 		parser.add_argument(
 			"--interval-seconds",
 			type=float,
-			default=10,
-			help="Time gap in seconds between successive synthetic AIS points.",
+			default=60.0,
+			help="Mean time gap in seconds between successive synthetic AIS points.",
+		)
+		parser.add_argument(
+			"--interval-jitter-seconds",
+			type=float,
+			default=10.0,
+			help="Standard deviation for normally sampled inter-ping intervals.",
 		)
 		parser.add_argument(
 			"--consistency-sog-knots",
@@ -274,6 +292,7 @@ class DisappearanceSimulation(BaseSimulation):
 			mean_new_data_count=args.mean_new_data_count,
 			std_new_data_count=args.std_new_data_count,
 			interval_seconds=args.interval_seconds,
+			interval_jitter_seconds=args.interval_jitter_seconds,
 			consistency_sog_knots=args.consistency_sog_knots,
 			sog_jitter_knots=args.sog_jitter_knots,
 			cog_jitter_deg=args.cog_jitter_deg,

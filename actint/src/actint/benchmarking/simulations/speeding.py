@@ -56,6 +56,7 @@ class SpeedingSimulation(BaseSimulation):
 		std_new_data_count: float,
 		radius_nm: float,
 		interval_seconds: float,
+		interval_jitter_seconds: float,
 		normal_max_sog_knots: float,
 		spike_min_sog_knots: float,
 		spike_max_sog_knots: float,
@@ -100,6 +101,12 @@ class SpeedingSimulation(BaseSimulation):
 				self.remove_ship_data(conn, source_mmsi)
 
 				start_time = latest_time + timedelta(hours=1)
+				interval_samples_seconds: list[float] = []
+				for _ in range(max(0, point_count - 1)):
+					step_interval = rng.gauss(interval_seconds, interval_jitter_seconds)
+					# Keep timestamps monotonic and avoid near-zero intervals.
+					interval_samples_seconds.append(max(1.0, step_interval))
+				track_duration_seconds = sum(interval_samples_seconds)
 				anomaly_mmsi = source_mmsi
 				vessel_name = source_name
 				anomaly_id = f"SPEED-{source_mmsi}"
@@ -128,7 +135,7 @@ class SpeedingSimulation(BaseSimulation):
 						vessel_meta["fleet"] if vessel_meta else "SIM_FLEET",
 						vessel_meta["fleet_original"] if vessel_meta else "SIM_FLEET",
 						start_time.strftime("%Y-%m-%dT%H:%M:%S"),
-						(start_time + timedelta(seconds=(point_count - 1) * interval_seconds)).strftime(
+						(start_time + timedelta(seconds=track_duration_seconds)).strftime(
 							"%Y-%m-%dT%H:%M:%S"
 						),
 					),
@@ -138,8 +145,9 @@ class SpeedingSimulation(BaseSimulation):
 				spike_speeds: list[float] = []
 
 				end_time = start_time
+				current_time = start_time
 				for step in range(point_count):
-					ts = start_time + timedelta(seconds=step * interval_seconds)
+					ts = current_time
 					end_time = ts
 
 					angle = rng.uniform(0.0, 2.0 * np.pi)
@@ -181,6 +189,9 @@ class SpeedingSimulation(BaseSimulation):
 							latest_position["transceiver_class"] if latest_position else "A",
 						),
 					)
+
+					if step < point_count - 1:
+						current_time = current_time + timedelta(seconds=interval_samples_seconds[step])
 
 				anomalies.append(
 					InjectedSpeedingAnomaly(
@@ -242,7 +253,13 @@ class SpeedingSimulation(BaseSimulation):
 			"--interval-seconds",
 			type=float,
 			default=180,
-			help="Time gap in seconds between successive synthetic AIS points.",
+			help="Mean time gap in seconds between successive synthetic AIS points.",
+		)
+		parser.add_argument(
+			"--interval-jitter-seconds",
+			type=float,
+			default=5.0,
+			help="Standard deviation for normally sampled inter-ping intervals.",
 		)
 		parser.add_argument(
 			"--normal-max-sog-knots",
@@ -287,6 +304,7 @@ class SpeedingSimulation(BaseSimulation):
 			std_new_data_count=args.std_new_data_count,
 			radius_nm=args.radius_nm,
 			interval_seconds=args.interval_seconds,
+			interval_jitter_seconds=args.interval_jitter_seconds,
 			normal_max_sog_knots=args.normal_max_sog_knots,
 			spike_min_sog_knots=args.spike_min_sog_knots,
 			spike_max_sog_knots=args.spike_max_sog_knots,
