@@ -13,6 +13,18 @@
   },
   "vehicles": [
     {
+      "id": 2,
+      "type": "bike",
+      "is_3d": false,
+      "action": "pursue",
+      "target_id": 1,
+      "properties": {
+        "max_speed": 100.0,
+        "max_force": 200.0,
+        "position": { "x": 0, "y": 0 }
+      }
+    },
+    {
       "id": 1,
       "type": "car",
       "is_3d": false,
@@ -49,18 +61,6 @@
           "error": 30.0
         }
       ]
-    },
-    {
-      "id": 2,
-      "type": "bike",
-      "is_3d": false,
-      "action": "pursue",
-      "target_id": 1,
-      "properties": {
-        "max_speed": 100.0,
-        "max_force": 200.0,
-        "position": { "x": 0, "y": 0 }
-      }
     }
   ]
 }

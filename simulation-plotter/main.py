@@ -3,8 +3,34 @@ import matplotlib
 from pathlib import Path
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 
 matplotlib.use("Agg")
+
+
+def wrap_lon_180(lon_degrees: np.ndarray) -> np.ndarray:
+  """Wrap longitude(s) into [-180, 180)."""
+  lon_degrees = np.asarray(lon_degrees, dtype=float)
+  return ((lon_degrees + 180.0) % 360.0) - 180.0
+
+
+def insert_penup_gaps(lon: np.ndarray, lat: np.ndarray, *, jump_degrees: float = 180.0):
+  """Insert NaN gaps where lon jumps across the dateline.
+
+  Matplotlib breaks a line at NaNs, which mimics "picking up the pen".
+  """
+  lon = np.asarray(lon, dtype=float)
+  lat = np.asarray(lat, dtype=float)
+  if lon.size != lat.size:
+    raise ValueError("lon and lat must have the same length")
+  if lon.size < 2:
+    return lon, lat
+
+  breaks = np.where(np.abs(np.diff(lon)) > jump_degrees)[0] + 1
+  if breaks.size == 0:
+    return lon, lat
+
+  return np.insert(lon, breaks, np.nan), np.insert(lat, breaks, np.nan)
 
 
 def non_clobber_png_path(output_path: str) -> str:
@@ -55,11 +81,16 @@ def main():
 
   for idx, mmsi in enumerate(mmsi_values):
     g = df[df["MMSI"] == mmsi]
-    ax.plot(g["LON"], g["LAT"], label=mmsi, color=cmap(idx), linewidth=1.5)
+    lon = wrap_lon_180(g["LON"].to_numpy(dtype=float))
+    lat = g["LAT"].to_numpy(dtype=float)
+    lon, lat = insert_penup_gaps(lon, lat, jump_degrees=180.0)
+    ax.plot(lon, lat, label=mmsi, color=cmap(idx), linewidth=1.5)
+    # ax.scatter(g["LON"], g["LAT"], label=mmsi, color=cmap(idx), s=10)
+
 
   ax.set_title(csv_path.name)
-  ax.set_xlabel("X (meters)")
-  ax.set_ylabel("Y (meters)")
+  ax.set_xlabel("Longitude (degrees)")
+  ax.set_ylabel("Latitude (degrees)")
   ax.grid(True, alpha=0.3)
   ax.set_aspect("equal", adjustable="datalim")
   ax.legend(title="MMSI", loc="best")

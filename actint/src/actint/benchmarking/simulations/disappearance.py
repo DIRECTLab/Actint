@@ -1,0 +1,321 @@
+"""Disappearance anomaly simulation for AIS benchmarking."""
+
+from __future__ import annotations
+
+import argparse
+import math
+import random
+import sqlite3
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from pathlib import Path
+from actint.benchmarking.simulations.base_simulation import BaseSimulation
+
+@dataclass
+class InjectedDisappearanceAnomaly:
+	anomaly_id: str
+	mmsi: int
+	vessel_name: str
+	source_mmsi: int
+	source_vessel_name: str
+	start_time: str
+	end_time: str
+	point_count: int
+	interval_seconds: float
+	expected_gap_seconds: int
+	mean_sog_knots: float
+
+
+def advance_position_by_heading(lat: float, lon: float, heading_deg: float, distance_nm: float) -> tuple[float, float]:
+	angle_rad = math.radians(heading_deg)
+	return BaseSimulation.nm_offset_to_lat_lon(lat, lon, distance_nm, angle_rad)
+
+
+class DisappearanceSimulation(BaseSimulation):
+	def __init__(self) -> None:
+		super().__init__(Path(__file__), scenario_name="disappearance", benchmark_id="disappearance_detection_injected")
+
+	def inject_anomalies(
+		self,
+		db_path: Path,
+		ships_to_replace: int,
+		mean_new_data_count: float,
+		std_new_data_count: float,
+		interval_seconds: float,
+		interval_jitter_seconds: float,
+		consistency_sog_knots: float,
+		sog_jitter_knots: float,
+		cog_jitter_deg: float,
+		disappearance_gap_hours: float,
+		min_source_positions: int,
+		rng_seed: int,
+	) -> list[InjectedDisappearanceAnomaly]:
+		conn = sqlite3.connect(str(db_path))
+		conn.row_factory = sqlite3.Row
+
+		try:
+			source_candidates = self.get_source_vessels(
+				conn,
+				min_positions=min_source_positions,
+				limit=max(ships_to_replace * 3, ships_to_replace),
+			)
+			if len(source_candidates) < ships_to_replace:
+				raise RuntimeError(
+					f"Not enough source vessels with at least {min_source_positions} positions. "
+					f"Needed {ships_to_replace}, found {len(source_candidates)}."
+				)
+
+			rng = random.Random(rng_seed)
+			anomalies: list[InjectedDisappearanceAnomaly] = []
+
+			for i in range(ships_to_replace):
+				point_count = self.sample_new_data_count(mean_new_data_count, std_new_data_count, rng)
+				source = source_candidates[i]
+				source_mmsi = int(source["mmsi"])
+				source_name = str(source["vessel_name"])
+
+				latest_position = self.get_latest_source_position(conn, source_mmsi)
+				vessel_meta = self.get_vessel_metadata(conn, source_mmsi)
+
+				center_lat = float(source["center_lat"])
+				center_lon = float(source["center_lon"])
+				if latest_position is not None:
+					latest_time = self.parse_iso_timestamp(latest_position["base_datetime"])
+				else:
+					latest_time = datetime.utcnow()
+
+				self.remove_ship_data(conn, source_mmsi)
+
+				interval_samples_seconds: list[float] = []
+				for _ in range(max(0, point_count - 1)):
+					step_interval = rng.gauss(interval_seconds, interval_jitter_seconds)
+					# Keep timestamps monotonic and avoid near-zero intervals.
+					interval_samples_seconds.append(max(1.0, step_interval))
+
+				track_duration_seconds = sum(interval_samples_seconds)
+				gap_delta = timedelta(hours=max(1.0, disappearance_gap_hours))
+				start_time = latest_time - gap_delta - timedelta(seconds=track_duration_seconds)
+				anomaly_mmsi = source_mmsi
+				vessel_name = source_name
+				anomaly_id = f"DISAPPEAR-{source_mmsi}"
+
+				conn.execute(
+					"""
+					INSERT OR REPLACE INTO vessels (
+						mmsi, vessel_name, call_sign, domain, class, type,
+						pennant_number, callsign_military, world_port_index_number,
+						home_base, parent_command, fleet, fleet_original,
+						first_seen, last_seen
+					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+					""",
+					(
+						anomaly_mmsi,
+						vessel_name,
+						(f"SD{anomaly_mmsi % 100000:05d}"),
+						vessel_meta["domain"] if vessel_meta else None,
+						vessel_meta["class"] if vessel_meta else "SIMULATED",
+						vessel_meta["type"] if vessel_meta else "SIM",
+						vessel_meta["pennant_number"] if vessel_meta else None,
+						vessel_meta["callsign_military"] if vessel_meta else None,
+						vessel_meta["world_port_index_number"] if vessel_meta else None,
+						vessel_meta["home_base"] if vessel_meta else "SIM_BASE",
+						vessel_meta["parent_command"] if vessel_meta else "SIM_COMMAND",
+						vessel_meta["fleet"] if vessel_meta else "SIM_FLEET",
+						vessel_meta["fleet_original"] if vessel_meta else "SIM_FLEET",
+						start_time.strftime("%Y-%m-%dT%H:%M:%S"),
+						(start_time + timedelta(seconds=track_duration_seconds)).strftime("%Y-%m-%dT%H:%M:%S"),
+					),
+				)
+
+				base_heading = rng.uniform(0.0, 359.9)
+				lat, lon = self.nm_offset_to_lat_lon(
+					center_lat,
+					center_lon,
+					radius_nm=0.1,
+					angle_rad=rng.uniform(0.0, 2.0 * math.pi),
+				)
+				generated_sogs: list[float] = []
+
+				end_time = start_time
+				current_time = start_time
+				for step in range(point_count):
+					ts = current_time
+					end_time = ts
+
+					sog = max(0.0, rng.gauss(consistency_sog_knots, sog_jitter_knots))
+					generated_sogs.append(sog)
+					cog = (base_heading + rng.uniform(-cog_jitter_deg, cog_jitter_deg)) % 360.0
+
+					if step > 0:
+						step_interval = interval_samples_seconds[step - 1]
+						distance_nm = sog * (step_interval / 3600.0)
+						lat, lon = advance_position_by_heading(lat, lon, cog, distance_nm)
+
+					conn.execute(
+						"""
+						INSERT INTO ais_positions (
+							mmsi, base_datetime, lat, lon, sog, cog, heading,
+							vessel_name, imo, call_sign, vessel_type, status,
+							length, width, draft, cargo, transceiver_class
+						) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+						""",
+						(
+							anomaly_mmsi,
+							ts.strftime("%Y-%m-%dT%H:%M:%S"),
+							lat,
+							lon,
+							sog,
+							cog,
+							int(cog),
+							vessel_name,
+							latest_position["imo"] if latest_position else None,
+							f"SD{anomaly_mmsi % 100000:05d}",
+							latest_position["vessel_type"] if latest_position else None,
+							latest_position["status"] if latest_position else 0,
+							latest_position["length"] if latest_position else None,
+							latest_position["width"] if latest_position else None,
+							latest_position["draft"] if latest_position else None,
+							latest_position["cargo"] if latest_position else None,
+							latest_position["transceiver_class"] if latest_position else "A",
+						),
+					)
+
+					if step < point_count - 1:
+						current_time = current_time + timedelta(seconds=interval_samples_seconds[step])
+
+				expected_gap_seconds = int(gap_delta.total_seconds())
+				mean_sog = sum(generated_sogs) / len(generated_sogs) if generated_sogs else 0.0
+				mean_interval_seconds = (
+					sum(interval_samples_seconds) / len(interval_samples_seconds)
+					if interval_samples_seconds
+					else interval_seconds
+				)
+
+				anomalies.append(
+					InjectedDisappearanceAnomaly(
+						anomaly_id=anomaly_id,
+						mmsi=anomaly_mmsi,
+						vessel_name=vessel_name,
+						source_mmsi=source_mmsi,
+						source_vessel_name=source_name,
+						start_time=start_time.strftime("%Y-%m-%dT%H:%M:%S"),
+						end_time=end_time.strftime("%Y-%m-%dT%H:%M:%S"),
+						point_count=point_count,
+						interval_seconds=mean_interval_seconds,
+						expected_gap_seconds=expected_gap_seconds,
+						mean_sog_knots=round(mean_sog, 3),
+					)
+				)
+
+			conn.commit()
+			return anomalies
+		finally:
+			conn.close()
+
+	def write_benchmark_config(self, config_path: Path, expected_mmsis: list[int]) -> None:
+		description = (
+			"Detect synthetic disappearance anomalies injected into the AIS database. "
+			"Success requires detecting all injected disappearance anomaly MMSIs; additional MMSIs are allowed."
+		)
+		prompt_template = (
+			"Use available MCP tools to identify ships that suddenly stop reporting after a very regular ping pattern.\\n"
+			"Return ONLY valid JSON with this exact shape:\\n"
+			"{\\\"disappearance_mmsi\\\": [<int>, <int>, ...]}"
+		)
+		self.write_detection_benchmark_config(
+			config_path=config_path,
+			expected_mmsis=expected_mmsis,
+			description=description,
+			prompt_template=prompt_template,
+			expected_field_name="expected_disappearance_mmsis",
+			validation_method="disappearance_detection",
+		)
+
+	def build_arg_parser(self) -> argparse.ArgumentParser:
+		parser = argparse.ArgumentParser(description="Create and test disappearance anomaly AIS databases")
+		self.add_common_args(
+			parser,
+			default_output_db=self.default_output_db_path("ais_disappearance.db"),
+			manifest_help="Optional path for anomaly manifest JSON; defaults in the scenario folder.",
+		)
+		parser.add_argument(
+			"--interval-seconds",
+			type=float,
+			default=60.0,
+			help="Mean time gap in seconds between successive synthetic AIS points.",
+		)
+		parser.add_argument(
+			"--interval-jitter-seconds",
+			type=float,
+			default=10.0,
+			help="Standard deviation for normally sampled inter-ping intervals.",
+		)
+		parser.add_argument(
+			"--consistency-sog-knots",
+			type=float,
+			default=12.0,
+			help="Target SOG for regular pre-disappearance movement.",
+		)
+		parser.add_argument(
+			"--sog-jitter-knots",
+			type=float,
+			default=0.3,
+			help="Small random SOG variance to keep pings highly consistent.",
+		)
+		parser.add_argument(
+			"--cog-jitter-deg",
+			type=float,
+			default=3.0,
+			help="Small heading variance in degrees for near-straight movement.",
+		)
+		parser.add_argument(
+			"--disappearance-gap-hours",
+			type=float,
+			default=24.0,
+			help="Gap length after the final ping to create abrupt disappearance behavior.",
+		)
+		return parser
+
+	def run_from_args(self, args: argparse.Namespace) -> int:
+		source_db = args.source_db.expanduser().resolve()
+		output_db = args.output_db.expanduser().resolve()
+
+		self.clone_database(source_db, output_db)
+		ships_to_replace = self.validate_ships_to_replace(
+			db_path=output_db,
+			min_source_positions=args.min_source_positions,
+			ships_to_replace=args.ships_to_replace,
+		)
+		anomalies = self.inject_anomalies(
+			db_path=output_db,
+			ships_to_replace=ships_to_replace,
+			mean_new_data_count=args.mean_new_data_count,
+			std_new_data_count=args.std_new_data_count,
+			interval_seconds=args.interval_seconds,
+			interval_jitter_seconds=args.interval_jitter_seconds,
+			consistency_sog_knots=args.consistency_sog_knots,
+			sog_jitter_knots=args.sog_jitter_knots,
+			cog_jitter_deg=args.cog_jitter_deg,
+			disappearance_gap_hours=args.disappearance_gap_hours,
+			min_source_positions=args.min_source_positions,
+			rng_seed=args.seed,
+		)
+
+		self.finalize_outputs_and_run(
+			args=args,
+			source_db=source_db,
+			output_db=output_db,
+			anomalies=anomalies,
+			write_benchmark_config=self.write_benchmark_config,
+		)
+		return 0
+
+
+def main() -> int:
+	simulation = DisappearanceSimulation()
+	args = simulation.build_arg_parser().parse_args()
+	return simulation.run_from_args(args)
+
+
+if __name__ == "__main__":
+	raise SystemExit(main())

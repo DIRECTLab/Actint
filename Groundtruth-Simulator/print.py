@@ -3,181 +3,8 @@ import numpy as np
 import datetime
 import json
 from pathlib import Path
-from classes import Settings
-
-# WGS‑84 ellipsoid constants
-a = 6378137.0            # semi-major axis (meters)
-f = 1 / 298.257223563    # flattening
-e2 = 2*f - f**2          # eccentricity squared
-
-
-def geodetic_to_ecef(lat, lon, h):
-  """
-  Convert geodetic coordinates (radians, radians, meters)
-  to ECEF (meters).
-  """
-  sin_lat = np.sin(lat)
-  cos_lat = np.cos(lat)
-  sin_lon = np.sin(lon)
-  cos_lon = np.cos(lon)
-
-  N = a / np.sqrt(1 - e2 * sin_lat**2)
-
-  X = (N + h) * cos_lat * cos_lon
-  Y = (N + h) * cos_lat * sin_lon
-  Z = (N * (1 - e2) + h) * sin_lat
-
-  return np.array([X, Y, Z])
-
-
-def enu_to_ecef_matrix(lat, lon):
-  """
-  Rotation matrix from local ENU frame to ECEF.
-  """
-  sin_lat = np.sin(lat)
-  cos_lat = np.cos(lat)
-  sin_lon = np.sin(lon)
-  cos_lon = np.cos(lon)
-
-  # Columns are East, North, Up unit vectors in ECEF
-  R = np.array([
-    [-sin_lon,              -sin_lat*cos_lon,   cos_lat*cos_lon],
-    [ cos_lon,              -sin_lat*sin_lon,   cos_lat*sin_lon],
-    [       0,                       cos_lat,            sin_lat]
-  ])
-
-  return R
-
-
-def enu_to_ecef(enu, lat0, lon0, h0):
-  """
-  Convert a local ENU vector to global ECEF coordinates.
-  enu: np.array([e, n, u])
-  lat0, lon0 in radians
-  h0 in meters
-  """
-  # ECEF of the ENU origin
-  origin_ecef = geodetic_to_ecef(lat0, lon0, h0)
-
-  # Rotation matrix
-  R = enu_to_ecef_matrix(lat0, lon0)
-
-  # Apply transform
-  return origin_ecef + R @ enu
-
-
-def ecef_to_geodetic(X, Y, Z):
-  """
-  Convert ECEF coordinates (meters) to geodetic coordinates.
-  Returns (latitude, longitude, height) in (radians, radians, meters).
-  Uses iterative algorithm for latitude calculation.
-  """
-  # Longitude is straightforward
-  lon = np.arctan2(Y, X)
-  
-  # Latitude requires iteration
-  p = np.sqrt(X**2 + Y**2)
-  lat = np.arctan2(Z, p * (1 - e2))
-  
-  # Iterate to refine latitude
-  for _ in range(5):
-    N = a / np.sqrt(1 - e2 * np.sin(lat)**2)
-    lat = np.arctan2(Z + e2 * N * np.sin(lat), p)
-  
-  # Calculate height
-  N = a / np.sqrt(1 - e2 * np.sin(lat)**2)
-  h = p / np.cos(lat) - N
-  
-  return lat, lon, h
-
-
-# Simulation reference point (origin) - Just east of Hawaii
-# Change these to match your simulation area
-# Accuracy by Distance. If the origin is too far from the area of interest, accuracy degrades:
-# 0-10 km: Sub-meter errors - excellent for harbor/port simulations
-# 10-50 km: 1-10 meter errors - good for coastal areas
-# 50-100 km: 10-50 meter errors - acceptable for regional simulations
-# 100-200 km: 50-200 meter errors - marginal accuracy
-# 200+ km: 200+ meter errors - significant distortion
-ORIGIN_LAT = 20.590305   # ~20.59°N latitude (degrees)
-ORIGIN_LON = -157.697742   # ~157.70°W longitude (degrees)
-ORIGIN_HEIGHT = 0.0              # Sea level
-  
-
-def ecef_to_enu(ecef: np.ndarray, lat0: float, lon0: float, h0: float) -> np.ndarray:
-  """Convert ECEF coordinates (meters) to a local ENU vector (meters).
-
-  Args:
-    ecef: np.array([X, Y, Z]) in meters
-    lat0, lon0: origin geodetic coordinates in radians
-    h0: origin height in meters
-
-  Returns:
-    np.array([e, n, u]) in meters
-  """
-  origin_ecef = geodetic_to_ecef(lat0, lon0, h0)
-  delta = np.asarray(ecef, dtype=float) - origin_ecef
-  R = enu_to_ecef_matrix(lat0, lon0)
-  return R.T @ delta
-
-
-def geodetic_to_local(latitude_deg: float, longitude_deg: float, height_m: float = 0.0, settings: Settings | None = None) -> tuple[float, float, float]:
-  """Convert geodetic coordinates (degrees) to local ENU coordinates (meters).
-
-  This is the inverse of `local_to_geodetic`.
-
-  Args:
-    latitude_deg: latitude in degrees
-    longitude_deg: longitude in degrees
-    height_m: height above ellipsoid in meters
-    settings: simulation Settings; uses `settings.latlon_origin` as the ENU origin
-
-  Returns:
-    Tuple of (x_east_m, y_north_m, z_up_m)
-  """
-  settings = settings or Settings(0, {"latitude": ORIGIN_LAT, "longitude": ORIGIN_LON, "height": ORIGIN_HEIGHT})
-
-  lat_rad = np.radians(latitude_deg)
-  lon_rad = np.radians(longitude_deg)
-  ecef = geodetic_to_ecef(lat_rad, lon_rad, height_m)
-
-  lat0 = np.radians(settings.latlon_origin["latitude"])
-  lon0 = np.radians(settings.latlon_origin["longitude"])
-  h0 = settings.latlon_origin["height"]
-  enu = ecef_to_enu(ecef, lat0, lon0, h0)
-
-  return float(enu[0]), float(enu[1]), float(enu[2])
-
-
-def local_to_geodetic(x: float, y: float, z: float = 0.0, settings: Settings | None = None) -> tuple[float, float, float]:
-  """
-  Convert local ENU coordinates (meters) to geodetic coordinates (degrees).
-  
-  Args:
-    x: East coordinate in meters
-    y: North coordinate in meters
-    z: Up coordinate in meters (default 0.0 for sea level)
-  
-  Returns:
-    Tuple of (latitude_deg, longitude_deg, height_m)
-  """
-  settings = settings or Settings(0, {"latitude": ORIGIN_LAT, "longitude": ORIGIN_LON, "height": ORIGIN_HEIGHT})
-  # Create ENU vector
-  enu = np.array([x, y, z])
-  
-  # Convert to ECEF
-  ecef = enu_to_ecef(enu, np.radians(settings.latlon_origin["latitude"]), np.radians(settings.latlon_origin["longitude"]), settings.latlon_origin["height"])
-  
-  # Convert to geodetic
-  lat_rad, lon_rad, h = ecef_to_geodetic(ecef[0], ecef[1], ecef[2])
-  
-  # Convert to degrees
-  lat_deg = np.degrees(lat_rad)
-  lon_deg = np.degrees(lon_rad)
-  
-  return lat_deg, lon_deg, h
-
-
+from classes import Vehicle, Vehicle2D, Vehicle3D, Settings
+from typing import List
 
 # Helper function to generate unique filenames for the csv_print_header function.
 def _name_file(settings: Settings) -> tuple[Path | None, Path | None]:
@@ -246,8 +73,8 @@ def csv_print_header(settings: Settings) -> tuple:
   df2D = pd.DataFrame(columns=[
     "MMSI",           # Maritime Mobile Service Identity (using vehicle_id)
     "BaseDateTime",   # Timestamp
-    "LAT",            # Latitude (using position_y)
-    "LON",            # Longitude (using position_x)
+    "LAT",            # Latitude (using latitude property)
+    "LON",            # Longitude (using longitude property)
     "SOG",            # Speed Over Ground (calculated from velocity)
     "COG",            # Course Over Ground (using heading in degrees)
     "Heading",        # Vessel heading (using heading in degrees)
@@ -262,8 +89,8 @@ def csv_print_header(settings: Settings) -> tuple:
     "date",                 # date
     "time",                 # time
     "icao_hex",             # ICAO hex (using vehicle_id)
-    "latitude",             # Latitude (using position_y)
-    "longitude",            # Longitude (using position_x)
+    "latitude",             # Latitude (using latitude property)
+    "longitude",            # Longitude (using longitude property)
     "altitude",             # Altitude (using position_z)
     "altitude_unit",        # Altitude unit (e.g., meters)
     "vertical_rate",        # Vertical rate (using velocity_z)
@@ -383,15 +210,12 @@ def json_print_data(vehicles: list, filename2D: str, filename3D: str, settings: 
     z = getattr(v, 'pos_z', 0.0)
     
     # Convert local ENU coordinates to geodetic (lat/lon in degrees)
-    lat, lon, height = local_to_geodetic(v.pos_x, v.pos_y, z, settings)
     if v.__class__.__name__ == 'Vehicle2D':
       data_rows_2d.append({
         "MMSI": v.vehicle_id,
         "BaseDateTime": settings.current_simulation_time.timestamp() if settings.print_time_as == "unix" else settings.current_simulation_time.isoformat(sep=' ', timespec='seconds'),
-        # "LAT": round(lat, 6),  # Latitude in degrees (~0.1m precision)
-        # "LON": round(lon, 6),  # Longitude in degrees (~0.1m precision)
-        "LAT": v.pos_y,
-        "LON": v.pos_x,
+        "LAT": v.latitude,
+        "LON": v.longitude,
         "SOG": round(np.linalg.norm(v.velocity.vector), 3),  # Speed over ground from velocity magnitude
         "COG": round(np.degrees(v.heading) % 360, 3),  # Course over ground in degrees
         "Heading": round(np.degrees(v.heading) % 360, 3),  # Heading in degrees
@@ -405,9 +229,9 @@ def json_print_data(vehicles: list, filename2D: str, filename3D: str, settings: 
         "date": settings.current_simulation_time.isoformat(sep=",", timespec="seconds").split(",")[0] if settings.print_time_as == "iso" else "",  # Date part of ISO timestamp
         "time": settings.current_simulation_time.isoformat(sep=",", timespec="seconds").split(",")[1] if settings.print_time_as == "iso" else settings.current_simulation_time.timestamp(),
         "icao_hex": f"{v.vehicle_id:06X}",  # ICAO hex from vehicle_id
-        "latitude": round(lat, 6),  # Latitude in degrees (~0.1m precision)
-        "longitude": round(lon, 6),  # Longitude in degrees (~0.1m precision)
-        "altitude": round(height, 3),  # Altitude in meters
+        "latitude": v.latitude,  # Latitude in degrees (~0.1m precision)
+        "longitude": v.longitude,  # Longitude in degrees (~0.1m precision)
+        "altitude": round(v.pos_z, 3),  # Altitude in meters
         "altitude_unit": "meters",
         "vertical_rate": round(v.velocity.z * 60, 3),  # Vertical rate in meters per minute
         "vertical_rate_unit": "meters/minute",
@@ -419,7 +243,7 @@ def json_print_data(vehicles: list, filename2D: str, filename3D: str, settings: 
   if settings.has_vehicle3d and filename3D is not None:
     _append_json_array(filename3D, data_rows_3d)
 
-def csv_print_data(vehicles: list, filename2D: str, filename3D: str, settings: Settings) -> None:
+def csv_print_data(vehicles: List[Vehicle], filename2D: str, filename3D: str, settings: Settings) -> None:
   """Append vehicle data to an existing CSV file in AIS format.
   
   Extracts vehicle data and writes it in AIS-like format.
@@ -443,15 +267,14 @@ def csv_print_data(vehicles: list, filename2D: str, filename3D: str, settings: S
     z = getattr(v, 'pos_z', 0.0)
     
     # Convert local ENU coordinates to geodetic (lat/lon in degrees)
-    lat, lon, height = local_to_geodetic(v.pos_x, v.pos_y, z, settings)
-    if v.__class__.__name__ == 'Vehicle2D':
+    # lat, lon, height = local_to_geodetic(v.pos_x, v.pos_y, z, settings)
+    if isinstance(v, Vehicle2D):
+
       data_rows_2d.append({
         "MMSI": v.vehicle_id,
         "BaseDateTime": settings.current_simulation_time.timestamp() if settings.print_time_as == "unix" else settings.current_simulation_time.isoformat(sep=' ', timespec='seconds'),
-        # "LAT": round(lat, 6),  # Latitude in degrees (~0.1m precision)
-        # "LON": round(lon, 6),  # Longitude in degrees (~0.1m precision)
-        "LAT": v.pos_y,
-        "LON": v.pos_x,
+        "LAT": round(v.latitude, 6),
+        "LON": round(v.longitude, 6),
         "SOG": round(np.linalg.norm(v.velocity.vector), 3),  # Speed over ground from velocity magnitude
         "COG": round(np.degrees(v.heading) % 360, 3),  # Course over ground in degrees
         "Heading": round(np.degrees(v.heading) % 360, 3),  # Heading in degrees
@@ -460,14 +283,14 @@ def csv_print_data(vehicles: list, filename2D: str, filename3D: str, settings: S
         "Length": round(getattr(v, 'scale', 0.0), 3),  # Using scale as length approximation
         "Width": round(getattr(v, 'scale', 0.0) / 3, 3),  # Approximate width as 1/3 of length
       })
-    elif v.__class__.__name__ == 'Vehicle3D':
+    elif isinstance(v, Vehicle3D):
       data_rows_3d.append({
         "date": settings.current_simulation_time.isoformat(sep=",", timespec="seconds").split(",")[0] if settings.print_time_as == "iso" else "",
         "time": settings.current_simulation_time.isoformat(sep=",", timespec="seconds").split(",")[1] if settings.print_time_as == "iso" else settings.current_simulation_time.timestamp(),
         "icao_hex": f"{v.vehicle_id:06X}",  # ICAO hex from vehicle_id
-        "latitude": round(lat, 6),  # Latitude in degrees (~0.1m precision)
-        "longitude": round(lon, 6),  # Longitude in degrees (~0.1m precision)
-        "altitude": round(height, 3),  # Altitude in meters
+        "latitude": round(v.latitude, 6),  # Latitude in degrees (~0.1m precision)
+        "longitude": round(v.longitude, 6),  # Longitude in degrees (~0.1m precision)
+        "altitude": round(v.pos_z, 3),  # Altitude in meters
         "altitude_unit": "meters",
         "vertical_rate": round(v.velocity.z * 60, 3),  # Vertical rate in meters per minute
         "vertical_rate_unit": "meters/minute",

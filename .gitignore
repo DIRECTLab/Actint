@@ -223,3 +223,7 @@ __marimo__/
 .vscode/
 actint/.vscode
 actint/src/.vscode
+
+**/db/**
+results/
+2016/*

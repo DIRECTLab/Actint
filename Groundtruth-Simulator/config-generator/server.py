@@ -15,6 +15,8 @@ def receive_points():
     current_datetime = datetime.now()
     openString = "./output/simulation_settings_" + current_datetime.strftime("%Y-%m-%d_%H:%M:%S") + ".json"
 
+    openString = openString.replace(":", "-")
+
     os.makedirs(os.path.dirname(openString), exist_ok=True)
 
     with open(openString, "w", encoding="utf-8") as f:

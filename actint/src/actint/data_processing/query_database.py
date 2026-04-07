@@ -1,5 +1,6 @@
 import sqlite3 
 from datetime import datetime
+import os
 
 from pathlib import Path
 
@@ -7,9 +8,17 @@ DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
 DB_DIR = DATA_DIR / "db"
 SQLITE_PATH = DB_DIR / "ais.db"
 
+
+def _resolve_sqlite_path() -> Path:
+    """Resolve SQLite path, allowing benchmark overrides via env var."""
+    override = os.getenv("ACTINT_SQLITE_PATH")
+    if override:
+        return Path(override).expanduser().resolve()
+    return SQLITE_PATH
+
 def _get_sqlite_connection() -> sqlite3.Connection:
     """Get a SQLite connection."""
-    return sqlite3.connect(SQLITE_PATH)
+    return sqlite3.connect(_resolve_sqlite_path())
 
 def query_ais_positions(searchQuery: dict, sort=False):
     conn = _get_sqlite_connection()

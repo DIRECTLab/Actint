@@ -20,33 +20,33 @@
       "is_3d": false,
       "action": "seek",
       "properties": {
-        "max_speed": 100.0,
+        "max_speed": 100.0, 
         "max_force": 200.0,
-        "position": { "x": 200.00, "y": 200.00 }
+        "position": { "lon": 200.00, "lat": 200.00 }
       },
       "destinations": [
         {
-          "position": { "x": 500.000, "y": 500.000 },
+          "position": { "lon": 500.000, "lat": 500.000 },
           "speed": 50.0,
           "error": 30.0
         },
         {
-          "position": { "x": 1000.000, "y": 500.000 },
+          "position": { "lon": 1000.000, "lat": 500.000 },
           "speed": 50.0,
           "error": 30.0
         },
         {
-          "position": { "x": 1000.000, "y": 1000.000 },
+          "position": { "lon": 1000.000, "lat": 1000.000 },
           "speed": 50.0,
           "error": 30.0
         },
         {
-          "position": { "x": 500.000, "y": 1000.000 },
+          "position": { "lon": 500.000, "lat": 1000.000 },
           "speed": 50.0,
           "error": 30.0
         },
         {
-          "position": { "x": 500.000, "y": 500.000 },
+          "position": { "lon": 500.000, "lat": 500.000 },
           "speed": 50.0,
           "error": 30.0
         }
@@ -61,31 +61,31 @@
         "max_speed": 100.0,
         "max_force": 200.0,
         "max_altitude": 1200,
-        "position": { "x": 200.00, "y": 200.00, "z": 200.00 }
+        "position": { "lon": 200.00, "lat": 200.00, "z": 200.00 }
       },
       "destinations": [
         {
-          "position": { "x": 500.000, "y": 500.000, "z": 500.000 },
+          "position": { "lon": 500.000, "lat": 500.000, "z": 500.000 },
           "speed": 50.0,
           "error": 30.0
         },
         {
-          "position": { "x": 1000.000, "y": 500.000, "z": 1000.000 },
+          "position": { "lon": 1000.000, "lat": 500.000, "z": 1000.000 },
           "speed": 50.0,
           "error": 30.0
         },
         {
-          "position": { "x": 1000.000, "y": 1000.000, "z": 500.000 },
+          "position": { "lon": 1000.000, "lat": 1000.000, "z": 500.000 },
           "speed": 50.0,
           "error": 30.0
         },
         {
-          "position": { "x": 500.000, "y": 1000.000, "z": 1000.000 },
+          "position": { "lon": 500.000, "lat": 1000.000, "z": 1000.000 },
           "speed": 50.0,
           "error": 30.0
         },
         {
-          "position": { "x": 500.000, "y": 500.000, "z": 500.000 },
+          "position": { "lon": 500.000, "lat": 500.000, "z": 500.000 },
           "speed": 50.0,
           "error": 30.0
         }

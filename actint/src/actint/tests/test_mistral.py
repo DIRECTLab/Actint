@@ -4,8 +4,8 @@ import torch
 
 print("Loading Mistral model and tokenizer...")
 try:
-    tokenizer = AutoTokenizer.from_pretrained("mistralai/Mistral-7B-v0.1")
-    model = AutoModelForCausalLM.from_pretrained("mistralai/Mistral-7B-v0.1")
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2-7B")
+    model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2-7B")
     print("✓ Model loaded successfully")
 except Exception as e:
     print(f"✗ Error loading model: {e}")

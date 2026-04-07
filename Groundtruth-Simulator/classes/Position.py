@@ -3,31 +3,10 @@ from abc import ABC, abstractmethod
 import numpy as np
 from numpy.typing import NDArray
 from .Vectors import Vector2D, Vector3D
+from pyproj import Geod
+from helpers import utm
 
-def _haversine_distance_numpy(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-  """
-  Calculate the great circle distance between two points 
-  on the earth (specified in decimal degrees)
-  Returns distance in kilometers
-  
-  All inputs can be scalars or arrays of the same shape.
-  """
-  # Convert decimal degrees to radians
-  lat1 = np.radians(lat1)
-  lon1 = np.radians(lon1)
-  lat2 = np.radians(lat2)
-  lon2 = np.radians(lon2)
-  
-  # Haversine formula
-  dlat = lat2 - lat1
-  dlon = lon2 - lon1
-  a = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
-  c = 2 * np.arcsin(np.sqrt(a))
-  
-  # Radius of earth in kilometers
-  r = 6371
-  
-  return c * r
+geod = Geod(ellps='WGS84')
 
 class Position(ABC):
   """Abstract base class for position representations."""
@@ -51,53 +30,89 @@ class Position(ABC):
   def get_heading_deg(self, position: 'Position') -> float:
     return np.rad2deg(self.get_heading(position))
 
+  # Removed abstract methods for __add__, __sub__, etc. from Position ABC
+  # as they don't apply universally to all Position types (e.g., Lat/Lon).
+  # They will be implemented in Cartesian-like classes (PositionUTM, Position3D).
+  
+  @abstractmethod
+  def __eq__(self, other: object) -> bool:
+      pass
+
+  # Common vector operations that apply *only* to Cartesian positions (PositionUTM, Position3D)
+  # These should ideally be moved out of the base `Position` class,
+  # or `Position` should represent a vector-like entity.
+  # For now, let's keep them here but understand they will be overridden
+  # or only applicable for PositionUTM/3D.
+  def magnitude(self) -> float:
+      return np.linalg.norm(self.vector)
+
+  def normalize(self) -> 'Position':
+      norm = self.magnitude()
+      if norm > 1e-9:
+          return self / norm
+      # Return a zero vector of the same type, assuming Position sub-classes
+      # implement __mul__ for scalar multiplication correctly.
+      return self * 0.0 # Will call __mul__ if implemented in concrete class
+
+  def truncate(self, limit: float) -> 'Position':
+      norm = self.magnitude()
+      if norm > limit:
+          return self.normalize() * limit
+      return self
 
 
-class Position2D(Position):
+class PositionUTM(Position): # This is now exclusively for Cartesian/UTM (easting, northing)
   """
-  2D position representation in Cartesian coordinates.
+  2D position representation in Cartesian coordinates (e.g., UTM easting/northing).
 
   This class represents a point in 2D space with x and y coordinates.
   It inherits from Position and provides 2D-specific functionality.
 
-  Example:
-    >>> pos = Position2D(3.0, 4.0)
-    >>> print(pos.x, pos.y)
-    3.0 4.0
-    
   Attributes:
-    x (float): The x-coordinate of the position
-    y (float): The y-coordinate of the position
+    x (float): The x-coordinate (easting)
+    y (float): The y-coordinate (northing)
   """
   
-  def __init__(self, x: float, y: float):
-    """
-    Initialize a 2D position with x and y coordinates.
-    
-    Args:
-      x (float): The x-coordinate
-      y (float): The y-coordinate
-    """
-    self._vector = np.array([x, y], dtype=np.float64)
-
+  def __init__(self, x: float, y: float, utm_zone_number: int = None, utm_zone_letter: str = None):
+    self._vector = np.array([float(x), float(y)], dtype=np.float64)
+    self._utm_zone_number = utm_zone_number
+    self._utm_zone_letter = utm_zone_letter
 
   @property
   def x(self) -> float:
-    """The x-coordinate of the position."""
+    """The x-coordinate of the position (easting)."""
     return self._vector[0]
 
   @x.setter
   def x(self, value: float) -> None:
-    self._vector[0] = value
+    self._vector[0] = float(value)
 
   @property
   def y(self) -> float:
-    """The y-coordinate of the position."""
+    """The y-coordinate of the position (northing)."""
     return self._vector[1]
 
   @y.setter
   def y(self, value: float) -> None:
-    self._vector[1] = value
+    self._vector[1] = float(value)
+
+  @property
+  def number(self) -> int:
+    """The UTM zone number."""
+    return self._utm_zone_number
+  
+  @number.setter
+  def number(self, value: int) -> None:
+    self._utm_zone_number = int(value)
+  
+  @property
+  def letter(self) -> str:
+    """The UTM zone letter."""
+    return self._utm_zone_letter
+  
+  @letter.setter
+  def letter(self, value: str) -> None:
+    self._utm_zone_letter = str(value)
 
   @property
   def vector(self) -> NDArray[np.float64]:
@@ -106,116 +121,161 @@ class Position2D(Position):
 
   def distance_to(self, position: Position) -> float:
     """
-    Calculate the Euclidean distance to another position. This will be used for now to imitate UTM distance with objects in the same UTM zone. As we progress we will need to update this for objects in different UTM zones.
-    
-    If the other position is 3D, the z component is ignored.
-    If the other position is 2D, all components are considered.
+    Calculate the Euclidean distance to another position.
+    This is used for local movement within the same UTM zone.
     
     Args:
-      position (Union[Position2D, Position3D]): Another position to calculate distance to
+      position (Position): Another position to calculate distance to.
+                           Expected to be PositionUTM or Position3D.
         
     Returns:
-      float: The Euclidean distance between positions
-        
-    Example:
-      >>> pos1 = Position2D(0, 0)
-      >>> pos2 = Position2D(3, 4)
-      >>> pos1.distance_to(pos2)
-      5.0
+      float: The Euclidean distance between positions in meters.
     """
-    if not isinstance(position, (Position2D, Position3D)):
-        raise TypeError(f"Unsupported position type: {type(position).__name__}. "
-                       f"Must be Position2D or Position3D")
-    # If the other position is also a Position2D, ignore z components
-    return np.sqrt((self.x - position.x)**2 + (self.y - position.y)**2)
-  
+    if not isinstance(position, (PositionUTM, Position3D)):
+        raise TypeError(f"Unsupported position type for Euclidean distance: {type(position).__name__}. "
+                       f"Must be PositionUTM or Position3D")
+    
+    # Ensure compatible dimensions for distance calculation
+    other_vec = position.vector
+    if len(other_vec) < 2:
+        raise ValueError("Cannot calculate 2D Euclidean distance to a 1D or lower dimension position.")
+    
+    return np.linalg.norm(self._vector - other_vec[:2])
+
   def get_heading(self, position: 'Position') -> float:
     """
     Calculate the heading (angle) to another position in radians.
+    (0 = positive x-axis, counter-clockwise in a standard Cartesian plane)
     
     Args:
       position (Position): Another position to calculate heading to
         
     Returns:
-      float: The heading in radians (0 = north, clockwise)
+      float: The heading in radians.
     """
-    if isinstance(position, Position2D):
-      diff = position._vector - self._vector
-    else:
-      raise TypeError(f"Unsupported position type: {type(position).__name__}. " f"Must be Position2D")
+    if not isinstance(position, (PositionUTM, Position3D)):
+      raise TypeError(f"Unsupported position type for heading calculation: {type(position).__name__}. " f"Must be PositionUTM or Position3D")
   
-    # arctan2 gives angle from positive x-axis (counterclockwise)
-    # We want angle from positive y-axis (north), clockwise
-    # So we need: π/2 - angle (to convert to north-oriented)
-    # But we also need to handle the clockwise convention properly
-    angle = np.arctan2(diff[1], diff[0])
-    # Convert to maritime convention (0° = north, clockwise)
-    heading = (np.pi / 2 - angle) % (2 * np.pi)
-    return heading
+    diff_vector = position.vector[:2] - self._vector
+    return np.arctan2(diff_vector[1], diff_vector[0])
 
   def __str__(self):
-    return f'{type(self).__name__}({self.x:.2f}, {self.y:.2f})'
+    return f'{type(self).__name__}({self.x:.2f}, {self.y:.2f}, {self._utm_zone_number}{self._utm_zone_letter})'
   
   def __repr__(self) -> str:
-    return f'{type(self).__name__}(x={self.x}, y={self.y})'
-    
+    return f'{type(self).__name__}(x={self.x}, y={self.y}, utm_zone_number={self._utm_zone_number}, utm_zone_letter={self._utm_zone_letter})'
+
   def __eq__(self, other: object) -> bool:
     """Check equality with another position."""
-    if not isinstance(other, Position2D):
+    if not isinstance(other, PositionUTM):
       return False
-    return np.allclose(self._vector, other._vector)
+    return np.allclose(self._vector, other._vector, atol=1e-9)
   
-  def __add__(self, other: Position2D | Vector2D) -> Position2D:
+  def __add__(self, other: PositionUTM | Vector2D) -> PositionUTM:
     """Add two positions."""
-    if isinstance(other, (Position2D, Vector2D)):
-      return Position2D(self.x + other.x, self.y + other.y)
-    raise TypeError(f"Can only add Position2D to Position2D NOT {type(other).__name__}")
-  
-  def __sub__(self, other: Position2D | Vector2D) -> Position2D:
+    if isinstance(other, PositionUTM):
+      if (
+          self._utm_zone_number is not None
+          and other._utm_zone_number is not None
+          and (
+              self._utm_zone_number != other._utm_zone_number
+              or self._utm_zone_letter != other._utm_zone_letter
+          )
+      ):
+        raise ValueError(
+            "Cannot add PositionUTM values from different UTM zones: "
+            f"{self._utm_zone_number}{self._utm_zone_letter} vs {other._utm_zone_number}{other._utm_zone_letter}"
+        )
+      return PositionUTM(
+          self.x + other.x,
+          self.y + other.y,
+          utm_zone_number=self._utm_zone_number or other._utm_zone_number,
+          utm_zone_letter=self._utm_zone_letter or other._utm_zone_letter,
+      )
+    if isinstance(other, Vector2D):
+      return PositionUTM(
+          self.x + other.x,
+          self.y + other.y,
+          utm_zone_number=self._utm_zone_number,
+          utm_zone_letter=self._utm_zone_letter,
+      )
+    raise TypeError(f"Can only add PositionUTM to PositionUTM NOT {type(other).__name__}")
+
+  def __sub__(self, other: PositionUTM | Vector2D) -> PositionUTM:
     """Subtract two positions."""
-    if isinstance(other, (Position2D, Vector2D)):
-      return Position2D(self.x - other.x, self.y - other.y)
-    raise TypeError(f"Can only subtract Position2D from Position2D NOT {type(other).__name__}")
+    if isinstance(other, PositionUTM):
+      if (
+          self._utm_zone_number is not None
+          and other._utm_zone_number is not None
+          and (
+              self._utm_zone_number != other._utm_zone_number
+              or self._utm_zone_letter != other._utm_zone_letter
+          )
+      ):
+        raise ValueError(
+            "Cannot subtract PositionUTM values from different UTM zones: "
+            f"{self._utm_zone_number}{self._utm_zone_letter} vs {other._utm_zone_number}{other._utm_zone_letter}"
+        )
+      return PositionUTM(
+          self.x - other.x,
+          self.y - other.y,
+          utm_zone_number=self._utm_zone_number or other._utm_zone_number,
+          utm_zone_letter=self._utm_zone_letter or other._utm_zone_letter,
+      )
+    if isinstance(other, Vector2D):
+      return PositionUTM(
+          self.x - other.x,
+          self.y - other.y,
+          utm_zone_number=self._utm_zone_number,
+          utm_zone_letter=self._utm_zone_letter,
+      )
+    raise TypeError(f"Can only subtract PositionUTM from PositionUTM NOT {type(other).__name__}")
+
+  def __mul__(self, scalar: float) -> 'PositionUTM':
+      return PositionUTM(
+        self.x * scalar,
+        self.y * scalar,
+        utm_zone_number=self._utm_zone_number,
+        utm_zone_letter=self._utm_zone_letter,
+      )
+
+  def __rmul__(self, scalar: float) -> 'PositionUTM':
+      return self.__mul__(scalar) # Scalar multiplication is commutative
+
+  def __truediv__(self, scalar: float) -> 'PositionUTM':
+      if scalar == 0:
+          raise ValueError("Cannot divide PositionUTM by zero.")
+      return PositionUTM(
+        self.x / scalar,
+        self.y / scalar,
+        utm_zone_number=self._utm_zone_number,
+        utm_zone_letter=self._utm_zone_letter,
+      )
 
 
-class Position3D(Position2D):
+class Position3D(PositionUTM): # This would be for 3D Cartesian UTM (easting, northing, altitude)
   """
-  3D position representation in Cartesian coordinates.
+  3D position representation in Cartesian coordinates (e.g., UTM easting/northing/altitude).
   
   This class represents a point in 3D space with x, y, and z coordinates.
-  It inherits from Position2D and adds the z coordinate functionality.
+  It inherits from PositionUTM and adds the z coordinate functionality.
   
-  Example:
-      >>> pos = Position3D(1.0, 2.0, 3.0)
-      >>> print(pos.x, pos.y, pos.z)
-      1.0 2.0 3.0
-      
   Attributes:
-      x (float): The x-coordinate of the position
-      y (float): The y-coordinate of the position
-      z (float): The z-coordinate of the position
+      x (float): The x-coordinate (easting)
+      y (float): The y-coordinate (northing)
+      z (float): The z-coordinate (altitude in meters)
   """
   def __init__(self, x: float, y: float, z: float):
-    """
-    Initialize a 3D position with x, y, and z coordinates.
-    
-    Args:
-        x (float): The x-coordinate
-        y (float): The y-coordinate
-        z (float): The z-coordinate
-    """
-    # Initialize the parent Position2D with x, y
-    # But we need to override _vector to be 3D
-    self._vector = np.array([x, y, z], dtype=np.float64)
+    self._vector = np.array([float(x), float(y), float(z)], dtype=np.float64)
 
   @property
   def z(self) -> float:
-    """The z-coordinate of the position."""
+    """The z-coordinate of the position (altitude)."""
     return self._vector[2]
 
   @z.setter
   def z(self, value: float) -> None:
-    self._vector[2] = value
+    self._vector[2] = float(value)
 
   @property
   def vector(self) -> NDArray[np.float64]:
@@ -226,38 +286,44 @@ class Position3D(Position2D):
     """
     Calculate the Euclidean distance to another position.
     
-    If the other position is 2D, the z component is ignored.
-    If the other position is 3D, all components are considered.
-    
     Args:
-        position (Union[Position2D, Position3D]): Another position to calculate distance to
+        position (Position): Another position to calculate distance to.
         
     Returns:
-        float: The Euclidean distance between positions
-        
-    Example:
-        >>> pos1 = Position3D(0, 0, 0)
-        >>> pos2 = Position3D(1, 1, 1)
-        >>> pos1.distance_to(pos2)
-        1.7320508075688772
+        float: The Euclidean distance between positions in meters.
     """
-    # If the other position is a Position2D, ignore z components
-    if not isinstance(position, (Position2D, Position3D)):
-        raise TypeError(f"Unsupported position type: {type(position).__name__}. "
-                       f"Must be Position2D or Position3D")
+    if not isinstance(position, (PositionUTM, Position3D)):
+        raise TypeError(f"Unsupported position type for Euclidean distance: {type(position).__name__}. "
+                       f"Must be PositionUTM or Position3D")
     
-    if isinstance(position, Position2D) and not isinstance(position, Position3D):
-        # Other position is 2D only, ignore z component
-        return np.sqrt((self.x - position.x)**2 + (self.y - position.y)**2)
-    else:
-        # Other position is 3D, use all components
-        return np.sqrt((self.x - position.x)**2 + (self.y - position.y)**2 + (self.z - position.z)**2)
+    other_vector = position.vector
+    # Pad 2D vector to 3D for consistent calculation if comparing with PositionUTM
+    if len(other_vector) == 2:
+        other_vector = np.append(other_vector, 0.0) # Assume Z is 0 if other is 2D
+    
+    return np.linalg.norm(self._vector - other_vector)
   
+  def get_heading(self, position: 'Position') -> float:
+    """
+    Calculate the horizontal heading (angle in x-y plane) to another position in radians.
+    
+    Args:
+      position (Position): Another position to calculate heading to
+        
+    Returns:
+      float: The horizontal heading in radians.
+    """
+    if not isinstance(position, (PositionUTM, Position3D)):
+      raise TypeError(f"Unsupported position type for heading calculation: {type(position).__name__}. " f"Must be PositionUTM or Position3D")
+    
+    diff_vector_xy = position.vector[:2] - self._vector[:2]
+    return np.arctan2(diff_vector_xy[1], diff_vector_xy[0])
+
   def get_direction_vector(self, position: 'Position') -> 'Position3D':
     """
     Get a normalized 3D direction vector to another position.
     
-    Calculates both heading (horizontal direction) and pitch (vertical angle)
+    Calculates both horizontal direction and vertical angle
     and combines them into a single 3D unit direction vector.
     
     Args:
@@ -265,52 +331,24 @@ class Position3D(Position2D):
         
     Returns:
       Position3D: A normalized unit direction vector pointing to the target
-      
-    Example:
-      >>> pos1 = Position3D(0, 0, 0)
-      >>> pos2 = Position3D(10, 0, 5)
-      >>> direction = pos1.get_direction_vector(pos2)
-      >>> # direction is a unit vector pointing towards pos2
     """
-    if not isinstance(position, (Position2D, Position3D)):
-      raise TypeError(f"Unsupported position type: {type(position).__name__}. " f"Must be Position2D or Position3D")
+    if not isinstance(position, (PositionUTM, Position3D)):
+      raise TypeError(f"Unsupported position type: {type(position).__name__}. " f"Must be PositionUTM or Position3D")
     
-    # Calculate differences
-    diff_x = position.x - self.x
-    diff_y = position.y - self.y
-    diff_z = position.z - self.z if isinstance(position, Position3D) else 0
+    target_vector = position.vector
+    # Pad 2D target to 3D for consistent calculation if target is PositionUTM
+    if len(target_vector) == 2:
+        target_vector = np.append(target_vector, 0.0)
     
-    # Calculate horizontal distance in x-y plane
-    horizontal_dist = np.sqrt(diff_x**2 + diff_y**2)
+    diff_vector = target_vector - self._vector
+    magnitude = np.linalg.norm(diff_vector)
     
-    # Calculate heading in x-y plane
-    # arctan2 gives angle from positive x-axis (counterclockwise)
-    # We want angle from positive y-axis (north), clockwise
-    angle = np.arctan2(diff_y, diff_x)
-    heading = (np.pi / 2 - angle) % (2 * np.pi)
-    
-    # Calculate pitch (elevation angle)
-    pitch = np.arctan2(diff_z, horizontal_dist)
-    
-    # Convert angles to 3D Cartesian coordinates
-    # heading: 0 = north (positive y), π/2 = east (positive x), π = south, 3π/2 = west
-    # pitch: 0 = horizontal, positive = upward, negative = downward
-    
-    # Horizontal magnitude reduces as pitch increases
-    horizontal_mag = np.cos(pitch)
-    
-    # Calculate direction components
-    direction_x = np.sin(heading) * horizontal_mag
-    direction_y = np.cos(heading) * horizontal_mag
-    direction_z = np.sin(pitch)
-    
-    # Normalize to unit vector
-    magnitude = np.sqrt(direction_x**2 + direction_y**2 + direction_z**2)
     if magnitude > 1e-9:
+      normalized_diff = diff_vector / magnitude
       return Position3D(
-        float(direction_x / magnitude),
-        float(direction_y / magnitude),
-        float(direction_z / magnitude)
+        float(normalized_diff[0]),
+        float(normalized_diff[1]),
+        float(normalized_diff[2])
       )
     else:
       return Position3D(0.0, 0.0, 0.0)
@@ -325,7 +363,7 @@ class Position3D(Position2D):
     """Check equality with another position."""
     if not isinstance(other, Position3D):
       return False
-    return np.allclose(self._vector, other._vector)
+    return np.allclose(self._vector, other._vector, atol=1e-9)
   
   def __add__(self, other: 'Position3D | Vector3D') -> 'Position3D':
     """Add a 3D position and a 3D offset (vector)."""
@@ -344,171 +382,101 @@ class Position3D(Position2D):
     )
   
   
-class Position2DGCS(Position):
+class PositionLatLon(Position):
   """
-  2D position representation in Cartesian coordinates.
-
-  This class represents a point in 2D space with x and y coordinates.
-  It inherits from Position and provides 2D-specific functionality.
-
-  Example:
-      >>> pos = Position2D(41.74076, -111.81404)
-      >>> print(pos.x, pos.y)
-      41.74076, -111.81404
-      
+  Position representation using Latitude and Longitude (Geographic Coordinates).
+  
   Attributes:
-      x (float): The longitude of the position
-      y (float): The latitude of the position
+      latitude (float): The latitude in decimal degrees.
+      longitude (float): The longitude in decimal degrees.
   """
   
-  def __init__(
-      self,
-      longitude: float,
-      latitude: float
-  ):
-    """
-    Initialize a 2D position with x and y coordinates.
-    
-    Args:
-        longitude (float): The x-coordinate
-        latitude (float): The y-coordinate
-    """
-    self._x = longitude
-    self._y = latitude
+  def __init__(self, latitude: float, longitude: float):
+    self._latitude = float(latitude)
+    self._longitude = float(longitude)
 
-  @property
-  def x(self) -> float:
-     return self._x
-  
-  @property
-  def y(self) -> float:
-     return self._y
-  
   @property
   def latitude(self) -> float:
-     return self._x
+     return self._latitude
+  
+  @latitude.setter
+  def latitude(self, value: float) -> None:
+      self._latitude = float(value)
   
   @property
   def longitude(self) -> float:
-     return self._y
+     return self._longitude
   
+  @longitude.setter
+  def longitude(self, value: float) -> None:
+      self._longitude = float(value)
+
   @property
-  def x(self, value: float):
-     self._x = value
-  
-  @property
-  def y(self, value: float):
-     self._y = value
-  
-  @property
-  def latitude(self, value: float):
-     self._x = value
-  
-  @property
-  def longitude(self, value: float):
-     self._y = value
+  def vector(self) -> NDArray[np.float64]:
+    """Returns [latitude, longitude] as a numpy array."""
+    return np.array([self._latitude, self._longitude], dtype=np.float64)
 
   def distance_to(self, position: Position) -> float:
     """
-    Calculate the Euclidean distance to another position.
-    
-    If the other position is 3D, the z component is ignored.
-    If the other position is 2D, all components are considered.
+    Calculate the geodesic distance (great-circle) to another geographic position.
     
     Args:
-        position (Union[Position2D, Position3D]): Another position to calculate distance to
+        position (Position): Another position, expected to be PositionLatLon.
         
     Returns:
-        float: The Euclidean distance between positions
-        
-    Example:
-        >>> pos1 = Position2D(0, 0)
-        >>> pos2 = Position2D(3, 4)
-        >>> pos1.distance_to(pos2)
-        5.0
+        float: The geodesic distance between positions in *meters*.
     """
-    if not isinstance(position, (Position2DGCS, Position3DGCS)):
-        raise TypeError(f"Unsupported position type: {type(position).__name__}. "
-                       f"Must be Position2DGCS or Position3DGCS")
-    # If the other position is also a Position2D, ignore z components
-    return _haversine_distance_numpy(self.latitude, self.longitude, position.latitude, position.longitude)
-  
-  def __str__(self):
-    return f'{type(self).__name__}({self.x:.2f}, {self.y:.2f})'
+    if not isinstance(position, PositionLatLon):
+        raise TypeError(f"Unsupported position type for geodesic distance: {type(position).__name__}. "
+                       f"Must be PositionLatLon")
+    
+    distance =utm.latlon_dist(self, position)
+    return distance # returns distance in meters
 
-
-class Position3DGCS(Position2DGCS):
-  """
-  3D position representation in Cartesian coordinates.
-  
-  This class represents a point in 3D space with x, y, and z coordinates.
-  It inherits from Position2D and adds the z coordinate functionality.
-  
-  Example:
-      >>> pos = Position3D(1.0, 2.0, 3.0)
-      >>> print(pos.x, pos.y, pos.z)
-      1.0 2.0 3.0
-      
-  Attributes:
-      x (float): The x-coordinate of the position
-      y (float): The y-coordinate of the position
-      z (float): The z-coordinate of the position
-  """
-  def __init__(self, 
-      longitude: float,
-      latitude: float, 
-      altitude: float):
+  def get_heading(self, position: 'Position') -> float:
     """
-    Initialize a 3D position with x, y, and z coordinates.
+    Calculate the initial bearing (heading) to another geographic position in radians.
     
     Args:
-        x (float): The x-coordinate
-        y (float): The y-coordinate
-        z (float): The z-coordinate
-    """
-    super().__init__(longitude, latitude)
-    self._z = altitude
-
-  @property
-  def altitude(self) -> float:
-     return self._z
-  
-  @property
-  def z(self, value: float):
-     self._z = value
-
-  def distance_to(self, position: Position) -> float:
-    """
-    Calculate the Euclidean distance to another position.
-    
-    If the other position is 2D, the z component is ignored.
-    If the other position is 3D, all components are considered.
-    
-    Args:
-        position (Union[Position2D, Position3D]): Another position to calculate distance to
+      position (Position): Another position, expected to be PositionLatLon.
         
     Returns:
-        float: The Euclidean distance between positions
-        
-    Example:
-        >>> pos1 = Position3D(0, 0, 0)
-        >>> pos2 = Position3D(1, 1, 1)
-        >>> pos1.distance_to(pos2)
-        1.7320508075688772
+      float: The initial bearing in radians (0 = North, increasing clockwise).
     """
-    # If the other position is a Position2D, ignore z components
-    if not isinstance(position, (Position2DGCS, Position3DGCS)):
-        raise TypeError(f"Unsupported position type: {type(position).__name__}. "
-                       f"Must be Position2D or Position3D")
+    if not isinstance(position, PositionUTM):
+      raise TypeError(f"Unsupported position type for heading calculation: {type(position).__name__}. " f"Must be PositionLatLon")
     
-    horizonal_diff = super().distance_to(position)
-
-    if isinstance(position, Position2DGCS):
-        return horizonal_diff
-    else:
-       #TODO
-       pass
-
+    # geod.inv returns (azimuth1, azimuth2, distance)
+    azimuth1, _, _ = geod.inv(
+        self.longitude, self.latitude,
+        position.longitude, position.latitude
+    )
+    # Convert azimuth from degrees (pyproj default) to radians
+    return np.radians(azimuth1)
 
   def __str__(self):
-    return f'{type(self).__name__}({self.x:.2f}, {self.y:.2f}, {self.z:.2f})'
+    return f'{type(self).__name__}(lat={self.latitude:.5f}, lon={self.longitude:.5f})'
+  
+  def __repr__(self) -> str:
+    return f'{type(self).__name__}(latitude={self.latitude}, longitude={self.longitude})'
+    
+  def __eq__(self, other: object) -> bool:
+    """Check equality with another position."""
+    if not isinstance(other, PositionUTM):
+      return False
+    return np.allclose(self.latitude, other.latitude, atol=1e-9) and \
+           np.allclose(self.longitude, other.longitude, atol=1e-9)
+
+  # Geographic coordinates do not typically support direct vector addition/subtraction
+  # or scalar multiplication in the same way Cartesian coordinates do for movement.
+  # So, these are explicitly not implemented for PositionLatLon.
+  def __add__(self, other: 'Position') -> 'Position':
+      raise NotImplementedError("Vector addition is not directly supported for PositionUTM. Use movement functions or convert to Cartesian.")
+  def __sub__(self, other: 'Position') -> 'Position':
+      raise NotImplementedError("Vector subtraction is not directly supported for PositionUTM. Use movement functions or convert to Cartesian.")
+  def __mul__(self, scalar: float) -> 'Position':
+      raise NotImplementedError("Scalar multiplication is not directly supported for PositionUTM.")
+  def __rmul__(self, scalar: float) -> 'Position':
+      raise NotImplementedError("Scalar multiplication is not directly supported for PositionUTM.")
+  def __truediv__(self, scalar: float) -> 'Position':
+      raise NotImplementedError("Scalar division is not directly supported for PositionUTM.")

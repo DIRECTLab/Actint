@@ -2,18 +2,29 @@
 
 # Setup
 
-We use conda for environment management. To set up the environment, run the following command in the terminal:
+We use conda for environment management. To set up the environment, run the following command in the terminal, run the following from the actint directory (where this README is located):
 
 ```bash
-conda create -n actint python=3.12 -y
+conda create -n actint python=3.12 -y 
 conda activate actint
 pip install -r requirements.txt
+pip install -e .
 ```
 
-Then setup torch, scroll to the bottom of [this page](https://pytorch.org/) and copy the appropriate command for your system. For example, if you have an Nvidia GPU with cuda 13, you would run:
+you can inspect llm output easily with arize ai pheonix, run 
 
 ```bash
-pip3 install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cu130
+python -m phoenix.server.main serve
+```
+
+and make sure you have the following at the top of your smolagent.py file:
+
+```python
+from phoenix.otel import register
+from openinference.instrumentation.smolagents import SmolagentsInstrumentor
+
+register()
+SmolagentsInstrumentor().instrument()
 ```
 
 # Problem scope and user
