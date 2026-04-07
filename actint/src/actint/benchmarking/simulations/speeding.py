@@ -8,6 +8,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
+import numpy as np
 
 try:
 	from actint.benchmarking.simulations.base_simulation import BaseSimulation
@@ -141,7 +142,7 @@ class SpeedingSimulation(BaseSimulation):
 					ts = start_time + timedelta(minutes=step * interval_minutes)
 					end_time = ts
 
-					angle = rng.uniform(0.0, 2.0 * math.pi)
+					angle = rng.uniform(0.0, 2.0 * np.pi)
 					radial_nm = rng.uniform(0.0, radius_nm)
 					lat, lon = self.nm_offset_to_lat_lon(center_lat, center_lon, radial_nm, angle)
 

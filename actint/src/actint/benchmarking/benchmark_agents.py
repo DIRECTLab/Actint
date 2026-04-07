@@ -367,24 +367,10 @@ def _resolve_requested_benchmarks(
 	if only_benchmark:
 		requested_names = [only_benchmark]
 	else:
-		requested_names = []
-		for key in ("benchmark_names", "benchmarks"):
-			value = base_config.get(key)
-			if not isinstance(value, list):
-				continue
-			for item in value:
-				if isinstance(item, str):
-					requested_names.append(item)
-				elif isinstance(item, dict) and item.get("id"):
-					requested_names.append(str(item["id"]))
-
-	# Include inline full benchmark definitions from config for backward compatibility.
-	inline_benchmarks = [
-		item
-		for item in base_config.get("benchmarks", [])
-		if isinstance(item, dict) and item.get("prompt_template")
-	]
-	inline_ids = {str(item["id"]): item for item in inline_benchmarks if item.get("id")}
+		value = base_config.get("benchmark_names")
+		if not isinstance(value, list) or not value:
+			raise ValueError("Config must define non-empty benchmark_names")
+		requested_names = [item for item in value if isinstance(item, str)]
 
 	resolved: list[dict[str, Any]] = []
 	missing: list[str] = []
@@ -393,10 +379,6 @@ def _resolve_requested_benchmarks(
 		if benchmark_id in seen:
 			continue
 		seen.add(benchmark_id)
-
-		if benchmark_id in inline_ids:
-			resolved.append(inline_ids[benchmark_id])
-			continue
 
 		definition = catalog_map.get(benchmark_id)
 		if definition is None:
@@ -412,7 +394,7 @@ def _resolve_requested_benchmarks(
 
 	if not resolved:
 		raise ValueError(
-			"No benchmark definitions resolved. Check benchmark_names/benchmarks in config and "
+			"No benchmark definitions resolved. Check benchmark_names in config and "
 			"ensure matching catalog files are discoverable."
 		)
 
@@ -439,6 +421,18 @@ def load_config(
 		anomalies_root=anomalies_root,
 		extra_catalog_files=extra_catalog_files,
 	)
+	if only_benchmark and only_benchmark not in catalog_map and anomalies_root is not None:
+		catalog_path, _ = _ensure_benchmark_artifacts(only_benchmark, anomalies_root, None)
+		parsed = _read_yaml_or_json(catalog_path)
+		benchmarks = parsed.get("benchmarks", []) if isinstance(parsed, dict) else []
+		if isinstance(benchmarks, list):
+			for benchmark in benchmarks:
+				if not isinstance(benchmark, dict):
+					continue
+				benchmark_id = benchmark.get("id")
+				if not benchmark_id:
+					continue
+				catalog_map[str(benchmark_id)] = benchmark
 	resolved_benchmarks = _resolve_requested_benchmarks(data, catalog_map, only_benchmark)
 
 	data["benchmarks"] = resolved_benchmarks
@@ -739,8 +733,10 @@ def validate_loitering_detection(
 	detected_expected = sorted(expected_set.intersection(found_set))
 	missed_expected = sorted(expected_set.difference(found_set))
 	false_positives = sorted(found_set.difference(expected_set))
+	expected_count = len(expected)
+	found_percent = (len(detected_expected) / expected_count * 100.0) if expected_count else 0.0
 
-	minimum_detected = int(validation_config.get("minimum_detected", len(expected)))
+	minimum_detected = int(validation_config.get("minimum_detected", expected_count))
 	require_all_expected = bool(validation_config.get("require_all_expected", False))
 
 	success = len(detected_expected) >= minimum_detected
@@ -751,7 +747,7 @@ def validate_loitering_detection(
 		"success": success,
 		"expected": {
 			"expected_loitering_mmsis": expected,
-			"expected_count": len(expected),
+			"expected_count": expected_count,
 		},
 		"predicted": {
 			"reported_mmsis": found,
@@ -760,6 +756,7 @@ def validate_loitering_detection(
 		"metrics": {
 			"minimum_detected": minimum_detected,
 			"detected_expected_count": len(detected_expected),
+			"detected_expected_percent": found_percent,
 			"detected_expected_mmsis": detected_expected,
 			"missed_expected_mmsis": missed_expected,
 			"false_positive_mmsis": false_positives,
@@ -784,8 +781,10 @@ def validate_disappearance_detection(
 	detected_expected = sorted(expected_set.intersection(found_set))
 	missed_expected = sorted(expected_set.difference(found_set))
 	false_positives = sorted(found_set.difference(expected_set))
+	expected_count = len(expected)
+	found_percent = (len(detected_expected) / expected_count * 100.0) if expected_count else 0.0
 
-	minimum_detected = int(validation_config.get("minimum_detected", len(expected)))
+	minimum_detected = int(validation_config.get("minimum_detected", expected_count))
 	require_all_expected = bool(validation_config.get("require_all_expected", False))
 
 	success = len(detected_expected) >= minimum_detected
@@ -796,7 +795,7 @@ def validate_disappearance_detection(
 		"success": success,
 		"expected": {
 			"expected_disappearance_mmsis": expected,
-			"expected_count": len(expected),
+			"expected_count": expected_count,
 		},
 		"predicted": {
 			"reported_mmsis": found,
@@ -805,6 +804,7 @@ def validate_disappearance_detection(
 		"metrics": {
 			"minimum_detected": minimum_detected,
 			"detected_expected_count": len(detected_expected),
+			"detected_expected_percent": found_percent,
 			"detected_expected_mmsis": detected_expected,
 			"missed_expected_mmsis": missed_expected,
 			"false_positive_mmsis": false_positives,
@@ -829,8 +829,10 @@ def validate_speeding_detection(
 	detected_expected = sorted(expected_set.intersection(found_set))
 	missed_expected = sorted(expected_set.difference(found_set))
 	false_positives = sorted(found_set.difference(expected_set))
+	expected_count = len(expected)
+	found_percent = (len(detected_expected) / expected_count * 100.0) if expected_count else 0.0
 
-	minimum_detected = int(validation_config.get("minimum_detected", len(expected)))
+	minimum_detected = int(validation_config.get("minimum_detected", expected_count))
 	require_all_expected = bool(validation_config.get("require_all_expected", False))
 
 	success = len(detected_expected) >= minimum_detected
@@ -841,7 +843,7 @@ def validate_speeding_detection(
 		"success": success,
 		"expected": {
 			"expected_speeding_mmsis": expected,
-			"expected_count": len(expected),
+			"expected_count": expected_count,
 		},
 		"predicted": {
 			"reported_mmsis": found,
@@ -850,6 +852,7 @@ def validate_speeding_detection(
 		"metrics": {
 			"minimum_detected": minimum_detected,
 			"detected_expected_count": len(detected_expected),
+			"detected_expected_percent": found_percent,
 			"detected_expected_mmsis": detected_expected,
 			"missed_expected_mmsis": missed_expected,
 			"false_positive_mmsis": false_positives,
@@ -1204,6 +1207,7 @@ def write_csv_results(results: dict[str, Any], csv_path: Path) -> None:
 		"latitude_tolerance",
 		"longitude_tolerance",
 		"timestamp_match",
+		"detected_expected_percent",
 	]
 
 	csv_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1241,6 +1245,7 @@ def write_csv_results(results: dict[str, Any], csv_path: Path) -> None:
 					"latitude_tolerance": metrics.get("latitude_tolerance"),
 					"longitude_tolerance": metrics.get("longitude_tolerance"),
 					"timestamp_match": metrics.get("timestamp_match"),
+					"detected_expected_percent": metrics.get("detected_expected_percent"),
 				}
 			)
 
