@@ -18,6 +18,11 @@ async def handle_recieve_message(sid, data):
         "direction": 'incoming',
         "position": 'single',
     }
+
+
+
+
+
     print(newMessage)
     await sio.emit("send_response", newMessage, to=sid)
     
@@ -40,7 +45,9 @@ def set_map_position(sid, lat, lon, zoom):
         "lat": lat, 
         "lon": lon, 
         "zoom": zoom
-    }, to=sid))
+    })) #This will need to have to=sid added back later after the tool can be accessed by the LLM
+
+    
 
 # 4. Handle Disconnect
 @sio.event

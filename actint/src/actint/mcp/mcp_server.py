@@ -506,6 +506,30 @@ def query_database(sql_query: str, max_rows: int | str = 200) -> str:
 
 
 # ============================================================================
+# Tools: Map positioning 
+# ============================================================================
+from ....data.live_db.chat_manager import set_map_position
+
+@mcp.tool()
+def position_map(lat: float, lon: float, zoom: int) -> str:
+    """
+    Position the map the user is looking at to a certain lattitude, longitude and zoom.
+    
+    Args:
+        lat (float): Latitude of the location to position the map to
+        lon (float): Longitude of the location to position the map to
+        zoom (int): Zoom level for the map
+    
+    Returns:
+        str: JSON string with the result of the map positioning operation
+    """
+    try:
+        set_map_position(lat=lat, lon=lon, zoom=zoom)
+        return json.dumps({"result": "Map positioned successfully"})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+# ============================================================================
 # Server Entry Point
 # ============================================================================
 
