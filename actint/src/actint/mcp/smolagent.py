@@ -10,16 +10,12 @@ from openinference.instrumentation.smolagents import SmolagentsInstrumentor
 register(project_name="actint")
 SmolagentsInstrumentor().instrument()
 
-##### Required pip packages #####
-# fastmcp
-# smolagents
-# 'smolagents[mcp]'
-
 model_id = "Qwen/Qwen3.5-9B"
 # model_id = "Qwen/Qwen2-7B-Instruct"
 
 conda_prefix = os.getenv("CONDA_PREFIX")
 python = str(Path(conda_prefix) / "bin" / "python")
+
 
 
 server_params = StdioServerParameters(
@@ -34,11 +30,16 @@ try:
     tools = mcp_client.get_tools()
 
     model = TransformersModel(model_id=model_id)
+
     agent = ToolCallingAgent(tools=tools, model=model)
 
-    result = agent.run("Are there any anomolies in the data?")
+    if ('Qwen3.5' in model_id):
+        template_path = Path(__file__).with_name("qwen_system_prompt_template.jinja")
+        qwen_system_prompt_template = template_path.read_text(encoding="utf-8")
+        agent.prompt_templates["system_prompt"] = qwen_system_prompt_template
+
+    result = agent.run("Where is the USS Montgomery currently heading?")
+
     # GradioUI(agent).launch()
-    # with open("agent_log.txt", "w") as f:
-    #     print(agent.write_memory_to_messages(), file=f)
 finally:
     mcp_client.disconnect()
