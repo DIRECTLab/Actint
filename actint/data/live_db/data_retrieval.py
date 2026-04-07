@@ -115,12 +115,16 @@ def get_positions_before_time(target_time):
                 FROM ais_positions 
                 WHERE base_datetime <= ?
                 AND mmsi = {MMSI}
-                ORDER BY base_datetime ASC
-                LIMIT {NUMBER_PREVIOUS_DISPLAYED_DETECTIONS}
-            """
+                ORDER BY base_datetime DESC
+                """
 
             cursor.execute(query, (str(target_time),))
             mmsi_locations = cursor.fetchall()
+            if MMSI == 369970707:
+                print(mmsi_locations)
+                print(str(target_time))
+            mmsi_locations = mmsi_locations[:NUMBER_PREVIOUS_DISPLAYED_DETECTIONS]
+            mmsi_locations.reverse()
             mmsi_locations_result = []
             for mmsi_location in mmsi_locations:
                 mmsi_locations_result.append(create_json_packet(mmsi_location))
