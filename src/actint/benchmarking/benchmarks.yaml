@@ -39,7 +39,7 @@ agents:
 benchmarks:
   - id: loitering_detection_injected
     mmsis: [338812000, 338839000, 368988000, 369970968, 366984000]
-  # - id: speeding_detection_injected
-  #   mmsis: [338812000, 338839000, 368702000, 369970707, 369970968]
+  - id: speeding_detection_injected
+    mmsis: [338812000, 338839000, 368702000, 369970707, 369970968]
   - id: disappearance_detection_injected
     mmsis: [338951000, 369970719, 369970709, 369970707, 368869000]
