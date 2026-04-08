@@ -60,37 +60,6 @@ mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 # ============================================================================
 
 @mcp.tool()
-def get_vessel_locations(mmsi: int | str) -> str:
-    """Get all recorded positions for a specific vessel identified by MMSI.
-    
-    Args:
-        mmsi (int): Maritime Mobile Service Identity number of the vessel
-    
-    Returns:
-        str: JSON list of vessel positions with coordinates, timestamps, and speed data
-    """
-    try:
-        mmsi = int(mmsi)
-        locations = get_vehicle_locations(mmsi)
-        result_data = [
-            {
-                "mmsi": loc.mmsi,
-                "vessel_name": loc.vessel_name,
-                "timestamp": loc.timestamp,
-                "latitude": loc.lat,
-                "longitude": loc.lon,
-                "speed_over_ground": loc.sog,
-                "course_over_ground": loc.cog,
-                "heading": loc.heading,
-            }
-            for loc in locations
-        ]
-        return json.dumps(result_data, indent=2)
-    except Exception as e:
-        return json.dumps({"error": str(e)})
-
-
-@mcp.tool()
 def get_vessel_current_position(mmsi: int | str) -> str:
     """Get the most recent position of a vessel.
     
