@@ -10,6 +10,13 @@ src/actint.egg-info/requires.txt
 src/actint.egg-info/top_level.txt
 src/actint/actint_logging/__init__.py
 src/actint/actint_logging/logger.py
+src/actint/benchmarking/__init__.py
+src/actint/benchmarking/benchmark_agents.py
+src/actint/benchmarking/simulations/__init__.py
+src/actint/benchmarking/simulations/base_simulation.py
+src/actint/benchmarking/simulations/disappearance.py
+src/actint/benchmarking/simulations/loitering.py
+src/actint/benchmarking/simulations/speeding.py
 src/actint/data_processing/__init__.py
 src/actint/data_processing/json_to_db.py
 src/actint/data_processing/query_database.py

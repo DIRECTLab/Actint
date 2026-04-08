@@ -254,50 +254,6 @@ def find_nearest_waterway(latitude: float | str, longitude: float | str) -> str:
     except Exception as e:
         return json.dumps({"error": str(e)})
 
-
-# ============================================================================
-# Tools: Fleet Analysis
-# ============================================================================
-
-@mcp.tool()
-def calculate_fleet_position(fleet_name: str) -> str:
-    """Calculate the average position of a fleet of vessels.
-    
-    Args:
-        fleet_name (str): Canonical name of the fleet
-    
-    Returns:
-        str: JSON with fleet position (latitude and longitude)
-    """
-    try:
-        lat, lon = calc_fleet_position(fleet_name)
-        result = {
-            "fleet_name": fleet_name,
-            "fleet_position": {"latitude": lat, "longitude": lon}
-        }
-        return json.dumps(result, indent=2)
-    except Exception as e:
-        return json.dumps({"error": str(e)})
-
-
-@mcp.tool()
-def is_ship_in_fleet(mmsi: int | str) -> str:
-    """Check if a vessel is within fleet proximity (10 nautical miles).
-    
-    Args:
-        mmsi (int): MMSI of the vessel to check
-    
-    Returns:
-        str: String indicating if ship is in fleet or outside fleet proximity
-    """
-    try:
-        mmsi = int(mmsi)
-        result_str = check_ship_in_fleet(mmsi)
-        return json.dumps({"proximity_check": result_str})
-    except Exception as e:
-        return json.dumps({"error": str(e)})
-
-
 # ============================================================================
 # Tools: Destination Prediction
 # ============================================================================
