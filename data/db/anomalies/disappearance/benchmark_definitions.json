@@ -1,0 +1,27 @@
+{
+  "benchmarks": [
+    {
+      "id": "disappearance_detection_injected",
+      "description": "Detect synthetic disappearance anomalies injected into the AIS database. Success requires detecting all injected disappearance anomaly MMSIs; additional MMSIs are allowed.",
+      "runs": 1,
+      "prompt_template": "Use available MCP tools to identify ships that suddenly stop reporting.\\nReturn ONLY valid JSON with this exact shape:\\n{\\\"disappearance_mmsi\\\": [<int>, <int>, ...]}",
+      "input_source": {
+        "type": "fixed",
+        "values": {
+          "expected_disappearance_mmsis": [
+            338951000,
+            369970719,
+            369970709,
+            369970707,
+            368869000
+          ]
+        }
+      },
+      "validation": {
+        "method": "disappearance_detection",
+        "minimum_detected": 5,
+        "require_all_expected": true
+      }
+    }
+  ]
+}

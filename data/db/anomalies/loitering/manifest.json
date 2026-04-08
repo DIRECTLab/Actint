@@ -1,0 +1,73 @@
+{
+  "created_at": "2026-04-08T16:00:55.564520Z",
+  "source_db": "/home/isaacp/repos/directlabs/JFN-Groundtruth-Simulator/actint/data/db/ais.db",
+  "output_db": "/home/isaacp/repos/directlabs/JFN-Groundtruth-Simulator/actint/data/db/anomalies/loitering/ais_loitering.db",
+  "anomaly_count": 5,
+  "anomalies": [
+    {
+      "anomaly_id": "LOITER-338812000",
+      "mmsi": 338812000,
+      "vessel_name": "USS LASSEN",
+      "source_mmsi": 338812000,
+      "source_vessel_name": "USS LASSEN",
+      "center_lat": 30.397274538812784,
+      "center_lon": -81.41472566210045,
+      "radius_nm": 0.4,
+      "start_time": "2023-01-01T00:00:01",
+      "end_time": "2023-01-01T19:28:26",
+      "point_count": 391
+    },
+    {
+      "anomaly_id": "LOITER-338839000",
+      "mmsi": 338839000,
+      "vessel_name": "USS FITZGERALD",
+      "source_mmsi": 338839000,
+      "source_vessel_name": "USS FITZGERALD",
+      "center_lat": 32.67559174577635,
+      "center_lon": -117.12248802091713,
+      "radius_nm": 0.4,
+      "start_time": "2023-01-01T00:00:01",
+      "end_time": "2023-01-01T18:51:28",
+      "point_count": 378
+    },
+    {
+      "anomaly_id": "LOITER-368988000",
+      "mmsi": 368988000,
+      "vessel_name": "USS VICKSBURG",
+      "source_mmsi": 368988000,
+      "source_vessel_name": "USS VICKSBURG",
+      "center_lat": 29.908557510548523,
+      "center_lon": -90.09691675105486,
+      "radius_nm": 0.4,
+      "start_time": "2023-01-01T00:00:01",
+      "end_time": "2023-01-01T18:58:23",
+      "point_count": 380
+    },
+    {
+      "anomaly_id": "LOITER-369970968",
+      "mmsi": 369970968,
+      "vessel_name": "USS SIOUX CITY",
+      "source_mmsi": 369970968,
+      "source_vessel_name": "USS SIOUX CITY",
+      "center_lat": 30.390262777777778,
+      "center_lon": -81.4105449537037,
+      "radius_nm": 0.4,
+      "start_time": "2023-01-01T00:00:01",
+      "end_time": "2023-01-01T18:43:59",
+      "point_count": 375
+    },
+    {
+      "anomaly_id": "LOITER-366984000",
+      "mmsi": 366984000,
+      "vessel_name": "USS THEODORE ROOSEVE",
+      "source_mmsi": 366984000,
+      "source_vessel_name": "USS THEODORE ROOSEVE",
+      "center_lat": 47.943956090651554,
+      "center_lon": -122.94206181303116,
+      "radius_nm": 0.4,
+      "start_time": "2023-01-01T00:00:01",
+      "end_time": "2023-01-01T20:20:26",
+      "point_count": 408
+    }
+  ]
+}

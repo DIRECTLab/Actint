@@ -1,0 +1,103 @@
+{
+  "started_at": "2026-04-03T03:08:27.599986+00:00",
+  "finished_at": "2026-04-03T03:09:26.641134+00:00",
+  "sqlite_path": "/home/isaacp/repos/directlabs/JFN-Groundtruth-Simulator/actint/data/db/ais.db",
+  "summary": {
+    "total_runs": 2,
+    "successful_runs": 2,
+    "success_rate": 1.0,
+    "average_duration_sec": 7.525865563002299,
+    "by_agent": {
+      "qwen35_9b": {
+        "runs": 1,
+        "successes": 1,
+        "avg_duration_sec": 10.438846085002297,
+        "success_rate": 1.0
+      },
+      "qwen2_7b_instruct": {
+        "runs": 1,
+        "successes": 1,
+        "avg_duration_sec": 4.612885041002301,
+        "success_rate": 1.0
+      }
+    },
+    "by_benchmark": {
+      "current_ship_location_latest_record": {
+        "runs": 2,
+        "successes": 2,
+        "avg_duration_sec": 7.525865563002299,
+        "success_rate": 1.0
+      }
+    }
+  },
+  "results": [
+    {
+      "agent": "qwen35_9b",
+      "model_id": "Qwen/Qwen3.5-9B",
+      "benchmark_id": "current_ship_location_latest_record",
+      "run_index": 0,
+      "runtime_inputs": {
+        "mmsi": 368702000
+      },
+      "prompt": "Use available MCP tools to find the vessel's most recent AIS position.\nMMSI: 368702000\n\nReturn ONLY valid JSON with this exact shape:\n{\"mmsi\": <int>, \"latitude\": <float>, \"longitude\": <float>, \"timestamp\": \"<iso8601>\"}\n",
+      "duration_sec": 10.438846085002297,
+      "agent_output": "{\"mmsi\": 368702000, \"latitude\": 36.47144, \"longitude\": -74.86544, \"timestamp\": \"2023-01-01T23:59:56.000000\"}",
+      "validation": {
+        "success": true,
+        "expected": {
+          "mmsi": 368702000,
+          "latitude": 36.47144,
+          "longitude": -74.86544,
+          "timestamp": "2023-01-01T23:59:56.000000"
+        },
+        "predicted": {
+          "mmsi": 368702000,
+          "latitude": 36.47144,
+          "longitude": -74.86544,
+          "timestamp": "2023-01-01T23:59:56.000000"
+        },
+        "metrics": {
+          "latitude_error": 0.0,
+          "longitude_error": 0.0,
+          "latitude_tolerance": 0.02,
+          "longitude_tolerance": 0.02,
+          "timestamp_match": true
+        }
+      }
+    },
+    {
+      "agent": "qwen2_7b_instruct",
+      "model_id": "Qwen/Qwen2-7B-Instruct",
+      "benchmark_id": "current_ship_location_latest_record",
+      "run_index": 0,
+      "runtime_inputs": {
+        "mmsi": 368702000
+      },
+      "prompt": "Use available MCP tools to find the vessel's most recent AIS position.\nMMSI: 368702000\n\nReturn ONLY valid JSON with this exact shape:\n{\"mmsi\": <int>, \"latitude\": <float>, \"longitude\": <float>, \"timestamp\": \"<iso8601>\"}\n",
+      "duration_sec": 4.612885041002301,
+      "agent_output": "{\"mmsi\": 368702000, \"latitude\": 36.47144, \"longitude\": -74.86544, \"timestamp\": \"2023-01-01T23:59:56.000000\"}",
+      "validation": {
+        "success": true,
+        "expected": {
+          "mmsi": 368702000,
+          "latitude": 36.47144,
+          "longitude": -74.86544,
+          "timestamp": "2023-01-01T23:59:56.000000"
+        },
+        "predicted": {
+          "mmsi": 368702000,
+          "latitude": 36.47144,
+          "longitude": -74.86544,
+          "timestamp": "2023-01-01T23:59:56.000000"
+        },
+        "metrics": {
+          "latitude_error": 0.0,
+          "longitude_error": 0.0,
+          "latitude_tolerance": 0.02,
+          "longitude_tolerance": 0.02,
+          "timestamp_match": true
+        }
+      }
+    }
+  ]
+}

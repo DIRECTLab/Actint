@@ -1,0 +1,68 @@
+{
+  "created_at": "2026-04-08T16:00:59.558343Z",
+  "source_db": "/home/isaacp/repos/directlabs/JFN-Groundtruth-Simulator/actint/data/db/ais.db",
+  "output_db": "/home/isaacp/repos/directlabs/JFN-Groundtruth-Simulator/actint/data/db/anomalies/disappearance/ais_disappearance.db",
+  "anomaly_count": 5,
+  "anomalies": [
+    {
+      "anomaly_id": "DISAPPEAR-338951000",
+      "mmsi": 338951000,
+      "vessel_name": "USS LAKE CHAMPLAIN",
+      "source_mmsi": 338951000,
+      "source_vessel_name": "USS LAKE CHAMPLAIN",
+      "start_time": "2023-01-01T00:00:01",
+      "end_time": "2023-01-01T06:26:51",
+      "point_count": 391,
+      "interval_seconds": 59.5146112237139,
+      "mean_sog_knots": 11.996
+    },
+    {
+      "anomaly_id": "DISAPPEAR-369970719",
+      "mmsi": 369970719,
+      "vessel_name": "USS ARLINGTON",
+      "source_mmsi": 369970719,
+      "source_vessel_name": "USS ARLINGTON",
+      "start_time": "2023-01-01T00:00:01",
+      "end_time": "2023-01-01T06:35:36",
+      "point_count": 397,
+      "interval_seconds": 59.93810097013572,
+      "mean_sog_knots": 12.024
+    },
+    {
+      "anomaly_id": "DISAPPEAR-369970709",
+      "mmsi": 369970709,
+      "vessel_name": "USS LITTLE ROCK",
+      "source_mmsi": 369970709,
+      "source_vessel_name": "USS LITTLE ROCK",
+      "start_time": "2023-01-01T00:00:01",
+      "end_time": "2023-01-01T06:54:21",
+      "point_count": 417,
+      "interval_seconds": 59.76032392256545,
+      "mean_sog_knots": 11.991
+    },
+    {
+      "anomaly_id": "DISAPPEAR-369970707",
+      "mmsi": 369970707,
+      "vessel_name": "USS MILWAUKEE",
+      "source_mmsi": 369970707,
+      "source_vessel_name": "USS MILWAUKEE",
+      "start_time": "2023-01-01T00:00:01",
+      "end_time": "2023-01-01T06:35:51",
+      "point_count": 402,
+      "interval_seconds": 59.2279741258221,
+      "mean_sog_knots": 12.012
+    },
+    {
+      "anomaly_id": "DISAPPEAR-368869000",
+      "mmsi": 368869000,
+      "vessel_name": "USS O'KANE",
+      "source_mmsi": 368869000,
+      "source_vessel_name": "USS O'KANE",
+      "start_time": "2023-01-01T00:00:01",
+      "end_time": "2023-01-01T06:36:25",
+      "point_count": 398,
+      "interval_seconds": 59.909868089223,
+      "mean_sog_knots": 11.995
+    }
+  ]
+}

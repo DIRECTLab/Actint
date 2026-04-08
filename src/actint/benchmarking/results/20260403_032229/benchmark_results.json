@@ -1,0 +1,130 @@
+{
+  "started_at": "2026-04-03T03:22:29.488105+00:00",
+  "finished_at": "2026-04-03T03:24:18.210956+00:00",
+  "sqlite_path": "/home/isaacp/repos/directlabs/JFN-Groundtruth-Simulator/actint/data/db/ais.db",
+  "summary": {
+    "total_runs": 3,
+    "successful_runs": 2,
+    "success_rate": 0.6666666666666666,
+    "average_duration_sec": 17.4093599909999,
+    "by_agent": {
+      "qwen35_9b": {
+        "runs": 1,
+        "successes": 1,
+        "avg_duration_sec": 47.5285688820004,
+        "success_rate": 1.0
+      },
+      "qwen2_7b_instruct": {
+        "runs": 1,
+        "successes": 1,
+        "avg_duration_sec": 4.6947186430006695,
+        "success_rate": 1.0
+      },
+      "mistralai/Mistral-7B-v0.1": {
+        "runs": 1,
+        "successes": 0,
+        "avg_duration_sec": 0.0047924479986249935,
+        "success_rate": 0.0
+      }
+    },
+    "by_benchmark": {
+      "current_ship_location_latest_record": {
+        "runs": 3,
+        "successes": 2,
+        "avg_duration_sec": 17.4093599909999,
+        "success_rate": 0.6666666666666666
+      }
+    }
+  },
+  "results": [
+    {
+      "agent": "qwen35_9b",
+      "model_id": "Qwen/Qwen3.5-9B",
+      "benchmark_id": "current_ship_location_latest_record",
+      "run_index": 0,
+      "runtime_inputs": {
+        "mmsi": 368702000
+      },
+      "prompt": "Use available MCP tools to find the vessel's most recent AIS position.\nMMSI: 368702000\n\nReturn ONLY valid JSON with this exact shape:\n{\"mmsi\": <int>, \"latitude\": <float>, \"longitude\": <float>, \"timestamp\": \"<iso8601>\"}\n",
+      "duration_sec": 47.5285688820004,
+      "agent_output": "{\"mmsi\": 368702000, \"latitude\": 36.47144, \"longitude\": -74.86544, \"timestamp\": \"2023-01-01T23:59:56.000000\"}",
+      "validation": {
+        "success": true,
+        "expected": {
+          "mmsi": 368702000,
+          "latitude": 36.47144,
+          "longitude": -74.86544,
+          "timestamp": "2023-01-01T23:59:56.000000"
+        },
+        "predicted": {
+          "mmsi": 368702000,
+          "latitude": 36.47144,
+          "longitude": -74.86544,
+          "timestamp": "2023-01-01T23:59:56.000000"
+        },
+        "metrics": {
+          "latitude_error": 0.0,
+          "longitude_error": 0.0,
+          "latitude_tolerance": 0.02,
+          "longitude_tolerance": 0.02,
+          "timestamp_match": true
+        }
+      }
+    },
+    {
+      "agent": "qwen2_7b_instruct",
+      "model_id": "Qwen/Qwen2-7B-Instruct",
+      "benchmark_id": "current_ship_location_latest_record",
+      "run_index": 0,
+      "runtime_inputs": {
+        "mmsi": 368702000
+      },
+      "prompt": "Use available MCP tools to find the vessel's most recent AIS position.\nMMSI: 368702000\n\nReturn ONLY valid JSON with this exact shape:\n{\"mmsi\": <int>, \"latitude\": <float>, \"longitude\": <float>, \"timestamp\": \"<iso8601>\"}\n",
+      "duration_sec": 4.6947186430006695,
+      "agent_output": {
+        "mmsi": 368702000,
+        "latitude": 36.47144,
+        "longitude": -74.86544,
+        "timestamp": "2023-01-01T23:59:56.000000"
+      },
+      "validation": {
+        "success": true,
+        "expected": {
+          "mmsi": 368702000,
+          "latitude": 36.47144,
+          "longitude": -74.86544,
+          "timestamp": "2023-01-01T23:59:56.000000"
+        },
+        "predicted": {
+          "mmsi": 368702000,
+          "latitude": 36.47144,
+          "longitude": -74.86544,
+          "timestamp": "2023-01-01T23:59:56.000000"
+        },
+        "metrics": {
+          "latitude_error": 0.0,
+          "longitude_error": 0.0,
+          "latitude_tolerance": 0.02,
+          "longitude_tolerance": 0.02,
+          "timestamp_match": true
+        }
+      }
+    },
+    {
+      "agent": "mistralai/Mistral-7B-v0.1",
+      "model_id": "mistralai/Mistral-7B-v0.1",
+      "benchmark_id": "current_ship_location_latest_record",
+      "run_index": 0,
+      "runtime_inputs": {
+        "mmsi": 368702000
+      },
+      "prompt": "Use available MCP tools to find the vessel's most recent AIS position.\nMMSI: 368702000\n\nReturn ONLY valid JSON with this exact shape:\n{\"mmsi\": <int>, \"latitude\": <float>, \"longitude\": <float>, \"timestamp\": \"<iso8601>\"}\n",
+      "duration_sec": 0.0047924479986249935,
+      "agent_output": null,
+      "validation": {
+        "success": false,
+        "error": "Agent execution failed: Error while generating output:\nCannot use chat template functions because tokenizer.chat_template is not set and no template argument was passed! For information about writing templates and setting the tokenizer.chat_template attribute, please see the documentation at https://huggingface.co/docs/transformers/main/en/chat_templating"
+      }
+    }
+  ]
+}

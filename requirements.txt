@@ -1,0 +1,36 @@
+# Consolidated dependencies for the ACTINT package + MCP/LLM servers.
+#
+# Install:
+#   pip install -r actint/requirements.txt
+
+# Core scientific stack
+numpy
+pandas
+matplotlib
+
+# Geospatial
+geopy
+reverse_geocoder
+
+# LLM
+torch
+torchvision
+transformers
+accelerate
+
+# Optional RAG / vector DB (required by some actint.data_processing modules)
+chromadb
+
+# MCP + HTTP server
+fastmcp
+fastapi
+uvicorn
+pydantic
+httpx
+python-dotenv
+smolagents[mcp]
+smolagents[gradio]
+smolagents[telemetry,toolkit]
+git+https://github.com/DIRECTLab/smolagents
+huggingface_hub
+huggingface_hub[mcp]
