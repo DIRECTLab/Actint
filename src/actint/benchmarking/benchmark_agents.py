@@ -296,7 +296,7 @@ def run_all_benchmarks(
 		aggregate_output_path.unlink()
 
 	# Ensure all benchmark artifacts exist once before executing any agent runs.
-	resolved_benchmarks: list[str] = []
+	resolved_benchmarks: list[dict[str, Any]] = []
 	for benchmark_spec in benchmark_specs:
 		benchmark_id = benchmark_spec["id"]
 		benchmark_override_mmsis = benchmark_spec.get("mmsis")
@@ -312,7 +312,13 @@ def run_all_benchmarks(
 			only_agent,
 			replace_mmsis,
 		)
-		resolved_benchmarks.append(benchmark_id)
+		resolved_benchmarks.append(
+			{
+				"id": benchmark_id,
+				"catalog_path": catalog_path,
+				"db_path": db_path,
+			}
+		)
 		print(
 			f"[run-all] Prepared benchmark '{benchmark_id}' artifacts: "
 			f"catalog={catalog_path.name}, db={db_path.name}"
@@ -342,28 +348,45 @@ def run_all_benchmarks(
 		raise ValueError("No runnable agents resolved for --run-all-benchmarks")
 
 	for agent_name in agent_names:
-		cmd = [
-			sys.executable,
-			str(Path(__file__).resolve()),
-			"--config",
-			str(config_path),
-			"--agent",
-			agent_name,
-			"--anomalies-root",
-			str(anomalies_root),
-			"--merge-into",
-			str(aggregate_output_path),
-		]
-
 		print(
 			f"[run-all] Running agent '{agent_name}' across "
 			f"{len(resolved_benchmarks)} benchmarks"
 		)
-		proc = subprocess.run(cmd)
-		if proc.returncode != 0:
-			raise RuntimeError(
-				f"Benchmark run failed for agent '{agent_name}' (exit {proc.returncode})"
+		for benchmark_info in resolved_benchmarks:
+			benchmark_id = str(benchmark_info["id"])
+			catalog_path = Path(benchmark_info["catalog_path"])
+			db_path = Path(benchmark_info["db_path"])
+
+			cmd = [
+				sys.executable,
+				str(Path(__file__).resolve()),
+				"--config",
+				str(config_path),
+				"--agent",
+				agent_name,
+				"--benchmark",
+				benchmark_id,
+				"--sqlite-path",
+				str(db_path),
+				"--benchmark-catalog",
+				str(catalog_path),
+				"--anomalies-root",
+				str(anomalies_root),
+				"--merge-into",
+				str(aggregate_output_path),
+			]
+
+			print(
+				f"[run-all] Agent '{agent_name}' benchmark '{benchmark_id}' "
+				f"using db={db_path.name}"
 			)
+			proc = subprocess.run(cmd)
+			if proc.returncode != 0:
+				raise RuntimeError(
+					"Benchmark run failed for "
+					f"agent '{agent_name}', benchmark '{benchmark_id}' "
+					f"(exit {proc.returncode})"
+				)
 
 	with aggregate_output_path.open("r", encoding="utf-8") as f:
 		return json.load(f)
