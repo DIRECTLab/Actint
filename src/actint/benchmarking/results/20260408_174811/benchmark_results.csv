@@ -1,0 +1,5 @@
+agent,model_id,benchmark_id,run_index,duration_sec,success,error,input_mmsi,expected_mmsi,expected_latitude,expected_longitude,expected_timestamp,predicted_mmsi,predicted_latitude,predicted_longitude,predicted_timestamp,latitude_error,longitude_error,latitude_tolerance,longitude_tolerance,timestamp_match,detected_expected_percent
+qwen35_9b,Qwen/Qwen3.5-9B,loitering_detection_injected,0,181.84223556006327,False,,,,,,,,,,,,,,,,80.0
+qwen35_9b,Qwen/Qwen3.5-9B,disappearance_detection_injected,0,261.94733498082496,True,,,,,,,,,,,,,,,,100.0
+Qwen/Qwen3.5-27B,Qwen/Qwen3.5-27B,loitering_detection_injected,0,158.02665995806456,False,,,,,,,,,,,,,,,,80.0
+Qwen/Qwen3.5-27B,Qwen/Qwen3.5-27B,disappearance_detection_injected,0,348.90377974300645,True,,,,,,,,,,,,,,,,100.0
