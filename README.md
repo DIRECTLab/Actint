@@ -11,7 +11,13 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-you can inspect llm output easily with arize ai pheonix, run 
+you can then run the benchmarks
+
+```bash
+python -m actint.benchmarking.benchmark_agents --run-all-benchmarks
+```
+
+you can inspect llm output easily with arize ai pheonix, in another terminal run 
 
 ```bash
 python -m phoenix.server.main serve
