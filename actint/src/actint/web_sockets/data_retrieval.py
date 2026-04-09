@@ -7,11 +7,14 @@ import socketio
 import eventlet
 import asyncio
 import uvicorn
+from pathlib import Path
 
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*') # Allow your React app to connect
 app = socketio.ASGIApp(sio)
 
-BASE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
+
+BASE_DIRECTORY = Path(__file__).resolve().parent.parent.parent.parent / "data"
+print(BASE_DIRECTORY)
 
 NUMBER_PREVIOUS_DISPLAYED_DETECTIONS = 20
 
@@ -78,7 +81,7 @@ def setup():
 
 
 def get_next_detection(offset):
-    with sqlite3.connect('../db/ais.db') as conn:
+    with sqlite3.connect(BASE_DIRECTORY / 'db' / 'ais.db') as conn:
         cursor = conn.cursor()
 
 
@@ -101,7 +104,7 @@ def get_positions_before_time(target_time):
     Returns a list of positions that occurred before the target_time.
     target_time should be a string in 'YYYY-MM-DD HH:MM:SS' format.
     """
-    with sqlite3.connect('../db/ais.db') as conn:
+    with sqlite3.connect(BASE_DIRECTORY / 'db' / 'ais.db') as conn:
 
         cursor = conn.cursor()
 
@@ -141,7 +144,7 @@ def get_positions_after_time(target_time):
     Returns a list of positions that occurred after the target_time.
     target_time should be a string in 'YYYY-MM-DD HH:MM:SS' format.
     """
-    with sqlite3.connect('../db/ais.db') as conn:
+    with sqlite3.connect(BASE_DIRECTORY / 'db' / 'ais.db') as conn:
         cursor = conn.cursor()
 
         # We filter with WHERE and sort by time to keep it chronological

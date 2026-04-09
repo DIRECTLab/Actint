@@ -7,11 +7,12 @@ import socketio
 import eventlet
 import asyncio
 import uvicorn
+from pathlib import Path
 
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*') # Allow your React app to connect
 app = socketio.ASGIApp(sio)
 
-BASE_DIRECTORY = os.path.dirname(os.path.abspath(__file__))
+BASE_DIRECTORY = Path(__file__).resolve().parent.parent.parent.parent
 
 def setup():
     with sqlite3.connect('live_ais.db') as conn:

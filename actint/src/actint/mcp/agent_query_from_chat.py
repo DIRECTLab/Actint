@@ -11,8 +11,8 @@ def run_agent(query: str):
     register(project_name="actint")
     SmolagentsInstrumentor().instrument()
 
-    model_id = "Qwen/Qwen3.5-9B"
-    # model_id = "Qwen/Qwen2-7B-Instruct"
+    #model_id = "Qwen/Qwen3.5-9B"
+    model_id = "Qwen/Qwen2-7B-Instruct"
 
     conda_prefix = os.getenv("CONDA_PREFIX")
     python = str(Path(conda_prefix) / "bin" / "python")

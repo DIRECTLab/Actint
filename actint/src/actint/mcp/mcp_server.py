@@ -508,7 +508,7 @@ def query_database(sql_query: str, max_rows: int | str = 200) -> str:
 # ============================================================================
 # Tools: Map positioning 
 # ============================================================================
-from ....data.live_db.chat_manager import set_map_position
+from actint.web_sockets.web_socket import set_map_position
 
 @mcp.tool()
 def position_map(lat: float, lon: float, zoom: int) -> str:
