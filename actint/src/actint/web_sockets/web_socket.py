@@ -25,7 +25,7 @@ async def connect(sid, environ):
 @sio.on("simulation_init")
 async def handle_simulation_init(sid, data):
     print(f"Simulation init from {sid}: {data}")
-          
+    
     start_time = str(data["start_time"]+":07.000000")
     # Send to EVERYONE else
     await sio.emit("private_response", {"msg": f"Sending simulation data up to {data["start_time"]}"}, to=sid)
@@ -84,31 +84,6 @@ async def handle_recieve_message(sid, data):
     print(newMessage)
     
     set_map_position(sid, 37.7749, -122.4194, 10) 
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 def set_map_position(sid, lat, lon, zoom):
     # This function can be called to set the map position for a specific client
@@ -119,6 +94,39 @@ def set_map_position(sid, lat, lon, zoom):
     })) #This will need to have to=sid added back later after the tool can be accessed by the LLM
 
     
+
+
+
+
+
+
+
+def draw_rectangle(sid, lat1, lon1, lat2, lon2, color="blue"):
+    asyncio.create_task(sio.emit("draw_rectangle", {
+        "lat1": lat1,
+        "lon1": lon1,
+        "lat2": lat2,
+        "lon2": lon2,
+        "color": color,
+    })) #This will need to have to=sid added back later after the tool can be accessed by the LLM
+
+
+def draw_circle(sid, radius, center_lat, center_lon, color="blue"):
+    asyncio.create_task(sio.emit("draw_circle", {
+        "radius": radius,
+        "center_lat": center_lat,
+        "center_lon": center_lon,
+        "color": color,
+    })) #This will need to have to=sid added back later after the tool can be accessed by the LLM
+
+
+
+def draw_line(sid, points,  color="blue"):
+    asyncio.create_task(sio.emit("draw_line", {
+        "points": points,
+        "color": color,
+    })) #This will need to have to=sid added back later after the tool can be accessed by the LLM
+
 
 
         
@@ -134,4 +142,4 @@ async def disconnect(sid):
 if __name__ == "__main__":
     # "0.0.0.0" means "listen on all network interfaces" 
     # (so other computers can connect to your IP)
-    uvicorn.run(app, host="0.0.0.0", port=2500)
+    uvicorn.run(app, host="0.0.0.0", port=3050)

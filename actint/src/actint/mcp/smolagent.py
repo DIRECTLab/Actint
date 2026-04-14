@@ -39,6 +39,16 @@ try:
         agent.prompt_templates["system_prompt"] = qwen_system_prompt_template
 
     result = agent.run("Where is the USS Montgomery currently heading?")
+    # result2 = agent.run("Do you know the muffin man?")
+
+
+    # Time to make a chat interface: What to do:
+    # Store the previous chat messsages and give the LLM a get_previous_messages tool. 
+    # It would probably be good if the LLM had one tool to get the last 10 or so messages, and another to search over the previous messages..
+    # It might be good to use a RAG here so that the LLM can fetch the most relavant information.
+    # The LLM will also need the various functions to manipulate the map as tools.
+    # This whole thing shouuld be in a loop      wait for user input -> answer -> wait for user input
+
 
     # GradioUI(agent).launch()
 finally:
