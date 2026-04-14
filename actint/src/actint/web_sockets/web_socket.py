@@ -6,7 +6,7 @@ import sqlite3
 import asyncio
 from datetime import datetime, timedelta
 import random
-from actint.mcp.agent_query_from_chat import run_agent
+# from actint.mcp.agent_query_from_chat import run_agent
 
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
 app = socketio.ASGIApp(sio)
@@ -83,7 +83,31 @@ async def handle_recieve_message(sid, data):
     }
     print(newMessage)
     
-    run_agent("change my latitude and longitude to 0 0 with zoom level 12") 
+    set_map_position(sid, 37.7749, -122.4194, 10) 
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def set_map_position(sid, lat, lon, zoom):
