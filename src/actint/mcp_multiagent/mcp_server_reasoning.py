@@ -11,6 +11,7 @@ import os
 import sys
 import atexit
 import io
+import re
 from contextlib import redirect_stdout, redirect_stderr
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,6 +38,11 @@ _MATH_AGENT: ToolCallingAgent | None = None
 _MATH_MCP_CLIENT: MCPClient | None = None
 _MATH_MODEL_ID: str | None = None
 MATH_LOG_PATH = Path(os.getcwd()) / "math_agent.log"
+ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+OTEL_NOISE_MARKERS = (
+    "Transient error StatusCode.UNAVAILABLE encountered while exporting traces",
+    "Failed to export traces to localhost:4317",
+)
 
 
 def _load_map_template() -> str:
@@ -56,6 +62,34 @@ def _resolve_python_executable() -> str:
         if candidate.exists():
             return str(candidate)
     return sys.executable
+
+
+def _clean_log_text(text: str) -> str:
+    """Make verbose specialist logs easier to read as plain text."""
+    text = ANSI_ESCAPE_RE.sub("", text)
+
+    cleaned_lines: list[str] = []
+    for line in text.splitlines():
+        if any(marker in line for marker in OTEL_NOISE_MARKERS):
+            continue
+
+        stripped = line.strip()
+        if stripped and all(ch in "─━│╭╮╰╯-=" for ch in stripped):
+            continue
+
+        cleaned_lines.append(line.rstrip())
+
+    collapsed: list[str] = []
+    prev_blank = False
+    for line in cleaned_lines:
+        is_blank = line.strip() == ""
+        if is_blank and prev_blank:
+            continue
+        collapsed.append(line)
+        prev_blank = is_blank
+
+    output = "\n".join(collapsed).strip()
+    return output + "\n" if output else ""
 
 
 def _build_sql_agent_singleton(model_id: str) -> ToolCallingAgent:
@@ -112,7 +146,7 @@ def _ask_sql_agent(question: str, model_id: str) -> str:
         sql_trace = io.StringIO()
         with redirect_stdout(sql_trace), redirect_stderr(sql_trace):
             result = sql_agent.run(question)
-        SQL_LOG_PATH.write_text(sql_trace.getvalue(), encoding="utf-8")
+        SQL_LOG_PATH.write_text(_clean_log_text(sql_trace.getvalue()), encoding="utf-8")
         return str(result)
     except Exception as e:
         return json.dumps({"error": f"SQL specialist call failed: {str(e)}"})
@@ -181,7 +215,7 @@ def _ask_map_agent(question: str, model_id: str) -> str:
         map_trace = io.StringIO()
         with redirect_stdout(map_trace), redirect_stderr(map_trace):
             result = map_agent.run(question)
-        MAP_LOG_PATH.write_text(map_trace.getvalue(), encoding="utf-8")
+        MAP_LOG_PATH.write_text(_clean_log_text(map_trace.getvalue()), encoding="utf-8")
         return str(result)
     except Exception as e:
         return json.dumps({"error": f"Map specialist call failed: {str(e)}"})
@@ -235,7 +269,7 @@ def _ask_math_agent(question: str, model_id: str) -> str:
         math_trace = io.StringIO()
         with redirect_stdout(math_trace), redirect_stderr(math_trace):
             result = math_agent.run(question)
-        MATH_LOG_PATH.write_text(math_trace.getvalue(), encoding="utf-8")
+        MATH_LOG_PATH.write_text(_clean_log_text(math_trace.getvalue()), encoding="utf-8")
         return str(result)
     except Exception as e:
         return json.dumps({"error": f"Math specialist call failed: {str(e)}"})

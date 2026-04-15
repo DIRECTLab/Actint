@@ -1,6 +1,7 @@
 import os
 import sys
 import io
+import re
 from contextlib import redirect_stdout, redirect_stderr
 from pathlib import Path
 
@@ -17,6 +18,39 @@ SmolagentsInstrumentor().instrument()
 DEFAULT_MODEL_ID = "Qwen/Qwen3.5-9B"
 DEFAULT_QUESTION = "Where is the USS Montgomery currently heading?"
 REASONING_LOG_PATH = Path(os.getcwd()) / "reasoning_agent.log"
+ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+OTEL_NOISE_MARKERS = (
+    "Transient error StatusCode.UNAVAILABLE encountered while exporting traces",
+    "Failed to export traces to localhost:4317",
+)
+
+
+def _clean_log_text(text: str) -> str:
+    """Make verbose agent logs easier to read as plain text."""
+    text = ANSI_ESCAPE_RE.sub("", text)
+
+    cleaned_lines: list[str] = []
+    for line in text.splitlines():
+        if any(marker in line for marker in OTEL_NOISE_MARKERS):
+            continue
+
+        stripped = line.strip()
+        if stripped and all(ch in "─━│╭╮╰╯-=" for ch in stripped):
+            continue
+
+        cleaned_lines.append(line.rstrip())
+
+    collapsed: list[str] = []
+    prev_blank = False
+    for line in cleaned_lines:
+        is_blank = line.strip() == ""
+        if is_blank and prev_blank:
+            continue
+        collapsed.append(line)
+        prev_blank = is_blank
+
+    output = "\n".join(collapsed).strip()
+    return output + "\n" if output else ""
 
 
 def _resolve_python_executable() -> str:
@@ -32,6 +66,16 @@ def _resolve_python_executable() -> str:
 def _load_reasoning_template() -> str:
     template_path = Path(__file__).with_name("qwen_system_prompt_reasoning.jinja")
     return template_path.read_text(encoding="utf-8")
+
+
+def _prompt_for_question() -> str:
+    """Prompt user for a question, with 'default' shortcut support."""
+    print("Enter your question for the multi-agent system.")
+    print("Type 'default' to use the built-in test question. which is '" + DEFAULT_QUESTION + "'")
+    user_input = input("Question: ").strip()
+    if not user_input or user_input.lower() == "default":
+        return DEFAULT_QUESTION
+    return user_input
 
 
 def _build_reasoning_agent(
@@ -96,7 +140,10 @@ def run_multi_agent(question: str = DEFAULT_QUESTION, model_id: str = DEFAULT_MO
         reasoning_trace = io.StringIO()
         with redirect_stdout(reasoning_trace), redirect_stderr(reasoning_trace):
             result = reasoning_agent.run(question)
-        REASONING_LOG_PATH.write_text(reasoning_trace.getvalue(), encoding="utf-8")
+        REASONING_LOG_PATH.write_text(
+            _clean_log_text(reasoning_trace.getvalue()),
+            encoding="utf-8",
+        )
         return str(result)
     finally:
         if reasoning_mcp_client is not None:
@@ -104,9 +151,13 @@ def run_multi_agent(question: str = DEFAULT_QUESTION, model_id: str = DEFAULT_MO
 
 
 if __name__ == "__main__":
-    user_question = DEFAULT_QUESTION
     if len(sys.argv) > 1:
-        user_question = " ".join(sys.argv[1:]).strip() or DEFAULT_QUESTION
+        cli_input = " ".join(sys.argv[1:]).strip()
+        user_question = DEFAULT_QUESTION if cli_input.lower() == "default" else cli_input
+        if not user_question:
+            user_question = DEFAULT_QUESTION
+    else:
+        user_question = _prompt_for_question()
 
     output = run_multi_agent(question=user_question, model_id=DEFAULT_MODEL_ID)
     print(output)
