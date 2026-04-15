@@ -30,6 +30,12 @@ src/actint/mcp/qwen_mcp_server.py
 src/actint/mcp/smolagent.py
 src/actint/mcp/telemetry.py
 src/actint/mcp/test_qwen_mcp.py
+src/actint/mcp_multiagent/__init__.py
+src/actint/mcp_multiagent/mcp_server_map.py
+src/actint/mcp_multiagent/mcp_server_math.py
+src/actint/mcp_multiagent/mcp_server_reasoning.py
+src/actint/mcp_multiagent/mcp_server_sql.py
+src/actint/mcp_multiagent/smolagent.py
 src/actint/tests/__init__.py
 src/actint/tests/test_mistral.py
 src/actint/tests/mcp/agent_client.py

@@ -11,7 +11,14 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-you can then run the benchmarks
+to run the muli-agent system, run the following command from the root of the repository (do this for ai architecture assignment):
+
+```bash
+python -m actint.mcp_multiagent.smolagent
+```
+you will be able to see the tool calls and reasoning of each agent output in reasoning_agent.log, sql_agent.log, map_agent.log, or math_agent.log, depending on which agents are called during the execution.
+
+to run the benchmarks on the single agent system
 
 ```bash
 python -m actint.benchmarking.benchmark_agents --run-all-benchmarks

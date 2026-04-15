@@ -23,7 +23,19 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-you can inspect llm output easily with arize ai pheonix, run 
+to run the muli-agent system, run the following command from the root of the repository (do this for ai architecture assignment):
+
+```bash
+python -m actint.mcp_multiagent.smolagent
+```
+
+to run the benchmarks on the single agent system
+
+```bash
+python -m actint.benchmarking.benchmark_agents --run-all-benchmarks
+```
+
+you can inspect llm output easily with arize ai pheonix, in another terminal run 
 
 ```bash
 python -m phoenix.server.main serve

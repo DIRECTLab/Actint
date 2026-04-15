@@ -16,7 +16,7 @@ register(project_name="actint")
 SmolagentsInstrumentor().instrument()
 
 DEFAULT_MODEL_ID = "Qwen/Qwen3.5-9B"
-DEFAULT_QUESTION = "Where is the USS Montgomery currently heading?"
+DEFAULT_QUESTION = "Where is the USS Montgomery?"
 REASONING_LOG_PATH = Path(os.getcwd()) / "reasoning_agent.log"
 ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 OTEL_NOISE_MARKERS = (
