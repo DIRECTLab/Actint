@@ -6,6 +6,7 @@ import sqlite3
 import asyncio
 from datetime import datetime, timedelta
 import random
+import sys
 # from actint.mcp.agent_query_from_chat import run_agent
 
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
@@ -19,12 +20,12 @@ messages = {}
 
 @sio.event
 async def connect(sid, environ):
-    print(f"User {sid} connected!")
+    print(f"User {sid} connected!", file=sys.stderr)
 
 
 @sio.on("simulation_init")
 async def handle_simulation_init(sid, data):
-    print(f"Simulation init from {sid}: {data}")
+    print(f"Simulation init from {sid}: {data}", file=sys.stderr)
     
     start_time = str(data["start_time"]+":07.000000")
     # Send to EVERYONE else
@@ -61,7 +62,7 @@ async def send_simulation_updates(sid, data, start_time):
 
 # Chat manager
 
-from actint.web_sockets.web_socket import sio, app
+# from actint.web_sockets.web_socket import sio, app
 import random
 import socketio
 import asyncio
@@ -70,18 +71,21 @@ messages = {}
 #Handle recieving a message
 @sio.on("recieve_message")
 async def handle_recieve_message(sid, data):
-    print(f"Message from {sid}: {data}")
+    print(f"Message from {sid}: {data}", file=sys.stderr)
     if(messages.get(sid) == None):
         messages[sid] = []
     messages[sid].append(data)
     newMessage = {
-        "message": "recieved the message, you will never get any AI response",
+        "message": "received the message, you will never get any AI response",
         "sentTime": 'just now',
         "sender": 'ChatBot',
         "direction": 'incoming',
         "position": 'single',
     }
-    print(newMessage)
+    print(newMessage, file=sys.stderr)
+    
+    # Send the message object back to the frontend
+    await sio.emit("send_response", newMessage, to=sid)
     
     set_map_position(sid, 37.7749, -122.4194, 10) 
 
@@ -135,7 +139,7 @@ def draw_line(sid, points,  color="blue"):
 
 @sio.event
 async def disconnect(sid):
-    print(f"User {sid} left.")
+    print(f"User {sid} left.", file=sys.stderr)
     if messages.get(sid):
         del messages[sid]
 
