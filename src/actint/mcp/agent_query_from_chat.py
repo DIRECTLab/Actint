@@ -1,5 +1,5 @@
 import os
-from smolagents import ToolCallingAgent, TransformersModel, MCPClient, GradioUI
+from smolagents import ToolCallingAgent, TransformersModel, MCPClient
 from mcp import StdioServerParameters
 import sys
 from pathlib import Path
@@ -7,43 +7,35 @@ from actint.mcp import mcp_server
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
 
-def run_agent(query: str):
-    register(project_name="actint")
-    SmolagentsInstrumentor().instrument()
+# Register Phoenix instrumentation
+register(project_name="Map_Actint")
+SmolagentsInstrumentor().instrument()
 
-    #model_id = "Qwen/Qwen3.5-9B"
-    model_id = "Qwen/Qwen2-7B-Instruct"
+#model_id = "Qwen/Qwen3.5-9B"
+model_id = "Qwen/Qwen2-7B-Instruct"
 
-    conda_prefix = os.getenv("CONDA_PREFIX")
-    python = str(Path(conda_prefix) / "bin" / "python")
+conda_prefix = os.getenv("CONDA_PREFIX")
+python = str(Path(conda_prefix) / "bin" / "python")
 
+# Initialize MCP server
+server_params = StdioServerParameters(
+    command=python,
+    args=[mcp_server.__file__],
+    env=os.environ.copy(),
+    cwd=os.getcwd()
+)
 
+mcp_client = MCPClient(server_params, structured_output=False)
+tools = mcp_client.get_tools()
 
-    server_params = StdioServerParameters(
-        command=python,
-        args=[mcp_server.__file__],
-        env=os.environ.copy(),
-        cwd=os.getcwd()
-    )
+# Load model and create agent
+model = TransformersModel(model_id=model_id)
+agent = ToolCallingAgent(tools=tools, model=model)
 
-    try:
-        mcp_client = MCPClient(server_params, structured_output=False)
-        tools = mcp_client.get_tools()
-
-        model = TransformersModel(model_id=model_id)
-
-        agent = ToolCallingAgent(tools=tools, model=model)
-
-        if ('Qwen3.5' in model_id):
-            template_path = Path(__file__).with_name("qwen_system_prompt_template.jinja")
-            qwen_system_prompt_template = template_path.read_text(encoding="utf-8")
-            agent.prompt_templates["system_prompt"] = qwen_system_prompt_template
-
-        result = agent.run(query)
-
-        # GradioUI(agent).launch()
-    finally:
-        mcp_client.disconnect()
-
-
-run_agent("Move the map to latitude 37.7749, longitude -122.4194, zoom level 12.")
+def process_chat_message(sid: str, message: str) -> str:
+    result = agent.run(message, return_full_result=True, reset=False)
+    print("Agent Responsed", file=sys.stderr)
+    if result.output:
+        return result.output
+    else:
+        return f"Response Failed. Agent state: {result.state}"
