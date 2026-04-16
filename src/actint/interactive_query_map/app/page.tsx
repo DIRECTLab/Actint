@@ -41,6 +41,7 @@ export default function Home() {
   const [simulationSettings, setSimulationSettings] = useState<SimulationSettingsTyp>(DEFAULT_SIM_SETTIINGS);
   const [map_zoom, setMapZoom] = useState<number>(10);
   const [map_center, setMapCenter] = useState<[number, number]>([20, -155.5]  );
+  const [AI_objects, setAI_objects] = useState<any[]>([]);
 
   
   
@@ -63,6 +64,7 @@ export default function Home() {
           vehicleCurrentPositions={vehicleCurrentPositions}
           map_center={map_center}
           map_zoom={map_zoom}
+          AI_objects={AI_objects}
           is_3D={simulationSettings.is_3D}
         />
 
@@ -71,6 +73,7 @@ export default function Home() {
       <Chat 
         setMapCenter={setMapCenter}
         setMapZoom={setMapZoom}
+        setAI_objects={setAI_objects}
       />
       {/* Put the chat interface here */}
     </div>

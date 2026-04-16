@@ -34,9 +34,10 @@ type Props = {
   vehicleCurrentPositions: vehicles_current_positions,
   map_center: [number, number],
   map_zoom: number,
+  AI_objects: any[],
   is_3D: boolean,
 }
-export default function Map({ vehiclesPreviousPositions, vehicleCurrentPositions, map_center, map_zoom, is_3D }: Props) {
+export default function Map({ vehiclesPreviousPositions, vehicleCurrentPositions, map_center, map_zoom, AI_objects, is_3D }: Props) {
 
 
   type ChangeViewProps = {
@@ -81,6 +82,7 @@ export default function Map({ vehiclesPreviousPositions, vehicleCurrentPositions
         <HandleMarkers
           vehiclesPreviousPositions={vehiclesPreviousPositions}
           vehicleCurrentPositions={vehicleCurrentPositions}
+          AI_objects={AI_objects}
           is_3D={is_3D}
         ></HandleMarkers>
         
