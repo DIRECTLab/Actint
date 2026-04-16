@@ -33,8 +33,9 @@ model = TransformersModel(model_id=model_id)
 agent = ToolCallingAgent(tools=tools, model=model)
 
 def process_chat_message(sid: str, message: str) -> str:
-    result = agent.run(message, return_full_result=True)
-    print("HER HER HER HER HER HER responded", file=sys.stderr)
-    if result.output is None:
-        print("HER HER HER HER Error", file=sys.stderr)
-    return f"Agent Response: {result.output}"
+    result = agent.run(message, return_full_result=True, reset=False)
+    print("Agent Responsed", file=sys.stderr)
+    if result.output:
+        return result.output
+    else:
+        return f"Response Failed. Agent state: {result.state}"
