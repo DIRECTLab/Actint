@@ -102,7 +102,8 @@ def set_map_position(sid, lat, lon, zoom):
 
 
 def draw_rectangle(sid, lat1, lon1, lat2, lon2, color="blue"):
-    asyncio.create_task(sio.emit("draw_rectangle", {
+    asyncio.create_task(sio.emit("create_AI_object", {
+        "type": "rectangle",
         "lat1": lat1,
         "lon1": lon1,
         "lat2": lat2,
@@ -112,7 +113,8 @@ def draw_rectangle(sid, lat1, lon1, lat2, lon2, color="blue"):
 
 
 def draw_circle(sid, radius, center_lat, center_lon, color="blue"):
-    asyncio.create_task(sio.emit("draw_circle", {
+    asyncio.create_task(sio.emit("create_AI_object", {
+        "type": "circle",
         "radius": radius,
         "center_lat": center_lat,
         "center_lon": center_lon,
@@ -122,7 +124,8 @@ def draw_circle(sid, radius, center_lat, center_lon, color="blue"):
 
 
 def draw_line(sid, points,  color="blue"):
-    asyncio.create_task(sio.emit("draw_line", {
+    asyncio.create_task(sio.emit("create_AI_object", {
+        "type": "line",
         "points": points,
         "color": color,
     })) #This will need to have to=sid added back later after the tool can be accessed by the LLM
