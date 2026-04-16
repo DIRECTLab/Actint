@@ -74,6 +74,9 @@ messages = {}
 async def handle_recieve_message(sid, data):
     print(f"Message from {sid}: {data}")
     
+    draw_rectangle(sid, lat1=37.7749, lon1=122.4194, lat2=-37.7849, lon2=-122.4094, color="green") # Example: Draw a rectangle in San Francisco
+    draw_circle(sid, radius=5000, center_lat=37.7749, center_lon=-122.4194, color="red") # Example: Draw a circle around San Francisco
+    draw_line(sid, points=[(37.7749, -122.4194), (37.7849, 122.4094)], color="blue") # Example: Draw a line in San Francisco
     set_map_position(37.7749, -122.4194, 10) # Example: Set map to San Francisco with zoom level 10
     # Extract the user's string message
     user_text = data.get("message", "")
