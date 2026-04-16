@@ -68,41 +68,21 @@ import socketio
 import asyncio
 
 messages = {}
-#Handle recieving a message
-# @sio.on("recieve_message")
-# async def handle_recieve_message(sid, data):
-#     print(f"Message from {sid}: {data}", file=sys.stderr)
-#     if(messages.get(sid) == None):
-#         messages[sid] = []
-#     messages[sid].append(data)
-#     newMessage = {
-#         "message": "received the message, you will never get any AI response",
-#         "sentTime": 'just now',
-#         "sender": 'ChatBot',
-#         "direction": 'incoming',
-#         "position": 'single',
-#     }
-#     print(newMessage, file=sys.stderr)
-    
-#     # Send the message object back to the frontend
-#     await sio.emit("send_response", newMessage, to=sid)
-    
-#     set_map_position(sid, 37.7749, -122.4194, 10) 
 
 @sio.on("recieve_message")
 async def handle_recieve_message(sid, data):
     print(f"Message from {sid}: {data}")
     
-    # 2. Extract the user's string message
+    # Extract the user's string message
     user_text = data.get("message", "")
 
-    # 3. Offload the synchronous smolagents run to a background thread
+    # Offload the synchronous smolagents run to a background thread
     try:
         agent_response_text = await asyncio.to_thread(process_chat_message, sid, user_text)
     except Exception as e:
         agent_response_text = f"Error processing message: {str(e)}"
 
-    # 4. Package the LLM response into the structure React expects
+    # Package the LLM response into the structure React expects
     newMessage = {
         "message": agent_response_text,
         "sentTime": datetime.now().strftime("%H:%M:%S"), # Dynamic time
@@ -111,7 +91,7 @@ async def handle_recieve_message(sid, data):
         "position": 'single',
     }
     
-    # 5. Send the response back to the specific client
+    # Send the response back to the specific client
     await sio.emit("send_response", newMessage, to=sid)
 
 def set_map_position(sid, lat, lon, zoom):
