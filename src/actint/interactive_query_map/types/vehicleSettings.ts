@@ -1,49 +1,6 @@
 
 // import L from 'leaflet'
 
-export type PositionTyp = {
-  LatLng: { lat: number, lng: number }
-  Z?: number;
-}
-
-
-export type DestinationTyp = {
-  position: PositionTyp;
-  speed: number;
-  error: number;
-}
-
-
-export type PointTyp = {
-  position: PositionTyp
-  lattitude: number;
-  longtude: number;
-  height?: number;
-  
-}
-
-
-export type PropertiesTyp = {
-  max_speed: number;
-  max_force: number;
-  max_altitude: number;
-  position: PositionTyp;
-}
-
-
-export type ActionPropertiesTyp = {
-  target_id: number;
-  target_offset: PositionTyp;
-  stay_time: number;
-}
-
-
-export type VehicleTyp = {
-  mmsi: number;
-  current_detection: DetectionTyp | null
-  previous_detections: DetectionTyp[];
-};
-
 export type DetectionTyp = {
   id: number;
   mmsi: number;

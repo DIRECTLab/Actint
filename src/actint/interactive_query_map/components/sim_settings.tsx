@@ -1,6 +1,5 @@
 import { SimulationSettingsTyp } from '@/types/simulationSettings'
-import { VehicleTyp } from '@/types/vehicleSettings';
-import { createWebSocketConnection } from '@/functions/web_socket_functions';
+import { start_simulation } from '@/functions/web_socket_functions';
 import { vehicles_current_positions, vehicles_previous_positions } from '@/types/vehicleSettings';
 
 type Props = {
@@ -27,9 +26,10 @@ export default function SimSettings({ simulation_settings, set_simulation_settin
                     value={simulation_settings.simulation_file}
                     onChange={(e) => {set_simulation_settings( prev => ({...prev, simulation_file: e.target.value}))}}
                   >
-                    <option value="ship">Ship</option>
-                    <option value="car">Car</option>
-                    <option value="drone">Drone</option>
+                    <option value="File1">File1</option>
+                    <option value="File2">File2</option>
+                    <option value="File3">File3</option>
+                    <option value="">This does nothing currently, functionality may be added later.</option>
                   </select>
                 </div>
 
@@ -63,7 +63,7 @@ export default function SimSettings({ simulation_settings, set_simulation_settin
                   id="start_simulation"
                   onClick={() => {
                     console.log("hello")
-                    createWebSocketConnection({simulation_settings, setVehicleCurrentPositions, setVehiclePreviousPositions});
+                    start_simulation({simulation_settings, setVehicleCurrentPositions, setVehiclePreviousPositions});
                   }} 
                   
                 >Start Simulation</button>

@@ -12,16 +12,7 @@ TypingIndicator,
 } from '@chatscope/chat-ui-kit-react';
 
 
-type Props = {  
-    setMapCenter: React.Dispatch<React.SetStateAction<[number, number]>>,
-    setMapZoom: React.Dispatch<React.SetStateAction<number>>,
-    setAI_objects: React.Dispatch<React.SetStateAction<any[]>>,
-}
-
-
-
-
-export function Chat({ setMapCenter, setMapZoom, setAI_objects }: Props) {
+export function Chat() {
 const [messages, setMessages] = useState<any[]>([]);
 const [isTyping, setIsTyping] = useState(false);
 
@@ -51,27 +42,6 @@ useEffect(() => {
         setMessages((prev) => [...prev, data]);
         setIsTyping(false);
     });
-
-    socket.on("set_map_position", (data) => {
-        console.log("set map position", data);
-        setMapCenter([data.lat, data.lon]);
-        setMapZoom(data.zoom);
-    });
-
-    socket.on("draw_rectangle", (data) => {
-        console.log("set AI objects", data);
-        setAI_objects(prev => [...prev, { type: "rectangle", data }]);
-    })
-    
-    socket.on("draw_circle", (data) => {
-        console.log("set AI objects", data);
-        setAI_objects(prev => [...prev, { type: "circle", data }]);
-    })
-
-    socket.on("draw_line", (data) => {
-        console.log("set AI objects", data);
-        setAI_objects(prev => [...prev, { type: "line", data }]);
-    })
 }, []);
 
 

@@ -19,11 +19,11 @@ const Map = dynamic(() => import('../components/Map'), {
 
 // ********************************************** Types **************************************************//
 // all types end in Typ
-import { PositionTyp, PointTyp, PropertiesTyp, VehicleTyp, DestinationTyp, DetectionTyp } from '@/types/vehicleSettings'
 import { SimulationSettingsTyp } from '@/types/simulationSettings'
 
 
 // ********************************************** Functions **********************************************//
+import { create_map_functions } from '@/functions/web_socket_functions';
 
 // ********************************************** Defaults ***********************************************//
 import DEFAULT_SIM_SETTIINGS from "@/defaults/sim_settings_defauluts";
@@ -39,9 +39,7 @@ export default function Home() {
   const [vehiclesPreviousPositions, setVehiclesPreviousPositions] = useState<vehicles_previous_positions>({});
   const [vehicleCurrentPositions, setVehicleCurrentPositions] = useState<vehicles_current_positions>({});
   const [simulationSettings, setSimulationSettings] = useState<SimulationSettingsTyp>(DEFAULT_SIM_SETTIINGS);
-  const [map_zoom, setMapZoom] = useState<number>(10);
-  const [map_center, setMapCenter] = useState<[number, number]>([20, -155.5]  );
-  const [AI_objects, setAI_objects] = useState<any[]>([]);
+  
 
   
   
@@ -62,19 +60,11 @@ export default function Home() {
         <Map 
           vehiclesPreviousPositions={vehiclesPreviousPositions}
           vehicleCurrentPositions={vehicleCurrentPositions}
-          map_center={map_center}
-          map_zoom={map_zoom}
-          AI_objects={AI_objects}
-          is_3D={simulationSettings.is_3D}
         />
 
 
       </div>
-      <Chat 
-        setMapCenter={setMapCenter}
-        setMapZoom={setMapZoom}
-        setAI_objects={setAI_objects}
-      />
+      <Chat />
       {/* Put the chat interface here */}
     </div>
     </div>

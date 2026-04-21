@@ -1,8 +1,5 @@
-import { useMapEvents, Popup, MapContainer, TileLayer, Marker, Polyline, Rectangle, Circle } from 'react-leaflet'
-import { useEffect, useState } from 'react'
-import { previousValsTyp } from '@/types/otherTypes';
-import { DestinationTyp, vehicles_current_positions, VehicleTyp, vehicles_previous_positions } from '@/types/vehicleSettings';
-import PopupInputs from '@/components/PopupInput'
+import { Popup, Marker, Polyline, Rectangle, Circle } from 'react-leaflet'
+import { vehicles_current_positions, vehicles_previous_positions } from '@/types/vehicleSettings';
 
 
 import L from 'leaflet';
@@ -22,14 +19,11 @@ type Props = {
   vehiclesPreviousPositions: vehicles_previous_positions,
   vehicleCurrentPositions: vehicles_current_positions,
   AI_objects: any[],
-  is_3D: boolean,
 };
 
 
 
-
-
-export function HandleMarkers({ vehiclesPreviousPositions, vehicleCurrentPositions, AI_objects, is_3D }: Props) {
+export function HandleMarkers({ vehiclesPreviousPositions, vehicleCurrentPositions, AI_objects }: Props) {
     
     return (
         <>
@@ -72,6 +66,7 @@ export function HandleMarkers({ vehiclesPreviousPositions, vehicleCurrentPositio
                         [obj.data.lat1, obj.data.lon1],
                         [obj.data.lat2, obj.data.lon2],
                         ]}
+                        color={obj.data.color}
                     />
                 );
 
@@ -80,12 +75,14 @@ export function HandleMarkers({ vehiclesPreviousPositions, vehicleCurrentPositio
                         key={index}
                         center={[obj.data.lat, obj.data.lon]}
                         radius={obj.data.radius}
+                        color={obj.data.color}
                     ></Circle>;
 
                 case "line":
                     return <Polyline
                         key={index}
                         positions={obj.data.points}
+                        color={obj.data.color}
                     ></Polyline>;
 
                 default:
