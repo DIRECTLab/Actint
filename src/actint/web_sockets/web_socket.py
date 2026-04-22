@@ -10,8 +10,7 @@ import sys
 import os
 from actint.mcp.agent_query_from_chat import process_chat_message
 
-sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
-app = socketio.ASGIApp(sio)
+from actint.web_sockets.defaults import sio, app
 
 
 
@@ -68,15 +67,22 @@ import random
 import socketio
 import asyncio
 
+from actint.web_sockets.map_functioons import set_map_position, draw_rectangle, draw_circle, draw_line
+
 messages = {}
 
 @sio.on("recieve_message")
 async def handle_recieve_message(sid, data):
     print(f"Message from {sid}: {data}")
     
+    draw_rectangle(sid, lat1=37.7749, lon1=122.4194, lat2=-37.7849, lon2=-122.4094, color="green") # Example: Draw a rectangle in San Francisco
+    draw_circle(sid, radius=5000, center_lat=37.7749, center_lon=-122.4194, color="red") # Example: Draw a circle around San Francisco
+    draw_line(sid, points=[(37.7749, -122.4194), (37.7849, 122.4094)], color="blue") # Example: Draw a line in San Francisco
+    set_map_position(37.7749, -122.4194, 10) # Example: Set map to San Francisco with zoom level 10
     # Extract the user's string message
     user_text = data.get("message", "")
 
+    
     # Offload the synchronous smolagents run to a background thread
     try:
         agent_response_text = await asyncio.to_thread(process_chat_message, sid, user_text)
@@ -95,47 +101,7 @@ async def handle_recieve_message(sid, data):
     # Send the response back to the specific client
     await sio.emit("send_response", newMessage, to=sid)
 
-def set_map_position(sid, lat, lon, zoom):
-    # This function can be called to set the map position for a specific client
-    asyncio.create_task(sio.emit("set_map_position", {
-        "lat": lat, 
-        "lon": lon, 
-        "zoom": zoom
-    })) #This will need to have to=sid added back later after the tool can be accessed by the LLM
 
-    
-
-
-
-
-
-
-
-def draw_rectangle(sid, lat1, lon1, lat2, lon2, color="blue"):
-    asyncio.create_task(sio.emit("draw_rectangle", {
-        "lat1": lat1,
-        "lon1": lon1,
-        "lat2": lat2,
-        "lon2": lon2,
-        "color": color,
-    })) #This will need to have to=sid added back later after the tool can be accessed by the LLM
-
-
-def draw_circle(sid, radius, center_lat, center_lon, color="blue"):
-    asyncio.create_task(sio.emit("draw_circle", {
-        "radius": radius,
-        "center_lat": center_lat,
-        "center_lon": center_lon,
-        "color": color,
-    })) #This will need to have to=sid added back later after the tool can be accessed by the LLM
-
-
-
-def draw_line(sid, points,  color="blue"):
-    asyncio.create_task(sio.emit("draw_line", {
-        "points": points,
-        "color": color,
-    })) #This will need to have to=sid added back later after the tool can be accessed by the LLM
 
 
 

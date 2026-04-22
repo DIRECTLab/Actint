@@ -1,9 +1,5 @@
-import { useMapEvents, Popup, MapContainer, TileLayer, Marker, Polyline } from 'react-leaflet'
-import { useEffect, useState } from 'react'
-import { previousValsTyp } from '@/types/otherTypes';
-import { DestinationTyp, vehicles_current_positions, VehicleTyp, vehicles_previous_positions } from '@/types/vehicleSettings';
-
-import PopupInputs from '@/components/PopupInput'
+import { Popup, Marker, Polyline, Rectangle, Circle } from 'react-leaflet'
+import { vehicles_current_positions, vehicles_previous_positions } from '@/types/vehicleSettings';
 
 
 import L from 'leaflet';
@@ -22,23 +18,12 @@ const icon = L.icon({
 type Props = {
   vehiclesPreviousPositions: vehicles_previous_positions,
   vehicleCurrentPositions: vehicles_current_positions,
-  is_3D: boolean,
+  AI_objects: any[],
 };
 
 
 
-// Use a hook to create and update a list of a list of positions for what the last 20 ship positions were.
-// Use the .map method to display all of those positinons to the screen with the polyline going through it
-// Have a list of thhe most curreent positions and use those to display a marker on the map. 
-// Also us a hook to update the most current poositions.
-
-
-
-
-// Assuming vehicles_previous_positions is { [mmsi: number]: { lat: number, lng: number }[] }
-// Assuming vehicles_current_positions is { [mmsi: number]: { lat: number, lng: number } }
-
-export function HandleMarkers({ vehiclesPreviousPositions, vehicleCurrentPositions, is_3D }: Props) {
+export function HandleMarkers({ vehiclesPreviousPositions, vehicleCurrentPositions, AI_objects }: Props) {
     
     return (
         <>
@@ -69,6 +54,43 @@ export function HandleMarkers({ vehiclesPreviousPositions, vehicleCurrentPositio
                     </Popup>
                 </Marker>
             ))}
+
+            {/* 3. Render AI Objects */}
+            {AI_objects.map((obj, index) => {
+            switch (obj.type) {
+                case "rectangle":
+                return (
+                    <Rectangle
+                        key={index}
+                        bounds={[
+                        [obj.data.lat1, obj.data.lon1],
+                        [obj.data.lat2, obj.data.lon2],
+                        ]}
+                        color={obj.data.color}
+                    />
+                );
+
+                case "circle":
+                    return <Circle
+                        key={index}
+                        center={[obj.data.lat, obj.data.lon]}
+                        radius={obj.data.radius}
+                        color={obj.data.color}
+                    ></Circle>;
+
+                case "line":
+                    return <Polyline
+                        key={index}
+                        positions={obj.data.points}
+                        color={obj.data.color}
+                    ></Polyline>;
+
+                default:
+                    return null;
+            }
+            })}
+
+            
         </>
     );
 }

@@ -34,3 +34,7 @@ smolagents[telemetry,toolkit]
 git+https://github.com/DIRECTLab/smolagents
 huggingface_hub
 huggingface_hub[mcp]
+
+#sockets for LLM streaming and data transfer
+python-socketio
+eventlet

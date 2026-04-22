@@ -12,15 +12,7 @@ TypingIndicator,
 } from '@chatscope/chat-ui-kit-react';
 
 
-type Props = {  
-    setMapCenter: React.Dispatch<React.SetStateAction<[number, number]>>,
-    setMapZoom: React.Dispatch<React.SetStateAction<number>>,
-}
-
-
-
-
-export function Chat({ setMapCenter, setMapZoom }: Props) {
+export function Chat() {
 const [messages, setMessages] = useState<any[]>([]);
 const [isTyping, setIsTyping] = useState(false);
 
@@ -50,12 +42,6 @@ useEffect(() => {
         setMessages((prev) => [...prev, data]);
         setIsTyping(false);
     });
-
-    socket.on("set_map_position", (data) => {
-        console.log("set map position", data);
-        setMapCenter([data.lat, data.lon]);
-        setMapZoom(data.zoom);
-    })
 }, []);
 
 

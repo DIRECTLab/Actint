@@ -511,6 +511,7 @@ def query_database(sql_query: str, max_rows: int | str = 200) -> str:
 # from actint.web_sockets.web_socket import set_map_position
 
 ####  TODO: move set_map_position out of web_socket.py so it can be imported without creating a circular import.
+# from actint.web_sockets.map_functioons import set_map_position
 
 # @mcp.tool()
 # def position_map(lat: float, lon: float, zoom: int) -> str:

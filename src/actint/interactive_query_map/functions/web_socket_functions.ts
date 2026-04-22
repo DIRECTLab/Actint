@@ -1,15 +1,11 @@
-import { io } from "socket.io-client";
 import { SimulationSettingsTyp } from '@/types/simulationSettings'
-import { NUMBER_PREVIOUS_DISPLAYED_DETECTIONS } from "@/defaults/sim_settings_defauluts";
 import { initializeVehicleData, update_position } from "./vehicle_position_functions";
 import { vehicles_current_positions, vehicles_previous_positions } from "@/types/vehicleSettings";
 import { socket } from "@/defaults/web_socket";
 
 
 
-
-
-type Props = {
+type Props1 = {
   simulation_settings: SimulationSettingsTyp,
 //   VehicleCurrentPositions: vehicle_current_positions
   setVehicleCurrentPositions: React.Dispatch<React.SetStateAction<vehicles_current_positions>>,
@@ -18,7 +14,7 @@ type Props = {
 };
 
 
-export const createWebSocketConnection = ({simulation_settings, setVehicleCurrentPositions, setVehiclePreviousPositions}: Props) => {
+export const start_simulation = ({simulation_settings, setVehicleCurrentPositions, setVehiclePreviousPositions}: Props1) => {
     console.log("send web crap");
 
     const starting_data = {
@@ -51,3 +47,30 @@ export const createWebSocketConnection = ({simulation_settings, setVehicleCurren
     });
   
 }
+type Props2 = {
+  handleManualMove: (lat: number, lng: number, zoom: number) => void;
+  setAI_objects: React.Dispatch<React.SetStateAction<any[]>>,
+}
+
+export const create_map_functions = ({handleManualMove, setAI_objects}: Props2) =>{
+  socket.on("set_map_position", (data) => {
+      console.log("set map position", data);
+      handleManualMove(data.lat, data.lon, data.zoom)
+  });
+
+  socket.on("draw_rectangle", (data) => {
+    setAI_objects(prev => [...prev, { type: "rectangle", data }]);
+    console.log("set AI objects", data);
+  })
+  
+  socket.on("draw_circle", (data) => {
+      console.log("set AI objects", data);
+      setAI_objects(prev => [...prev, { type: "circle", data }]);
+  })
+
+  socket.on("draw_line", (data) => {
+      console.log("set AI objects", data);
+      setAI_objects(prev => [...prev, { type: "line", data }]);
+  })
+}
+
