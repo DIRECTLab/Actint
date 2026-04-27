@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import random
 import sys
 import os
-from actint.mcp.agent_query_from_chat import process_chat_message
+from actint.web_sockets.agent_query_from_chat import process_chat_message
 
 from actint.web_sockets.defaults import sio, app
 
