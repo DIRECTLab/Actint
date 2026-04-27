@@ -12,12 +12,6 @@ matplotlib
 geopy
 reverse_geocoder
 
-# LLM
-torch
-torchvision
-transformers
-accelerate
-
 # Optional RAG / vector DB (required by some actint.data_processing modules)
 chromadb
 
