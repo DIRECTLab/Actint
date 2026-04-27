@@ -1,4 +1,5 @@
 import os
+import socket
 from smolagents import ToolCallingAgent, TransformersModel, MCPClient
 from mcp import StdioServerParameters
 import sys
@@ -7,9 +8,16 @@ from actint.mcp import mcp_server
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
 
-# Register Phoenix instrumentation
-register(project_name="Map_Actint")
-SmolagentsInstrumentor().instrument()
+def is_port_in_use(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('localhost', port)) == 0
+
+# Register Phoenix instrumentation if server is running
+if is_port_in_use(4317):
+    register(project_name="Map_Actint")
+    SmolagentsInstrumentor().instrument()
+else:
+    print("Phoenix telemetry server is not running on localhost:4317. Skipping instrumentation.", file=sys.stderr)
 
 #model_id = "Qwen/Qwen3.5-9B"
 model_id = "Qwen/Qwen2-7B-Instruct"

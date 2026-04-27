@@ -941,11 +941,21 @@ def run_benchmarks(config: dict[str, Any], only_agent: str | None, only_benchmar
 			model = None
 			agent = None
 			try:
+				import socket
 				from phoenix.otel import register
 				from openinference.instrumentation.smolagents import SmolagentsInstrumentor
 
-				register(project_name="actint")
-				SmolagentsInstrumentor().instrument()
+				def is_port_in_use(port: int) -> bool:
+					with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+						return s.connect_ex(('localhost', port)) == 0
+
+				if is_port_in_use(4317):
+					register(project_name="actint")
+					SmolagentsInstrumentor().instrument()
+				else:
+					import sys
+					print("Phoenix telemetry server is not running on localhost:4317. Skipping instrumentation.", file=sys.stderr)
+
 				model = TransformersModel(model_id=model_id, **model_kwargs)
 
 				agent_kwargs: dict[str, Any] = {

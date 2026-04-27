@@ -1,8 +1,17 @@
+import sys
+import socket
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
 
-register()
-SmolagentsInstrumentor().instrument()
+def is_port_in_use(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('localhost', port)) == 0
+
+if is_port_in_use(4317):
+    register()
+    SmolagentsInstrumentor().instrument()
+else:
+    print("Phoenix telemetry server is not running on localhost:4317. Skipping instrumentation.", file=sys.stderr)
 
 from smolagents import (
     CodeAgent,
