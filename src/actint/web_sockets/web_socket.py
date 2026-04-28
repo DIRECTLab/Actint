@@ -7,8 +7,12 @@ import asyncio
 from datetime import datetime, timedelta
 import random
 import sys
-from actint.mcp.agent_query_from_chat import process_chat_message
+import random
+import socketio
+import asyncio
 
+from actint.web_sockets.map_functioons import set_map_position, draw_rectangle, draw_circle, draw_line
+from actint.mcp.agent_query_from_chat import process_chat_message
 from actint.web_sockets.defaults import sio, app
 
 
@@ -22,33 +26,33 @@ async def connect(sid, environ):
     print(f"User {sid} connected!", file=sys.stderr)
 
 
-# @sio.on("simulation_init")
-# async def handle_simulation_init(sid, data):
-#     print(f"Simulation init from {sid}: {data}", file=sys.stderr)
+@sio.on("simulation_init")
+async def handle_simulation_init(sid, data):
+    print(f"Simulation init from {sid}: {data}", file=sys.stderr)
     
-#     start_time = str(data["start_time"]+":07.000000")
-#     # Send to EVERYONE else
-#     await sio.emit("private_response", {"msg": f"Sending simulation data up to {data["start_time"]}"}, to=sid)
+    start_time = str(data["start_time"]+":07.000000")
+    # Send to EVERYONE else
+    await sio.emit("private_response", {"msg": f"Sending simulation data up to {data["start_time"]}"}, to=sid)
 
-#     (MMSIs, results) = get_positions_before_time(start_time)
+    (MMSIs, results) = get_positions_before_time(start_time)
 
-#     await sio.emit("previous_data", {"MMSIs": MMSIs, "results": results}, to=sid)
-#     await sio.emit("private_response", {"msg": f"Finished sending simulation data up to {data["start_time"]}"}, to=sid)
+    await sio.emit("previous_data", {"MMSIs": MMSIs, "results": results}, to=sid)
+    await sio.emit("private_response", {"msg": f"Finished sending simulation data up to {data["start_time"]}"}, to=sid)
 
-#     future_detections = get_positions_after_time(start_time)
-#     await send_simulation_updates(sid, future_detections, start_time)
+    future_detections = get_positions_after_time(start_time)
+    await send_simulation_updates(sid, future_detections, start_time)
 
 
 
-# async def send_simulation_updates(sid, data, start_time):
-#     current_time = start_time
-#     for detection in data:
-#         time_between = datetime.strptime(detection[2], '%Y-%m-%dT%H:%M:%S.%f') - datetime.strptime(current_time, '%Y-%m-%dT%H:%M:%S.%f')
-#         if(time_between.total_seconds() > 0):
-#             await asyncio.sleep(time_between.total_seconds())
-#         json_packet = create_json_packet(detection) 
-#         await sio.emit("new_detection", json_packet, to=sid)
-#         current_time = detection[2]
+async def send_simulation_updates(sid, data, start_time):
+    current_time = start_time
+    for detection in data:
+        time_between = datetime.strptime(detection[2], '%Y-%m-%dT%H:%M:%S.%f') - datetime.strptime(current_time, '%Y-%m-%dT%H:%M:%S.%f')
+        if(time_between.total_seconds() > 0):
+            await asyncio.sleep(time_between.total_seconds())
+        json_packet = create_json_packet(detection) 
+        await sio.emit("new_detection", json_packet, to=sid)
+        current_time = detection[2]
 
 
 
@@ -62,11 +66,6 @@ async def connect(sid, environ):
 # Chat manager
 
 # from actint.web_sockets.web_socket import sio, app
-import random
-import socketio
-import asyncio
-
-from actint.web_sockets.map_functioons import set_map_position, draw_rectangle, draw_circle, draw_line
 
 messages = {}
 

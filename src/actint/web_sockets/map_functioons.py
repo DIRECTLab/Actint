@@ -3,22 +3,17 @@ from actint.web_sockets.defaults import sio, app
 import uvicorn
 
 
-def set_map_position(lat, lon, zoom):
-    # This function can be called to set the map position for a specific client
-    asyncio.create_task(sio.emit("set_map_position", {
-        "lat": lat, 
-        "lon": lon, 
-        "zoom": zoom
-    })) #This will need to have to=sid added back later after the tool can be accessed by the LLM
-
-
-def set_map_position(lat, lon, zoom):
-    # This function can be called to set the map position for a specific client
-    asyncio.create_task(sio.emit("set_map_position", {
-        "lat": lat, 
-        "lon": lon, 
-        "zoom": zoom
-    })) #This will need to have to=sid added back later after the tool can be accessed by the LLM
+def set_map_position(lat, lon, zoom, sid=None):
+    # This function can be called to set the map position for a specific client.
+    payload = {
+        "lat": lat,
+        "lon": lon,
+        "zoom": zoom,
+    }
+    if sid:
+        asyncio.create_task(sio.emit("set_map_position", payload, to=sid))
+    else:
+        asyncio.create_task(sio.emit("set_map_position", payload))
 
 
 

@@ -18,6 +18,7 @@ import sqlite3
 import os
 from pathlib import Path
 from fastmcp import FastMCP
+import asyncio
 
 # Database path
 DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
@@ -511,26 +512,39 @@ def query_database(sql_query: str, max_rows: int | str = 200) -> str:
 # from actint.web_sockets.web_socket import set_map_position
 
 ####  TODO: move set_map_position out of web_socket.py so it can be imported without creating a circular import.
-# from actint.web_sockets.map_functioons import set_map_position
+from actint.web_sockets.map_functioons import set_map_position
+from actint.web_sockets.defaults import sio, app
 
-# @mcp.tool()
-# def position_map(lat: float, lon: float, zoom: int) -> str:
-#     """
-#     Position the map the user is looking at to a certain lattitude, longitude and zoom.
-    
-#     Args:
-#         lat (float): Latitude of the location to position the map to
-#         lon (float): Longitude of the location to position the map to
-#         zoom (int): Zoom level for the map
-    
-#     Returns:
-#         str: JSON string with the result of the map positioning operation
-#     """
-#     try:
-#         set_map_position(lat=lat, lon=lon, zoom=zoom)
-#         return json.dumps({"result": "Map positioned successfully"})
-#     except Exception as e:
-#         return json.dumps({"error": str(e)})
+
+
+@mcp.tool()
+def position_map(lat: float | str, lon: float | str, zoom: int | str, sid: str | None = None) -> str:
+    """
+    Position the map the user is looking at to a certain latitude, longitude and zoom.
+
+    Args:
+        lat (float | str): Latitude of the location to position the map to
+        lon (float | str): Longitude of the location to position the map to
+        zoom (int | str): Zoom level for the map
+        sid (str | None): Optional websocket client session ID to target a specific client
+
+    Returns:
+        str: JSON string with the result of the map positioning operation
+    """
+    try:
+        lat = float(lat)
+        lon = float(lon)
+        zoom = int(zoom)
+        set_map_position(lat=lat, lon=lon, zoom=zoom, sid=sid)
+        return json.dumps({
+            "result": "Map positioned successfully",
+            "target_sid": sid or "broadcast",
+            "lat": lat,
+            "lon": lon,
+            "zoom": zoom,
+        }, indent=2)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
 
 # ============================================================================
 # Server Entry Point
