@@ -1,6 +1,5 @@
 import socketio
 import uvicorn
-from actint.tests.mcp.host import run_agent
 from actint.web_sockets.data_retrieval import get_positions_before_time, get_positions_after_time, create_json_packet
 import sqlite3
 import asyncio
@@ -12,7 +11,7 @@ import socketio
 import asyncio
 
 from actint.web_sockets.map_functioons import set_map_position, draw_rectangle, draw_circle, draw_line
-from actint.mcp.agent_query_from_chat import process_chat_message
+from actint.mcp.chat_start import user_agent_query
 from actint.web_sockets.defaults import sio, app
 
 
@@ -67,11 +66,10 @@ async def send_simulation_updates(sid, data, start_time):
 
 # from actint.web_sockets.web_socket import sio, app
 
-messages = {}
 
 @sio.on("recieve_message")
-async def handle_recieve_message(sid, data):
-    print(f"Message from {sid}: {data}")
+async def query_agent(sid, data):
+    print(f"Message from {sid}: {data}", file=sys.stderr)
     
     draw_rectangle(sid, lat1=37.7749, lon1=122.4194, lat2=-37.7849, lon2=-122.4094, color="green") # Example: Draw a rectangle in San Francisco
     draw_circle(sid, radius=5000, center_lat=37.7749, center_lon=-122.4194, color="red") # Example: Draw a circle around San Francisco
@@ -83,7 +81,7 @@ async def handle_recieve_message(sid, data):
     
     # Offload the synchronous smolagents run to a background thread
     try:
-        agent_response_text = await asyncio.to_thread(process_chat_message, sid, user_text)
+        agent_response_text = await asyncio.to_thread(user_agent_query, user_text, sid),
     except Exception as e:
         agent_response_text = f"Error processing message: {str(e)}"
 
@@ -105,15 +103,12 @@ async def handle_recieve_message(sid, data):
 
         
 
-
+from actint.mcp.chat_start import remoove_user_agent
 
 @sio.event
 async def disconnect(sid):
     print(f"User {sid} left.", file=sys.stderr)
-    if messages.get(sid):
-        del messages[sid]
+    remoove_user_agent(sid)
 
 if __name__ == "__main__":
-    # "0.0.0.0" means "listen on all network interfaces" 
-    # (so other computers can connect to your IP)
     uvicorn.run(app, host="0.0.0.0", port=3050)
