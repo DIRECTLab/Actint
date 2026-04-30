@@ -19,6 +19,7 @@ import os
 from pathlib import Path
 from fastmcp import FastMCP
 import asyncio
+import sys
 
 # Database path
 DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
@@ -59,6 +60,14 @@ mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 # ============================================================================
 # Health & Info Endpoints
 # ============================================================================
+
+@mcp.tool()
+def say_hello() -> str:
+    """Simple tool to test connectivity and responsiveness of the MCP server."""
+    message = "Hello! The AIS Vessel Intelligence MCP server is up and running."
+    print("Printed Message:", message)#, file=sys.stderr)
+    return message
+
 
 @mcp.tool()
 def get_vessel_locations(mmsi: int | str) -> str:

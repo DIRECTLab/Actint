@@ -39,3 +39,13 @@ def process_chat_message(sid: str, message: str) -> str:
         return result.output
     else:
         return f"Response Failed. Agent state: {result.state}"
+
+
+
+
+
+# Pseudocode: 
+#  Create a global LLM that all the different toolCallingAgents can reference.
+#  Create a function that handles every user that gets on.  
+#  For every user, give them a toolCallingAgent, and allow them to make queries with all the tools in the MCP server. 
+#  Return the answer the tool calling agent returns to them. Might need to figure out a way to deal with the thinking behaviors of the ceratin LLM.
