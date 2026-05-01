@@ -8,13 +8,17 @@ from transformers import AutoTokenizer
 from actint.mcp import mcp_server
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
+import asyncio
+from actint.web_sockets.map_functions import draw_rectangle, draw_circle, draw_line
+from actint.web_sockets.defaults import sio, app
+from actint.mcp.map_edit_tools import ZoomTool, DrawRectangleTool, DrawCircleTool, DrawLineTool
 
 # Register Phoenix instrumentation
 # register(project_name="Map_Actint")
 # SmolagentsInstrumentor().instrument()
 
-#model_id = "Qwen/Qwen3.5-9B"
-model_id = "Qwen/Qwen2-7B-Instruct"
+model_id = "Qwen/Qwen3.5-9B"
+#model_id = "Qwen/Qwen2-7B-Instruct"
 
 conda_prefix = os.getenv("CONDA_PREFIX")
 python = str(Path(conda_prefix) / "bin" / "python")
@@ -45,15 +49,19 @@ model = TransformersModel(
     eos_token_id=tokenizer.eos_token_id,
 )
 
+import asyncio
+import sys
+
 user_agent_dict = {}
 
-def user_agent_query(query: str, sid: str):
+async def user_agent_query(query: str, sid: str):
     if sid not in user_agent_dict:
-        user_agent_dict[sid] = ToolCallingAgent(tools=tools, model=model)
-    
+        user_tools = tools + [ZoomTool(sid, sio), DrawRectangleTool(sid, sio), DrawCircleTool(sid, sio), DrawLineTool(sid, sio)]
+        user_agent_dict[sid] = ToolCallingAgent(tools=user_tools, model=model)
+
     result = user_agent_dict[sid].run(query, reset=False)
     return result
 
-def remoove_user_agent(sid: str):
+def remove_user_agent(sid: str):
     if sid in user_agent_dict:
         del user_agent_dict[sid]
