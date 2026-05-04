@@ -1,0 +1,67 @@
+import os
+from smolagents import ToolCallingAgent, TransformersModel, MCPClient
+from mcp import StdioServerParameters
+import sys
+from pathlib import Path
+
+from transformers import AutoTokenizer
+from actint.mcp import mcp_server
+from phoenix.otel import register
+from openinference.instrumentation.smolagents import SmolagentsInstrumentor
+import asyncio
+from actint.web_sockets.map_functions import draw_rectangle, draw_circle, draw_line
+from actint.web_sockets.defaults import sio, app
+from actint.mcp.map_edit_tools import ZoomTool, DrawRectangleTool, DrawCircleTool, DrawLineTool
+
+# Register Phoenix instrumentation
+# register(project_name="Map_Actint")
+# SmolagentsInstrumentor().instrument()
+
+model_id = "Qwen/Qwen3.5-9B"
+#model_id = "Qwen/Qwen2-7B-Instruct"
+
+conda_prefix = os.getenv("CONDA_PREFIX")
+python = str(Path(conda_prefix) / "bin" / "python")
+
+# Initialize MCP server
+server_params = StdioServerParameters(
+    command=python,
+    args=[mcp_server.__file__],
+    env=os.environ.copy(),
+    cwd=os.getcwd()
+)
+
+mcp_client = MCPClient(server_params, structured_output=False)
+tools = mcp_client.get_tools()
+
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+tokenizer.padding_side = "left"
+
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token  #The pad_token is the padding token, AI processes things in chunks, so this is just filler so everything is the same chunk size. This is put on the left side (as described in previous code)
+                                                #The eos_token is just the end of sentence token. It describes when a sentence has ended.
+
+
+model = TransformersModel(
+    model_id=model_id,
+    max_new_tokens=4096,
+    pad_token_id=tokenizer.pad_token_id,
+    eos_token_id=tokenizer.eos_token_id,
+)
+
+import asyncio
+import sys
+
+user_agent_dict = {}
+
+async def user_agent_query(query: str, sid: str):
+    if sid not in user_agent_dict:
+        user_tools = tools + [ZoomTool(sid, sio), DrawRectangleTool(sid, sio), DrawCircleTool(sid, sio), DrawLineTool(sid, sio)]
+        user_agent_dict[sid] = ToolCallingAgent(tools=user_tools, model=model)
+
+    result = user_agent_dict[sid].run(query, reset=False)
+    return result
+
+def remove_user_agent(sid: str):
+    if sid in user_agent_dict:
+        del user_agent_dict[sid]
