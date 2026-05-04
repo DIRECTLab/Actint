@@ -4,34 +4,28 @@
 #   pip install -r actint/requirements.txt
 
 # Core scientific stack
-numpy>=2.4.1
-pandas>=3.0
-matplotlib>=3.10
+numpy
+pandas
+matplotlib
 
 # Geospatial
-geopy>=2.4
-reverse_geocoder>=1.5
+geopy
+reverse_geocoder
 
 # Optional RAG / vector DB (required by some actint.data_processing modules)
-chromadb>=1.5.5
+chromadb
 
 # MCP + HTTP server
-fastmcp>=3.0
-fastapi>=0.130
-uvicorn>=0.44
-pydantic>=2.13
-httpx>=0.28
-python-dotenv>=1.0
-arize-phoenix==14.12.0
-
+fastmcp
+fastapi
+uvicorn
+pydantic
+httpx
+python-dotenv
+smolagents[mcp]
+smolagents[gradio]
+smolagents[telemetry,toolkit]
+smolagents[transformers]
 git+https://github.com/DIRECTLab/smolagents
-
-smolagents[mcp] @ git+https://github.com/DIRECTLab/smolagents
-smolagents[transformers] @ git+https://github.com/DIRECTLab/smolagents
-smolagents[telemetry,toolkit] @ git+https://github.com/DIRECTLab/smolagents
-
-huggingface_hub>=1.9
+huggingface_hub
 huggingface_hub[mcp]
-
-#sockets for LLM streaming and data transfer
-python-socketio>=5.15
