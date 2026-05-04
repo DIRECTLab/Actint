@@ -50,7 +50,7 @@ export default function Map({ vehiclesPreviousPositions, vehicleCurrentPositions
   })
   
   return (
-    <div style={{ height: '100vh', width: '100%', background: '#000'}}>
+    <div style={{ height: '100%', width: '100%', background: '#000'}}>
       
 
       <MapContainer 
@@ -63,18 +63,18 @@ export default function Map({ vehiclesPreviousPositions, vehicleCurrentPositions
         {/* A bunch of different themes you can pick from: */}
 
         {/* Basic map */}
-        {/* <TileLayer 
+        <TileLayer 
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
-          /> */}
+          />
 
         {/* Google 2012 night satellite image */}
-        <TileLayer
+        {/* <TileLayer
           attribution='Imagery provided by services from the Global Imagery Browse Services (GIBS), operated by the NASA/GSFC/Earth Science Data and Information System (ESDIS)'
           url="https://map1.vis.earthdata.nasa.gov/wmts-webmerc/VIIRS_CityLights_2012/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpg"
           minZoom={1}
           maxZoom={8}
-        />
+        /> */}
 
         {/* Grey-green military map */}
         {/* <TileLayer

@@ -46,7 +46,7 @@ useEffect(() => {
 
 
 return (
-    <div style={{ position: 'relative', height: '1000px', width: '25%' }}>
+    <div style={{ position: 'relative', height: '100%', width: '100%' }}>
         <MainContainer>
             <ChatContainer>
                 <MessageList>

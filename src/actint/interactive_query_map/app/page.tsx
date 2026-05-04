@@ -44,29 +44,33 @@ export default function Home() {
   
   
 
-  return (<>
-    <div id="main">
-    <div id="row">
-      <div id="column">
-        
-
+  return (
+    <>
+      <div id="simulation_settings" className="flex-none h-1/10 overflow-hidden"> {/* 20% of screen height for SimSettings */}
         <SimSettings
           simulation_settings={simulationSettings}
           set_simulation_settings={setSimulationSettings}
           setVehicleCurrentPositions={setVehicleCurrentPositions}
           setVehiclePreviousPositions={setVehiclesPreviousPositions}
         />
-
-        <Map 
-          vehiclesPreviousPositions={vehiclesPreviousPositions}
-          vehicleCurrentPositions={vehicleCurrentPositions}
-        />
-
-
       </div>
-      <Chat />
-      {/* Put the chat interface here */}
-    </div>
-    </div>
-  </>)
-  }
+
+
+
+
+
+
+      <div id="chat_map" className="flex flex-1 h-9/10"> {/* Remaining 80% height, flex horizontally */}
+        <div className="w-3/4"> {/* 75% width for Map */}
+          <Map
+            vehiclesPreviousPositions={vehiclesPreviousPositions}
+            vehicleCurrentPositions={vehicleCurrentPositions}
+          />
+        </div>
+        <div className="w-1/4"> {/* 25% width for Chat */}
+          <Chat />
+        </div>
+      </div>
+    </>
+  );
+}
