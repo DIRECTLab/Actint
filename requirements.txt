@@ -12,6 +12,9 @@ matplotlib
 geopy
 reverse_geocoder
 
+# Postgres (ADS-B tools)
+psycopg[binary]
+
 # LLM
 torch
 torchvision
