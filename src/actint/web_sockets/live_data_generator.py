@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 import time
 import threading
 import socketio
-import eventlet
 import asyncio
 import uvicorn
 from pathlib import Path

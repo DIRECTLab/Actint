@@ -228,3 +228,7 @@ actint/src/.vscode
 **/db/**
 results/
 2016/*
+
+# Slurm Results
+*.err
+*.out
