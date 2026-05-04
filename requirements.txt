@@ -22,6 +22,7 @@ uvicorn>=0.44
 pydantic>=2.13
 httpx>=0.28
 python-dotenv>=1.0
+arize-phoenix==14.12.0
 
 git+https://github.com/DIRECTLab/smolagents
 
