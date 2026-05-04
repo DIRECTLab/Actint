@@ -18,11 +18,15 @@ import sqlite3
 import os
 from pathlib import Path
 from fastmcp import FastMCP
+import asyncio
+import nest_asyncio
+import sys
 
 # Database path
 DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
 DB_DIR = DATA_DIR / "db"
 SQLITE_PATH = DB_DIR / "ais.db"
+
 
 
 def _resolve_sqlite_path() -> Path:
@@ -58,6 +62,14 @@ mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 # ============================================================================
 # Health & Info Endpoints
 # ============================================================================
+
+@mcp.tool()
+def say_hello() -> str:
+    """Simple tool to test connectivity and responsiveness of the MCP server."""
+    message = "Hello! The AIS Vessel Intelligence MCP server is up and running."
+    print("Printed Message:", message)#, file=sys.stderr)
+    return message
+
 
 @mcp.tool()
 def get_vessel_locations(mmsi: int | str) -> str:
@@ -510,28 +522,46 @@ def query_database(sql_query: str, max_rows: int | str = 200) -> str:
 # ============================================================================
 # from actint.web_sockets.web_socket import set_map_position
 
-####  TODO: move set_map_position out of web_socket.py so it can be imported without creating a circular import.
-# from actint.web_sockets.map_functioons import set_map_position
+from actint.web_sockets.map_functions import set_map_position
+from actint.web_sockets.defaults import sio, app
+
+
 
 # @mcp.tool()
-# def position_map(lat: float, lon: float, zoom: int) -> str:
+# async def position_map(lat: float, lon: float, zoom: int) -> str:
 #     """
-#     Position the map the user is looking at to a certain lattitude, longitude and zoom.
-    
+#     Position the map the user is looking at to a certain latitude, longitude and zoom.
+
 #     Args:
-#         lat (float): Latitude of the location to position the map to
-#         lon (float): Longitude of the location to position the map to
-#         zoom (int): Zoom level for the map
-    
+#         lat (float | str): Latitude of the location to position the map to
+#         lon (float | str): Longitude of the location to position the map to
+#         zoom (int | str): Zoom level for the map
+#         sid (str | None): Optional websocket client session ID to target a specific client
+
 #     Returns:
 #         str: JSON string with the result of the map positioning operation
 #     """
-#     try:
-#         set_map_position(lat=lat, lon=lon, zoom=zoom)
-#         return json.dumps({"result": "Map positioned successfully"})
+#     lat = float(lat)
+#     lon = float(lon)
+#     zoom = int(zoom)
+#     print("Positioning map", file=sys.stderr)
+    
+#     try: 
+#         asyncio.run(set_map_position(float(lat), float(lon), int(zoom)))
+#         print("Map hopefullly positioned", file=sys.stderr)
+#         return json.dumps({"status": "success", "message": f"Map positioned to lat: {lat}, lon: {lon}, zoom: {zoom}"})
 #     except Exception as e:
-#         return json.dumps({"error": str(e)})
+#         # 1. Print the full technical error to your server console for YOU to see
+#         import traceback
+#         print(f"Error in position_map: {e}", file=sys.stderr)
+#         traceback.print_exc(file=sys.stderr) 
 
+#         # 2. Return a clean error message back to the AGENT
+#         return json.dumps({
+#             "status": "failure", 
+#             "error_type": type(e).__name__,
+#             "message": str(e)
+#         })
 # ============================================================================
 # Server Entry Point
 # ============================================================================

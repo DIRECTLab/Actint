@@ -15,7 +15,7 @@ type Props = {
 export default function SimSettings({ simulation_settings, set_simulation_settings, setVehicleCurrentPositions, setVehiclePreviousPositions }: Props) {
 
     return (
-            <div id='simulation_settings'>
+            <div id='simulation_settings' className="h-full flex justify-between overflow-y-auto p-4">
                 <h1 className="bg-blue-500 rounded p-3">Simulation Settings</h1>
 
 

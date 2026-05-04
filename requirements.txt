@@ -12,6 +12,9 @@ matplotlib>=3.10
 geopy>=2.4
 reverse_geocoder>=1.5
 
+# Postgres (ADS-B tools)
+psycopg[binary]
+
 # Optional RAG / vector DB (required by some actint.data_processing modules)
 chromadb>=1.5.5
 
