@@ -1,4 +1,9 @@
 import os
+import sys
+
+# Set the Hugging Face cache directory before importing Transformers
+# os.environ["HF_HOME"] = os.path.expandvars("/scratch/$USER/huggingface_cache")
+
 import socket
 from smolagents import ToolCallingAgent, TransformersModel, MCPClient
 from mcp import StdioServerParameters
@@ -19,8 +24,8 @@ if is_port_in_use(4317):
 else:
     print("Phoenix telemetry server is not running on localhost:4317. Skipping instrumentation.", file=sys.stderr)
 
-#model_id = "Qwen/Qwen3.5-9B"
-model_id = "Qwen/Qwen2-7B-Instruct"
+model_id = "Qwen/Qwen3.5-9B"
+# model_id = "Qwen/Qwen2-7B-Instruct"
 
 conda_prefix = os.getenv("CONDA_PREFIX")
 python = str(Path(conda_prefix) / "bin" / "python")
