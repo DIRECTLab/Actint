@@ -1,6 +1,6 @@
 from actint.data_processing.query_database import query_ais_positions, query_vessels, query_fleets
 from dataclasses import dataclass
-from actint.data_processing.rag import VesselPosition
+from actint.tools.vessel_data import VesselPosition
 from actint.tools.utils.distance_calculation import haversine_distance_nm
 
 from datetime import datetime, timedelta

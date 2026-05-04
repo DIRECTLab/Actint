@@ -6,7 +6,8 @@ from pathlib import Path
 
 DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
 DB_DIR = DATA_DIR / "db"
-SQLITE_PATH = DB_DIR / "ais.db"
+SQLITE_PATH_AIS = DB_DIR / "ais.db"
+SQLITE_PATH_ADSB = DB_DIR / "adsb.db"
 
 
 def _resolve_sqlite_path() -> Path:
@@ -14,11 +15,30 @@ def _resolve_sqlite_path() -> Path:
     override = os.getenv("ACTINT_SQLITE_PATH")
     if override:
         return Path(override).expanduser().resolve()
-    return SQLITE_PATH
+    return SQLITE_PATH_AIS
 
 def _get_sqlite_connection() -> sqlite3.Connection:
     """Get a SQLite connection."""
     return sqlite3.connect(_resolve_sqlite_path())
+
+
+def _resolve_sqlite_path_asdb() -> Path:
+    """Resolve SQLite path, allowing benchmark overrides via env var."""
+    override = os.getenv("ACTINT_SQLITE_PATH")
+    if override:
+        return Path(override).expanduser().resolve()
+    return SQLITE_PATH_ADSB
+
+
+
+def _get_sqlite_connection_asdb() -> sqlite3.Connection:
+    """Get a SQLite connection."""
+    return sqlite3.connect(_resolve_sqlite_path_asdb())
+
+
+
+
+###################################### Functions for AIS/boats #######################################
 
 def query_ais_positions(searchQuery: dict, sort=False):
     conn = _get_sqlite_connection()
@@ -27,6 +47,7 @@ def query_ais_positions(searchQuery: dict, sort=False):
         cursor.execute(f"SELECT * FROM ais_positions WHERE {key} = ?", (value,))
     results = cursor.fetchall()
     print(results[0][2])
+    conn.close()
     if(results and sort):
         sorted_vessels = sorted(
             results,
@@ -34,8 +55,6 @@ def query_ais_positions(searchQuery: dict, sort=False):
             reverse=True
         )
         return sorted_vessels
-
-    conn.close()
     return results
 
 
@@ -59,3 +78,29 @@ def query_vessels(searchQuery: dict):
     results = cursor.fetchall()
     conn.close()
     return results
+
+
+
+
+
+######################################### Functions for planes ##########################################
+
+
+def query_adsb_positions(searchQuery: dict, sort=False):
+    conn = _get_sqlite_connection_asdb()
+    cursor = conn.cursor()
+    for key, value in searchQuery.items():
+        cursor.execute(f"SELECT * FROM adsb_positions WHERE {key} = ?", (value,))
+    results = cursor.fetchall()
+    conn.close()
+    if results and sort:
+        sorted_planes = sorted(
+            results,
+            key=lambda x: float(x[7]),
+            reverse=True
+        )
+        return sorted_planes
+
+    return results
+
+

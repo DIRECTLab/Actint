@@ -60,6 +60,45 @@ mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 # ============================================================================
 
 @mcp.tool()
+def say_hello() -> str:
+    """Simple tool to test connectivity and responsiveness of the MCP server."""
+    message = "Hello! The AIS Vessel Intelligence MCP server is up and running."
+    print("Printed Message:", message)#, file=sys.stderr)
+    return message
+
+
+@mcp.tool()
+def get_vessel_locations(mmsi: int | str) -> str:
+    """Get all recorded positions for a specific vessel identified by MMSI.
+    
+    Args:
+        mmsi (int): Maritime Mobile Service Identity number of the vessel
+    
+    Returns:
+        str: JSON list of vessel positions with coordinates, timestamps, and speed data
+    """
+    try:
+        mmsi = int(mmsi)
+        locations = get_vehicle_locations(mmsi)
+        result_data = [
+            {
+                "mmsi": loc.mmsi,
+                "vessel_name": loc.vessel_name,
+                "timestamp": loc.timestamp,
+                "latitude": loc.lat,
+                "longitude": loc.lon,
+                "speed_over_ground": loc.sog,
+                "course_over_ground": loc.cog,
+                "heading": loc.heading,
+            }
+            for loc in locations
+        ]
+        return json.dumps(result_data, indent=2)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+@mcp.tool()
 def get_vessel_current_position(mmsi: int | str) -> str:
     """Get the most recent position of a vessel.
     
@@ -254,6 +293,50 @@ def find_nearest_waterway(latitude: float | str, longitude: float | str) -> str:
     except Exception as e:
         return json.dumps({"error": str(e)})
 
+
+# ============================================================================
+# Tools: Fleet Analysis
+# ============================================================================
+
+@mcp.tool()
+def calculate_fleet_position(fleet_name: str) -> str:
+    """Calculate the average position of a fleet of vessels.
+    
+    Args:
+        fleet_name (str): Canonical name of the fleet
+    
+    Returns:
+        str: JSON with fleet position (latitude and longitude)
+    """
+    try:
+        lat, lon = calc_fleet_position(fleet_name)
+        result = {
+            "fleet_name": fleet_name,
+            "fleet_position": {"latitude": lat, "longitude": lon}
+        }
+        return json.dumps(result, indent=2)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+@mcp.tool()
+def is_ship_in_fleet(mmsi: int | str) -> str:
+    """Check if a vessel is within fleet proximity (10 nautical miles).
+    
+    Args:
+        mmsi (int): MMSI of the vessel to check
+    
+    Returns:
+        str: String indicating if ship is in fleet or outside fleet proximity
+    """
+    try:
+        mmsi = int(mmsi)
+        result_str = check_ship_in_fleet(mmsi)
+        return json.dumps({"proximity_check": result_str})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
 # ============================================================================
 # Tools: Destination Prediction
 # ============================================================================
@@ -293,10 +376,10 @@ def _quote_sqlite_identifier(identifier: str) -> str:
 
 @mcp.tool()
 def get_database_info() -> str:
-    """Get schema info for the ais_positions table only.
+    """Get basic SQLite database schema info (tables and column definitions).
 
     Returns:
-        str: JSON object containing database path and ais_positions column definitions.
+        str: JSON object containing database path and a list of tables with columns.
     """
     try:
         sqlite_path = _resolve_sqlite_path()
@@ -306,35 +389,40 @@ def get_database_info() -> str:
         conn = sqlite3.connect(str(sqlite_path))
         cursor = conn.cursor()
 
-        table_name = "ais_positions"
-        quoted = _quote_sqlite_identifier(table_name)
-        cursor.execute(f"PRAGMA table_info({quoted});")
+        cursor.execute(
+            "SELECT name FROM sqlite_master "
+            "WHERE type='table' AND name NOT LIKE 'sqlite_%' "
+            "ORDER BY name;"
+        )
+        table_names = [r[0] for r in cursor.fetchall()]
 
-        # PRAGMA table_info returns: cid, name, type, notnull, dflt_value, pk
-        columns = []
-        for cid, name, col_type, notnull, dflt_value, pk in cursor.fetchall():
-            columns.append(
-                {
-                    "cid": cid,
-                    "name": name,
-                    "type": col_type,
-                    "notnull": bool(notnull),
-                    "default": dflt_value,
-                    "pk": bool(pk),
-                }
-            )
+        tables: list[dict] = []
+        for table_name in table_names:
+            quoted = _quote_sqlite_identifier(table_name)
+            cursor.execute(f"PRAGMA table_info({quoted});")
+            # PRAGMA table_info returns: cid, name, type, notnull, dflt_value, pk
+            columns = []
+            for cid, name, col_type, notnull, dflt_value, pk in cursor.fetchall():
+                columns.append(
+                    {
+                        "cid": cid,
+                        "name": name,
+                        "type": col_type,
+                        "notnull": bool(notnull),
+                        "default": dflt_value,
+                        "pk": bool(pk),
+                    }
+                )
 
-        if not columns:
-            conn.close()
-            return json.dumps({"error": "Table 'ais_positions' not found"})
+            tables.append({"name": table_name, "columns": columns})
 
         conn.close()
 
         return json.dumps(
             {
                 "db_path": str(sqlite_path),
-                "table_count": 1,
-                "tables": [{"name": table_name, "columns": columns}],
+                "table_count": len(tables),
+                "tables": tables,
             },
             indent=2,
         )

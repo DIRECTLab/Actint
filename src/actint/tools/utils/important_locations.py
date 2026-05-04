@@ -24,21 +24,6 @@ MAJOR_PORTS = {
 
 # Ocean/Sea boundaries (simplified bounding boxes)
 MARITIME_REGIONS = {
-    "Pacific Ocean (Eastern)": {
-        "bounds": {"lat_min": -60, "lat_max": 60, "lon_min": -180, "lon_max": -100},
-    },
-    "Pacific Ocean (Western)": {
-        "bounds": {"lat_min": -60, "lat_max": 60, "lon_min": 100, "lon_max": 180},
-    },
-    "Pacific Ocean (Central)": {
-        "bounds": {"lat_min": -60, "lat_max": 60, "lon_min": -160, "lon_max": -100},
-    },
-    "Atlantic Ocean (Western)": {
-        "bounds": {"lat_min": -60, "lat_max": 60, "lon_min": -80, "lon_max": -30},
-    },
-    "Atlantic Ocean (Eastern)": {
-        "bounds": {"lat_min": -60, "lat_max": 60, "lon_min": -30, "lon_max": 0},
-    },
     "Gulf of America": {
         "bounds": {"lat_min": 18, "lat_max": 31, "lon_min": -98, "lon_max": -80},
     },
@@ -72,8 +57,29 @@ MARITIME_REGIONS = {
     "Indian Ocean": {
         "bounds": {"lat_min": -60, "lat_max": 30, "lon_min": 20, "lon_max": 100},
     },
-    "Bering Sea": {
-        "bounds": {"lat_min": 52, "lat_max": 66, "lon_min": 162, "lon_max": -157},
+    "Bering Sea (Eastern)": {
+        "bounds": {"lat_min": 52, "lat_max": 66, "lon_min": 162, "lon_max": 180},
+    },
+    "Bearing Sea (Western)": {
+        "bounds": {"lat_min": 52, "lat_max": 66, "lon_min": -180, "lon_max": -157},
+    }
+}
+
+OCEANS = {
+    "Pacific Ocean (Eastern)": {
+        "bounds": {"lat_min": -60, "lat_max": 60, "lon_min": -180, "lon_max": -100},
+    },
+    "Pacific Ocean (Western)": {
+        "bounds": {"lat_min": -60, "lat_max": 60, "lon_min": 100, "lon_max": 180},
+    },
+    "Pacific Ocean (Central)": {
+        "bounds": {"lat_min": -60, "lat_max": 60, "lon_min": -160, "lon_max": -100},
+    },
+    "Atlantic Ocean (Western)": {
+        "bounds": {"lat_min": -60, "lat_max": 60, "lon_min": -80, "lon_max": -30},
+    },
+    "Atlantic Ocean (Eastern)": {
+        "bounds": {"lat_min": -60, "lat_max": 60, "lon_min": -30, "lon_max": 0},
     },
 }
 
@@ -91,10 +97,97 @@ STRATEGIC_WATERWAYS = {
 
 
 CONTINENTS = {
-    "North America": {"lat_min": 10, "lat_max": 90, "lon_min": -135, "lon_max": -50},
-    "South America": {"lat_min": -56, "lat_max": 14, "lon_min": -85, "lon_max": -34},
-    "Europe": {"lat_min": 32, "lat_max": 75, "lon_min": -13, "lon_max": 46},
-    "Africa": {"lat_min": -38, "lat_max": 39, "lon_min": -19, "lon_max": 54},
-    "Asia": {"lat_min": 0, "lat_max": 75, "lon_min": 34, "lon_max": 180},
-    "Austrailia": {"lat_min": -44, "lat_max": -3, "lon_min": 113, "lon_max": 154},
+    "North America": {
+        "bounds": {"lat_min": 10, "lat_max": 90, "lon_min": -135, "lon_max": -50},
+    },
+    "South America": {
+        "bounds":  {"lat_min": -56, "lat_max": 14, "lon_min": -85, "lon_max": -34},
+    },
+    "Europe": {
+        "bounds": {"lat_min": 32, "lat_max": 75, "lon_min": -13, "lon_max": 46},
+    },
+    "Africa": {
+        "bounds": {"lat_min": -38, "lat_max": 39, "lon_min": -19, "lon_max": 54},
+    },
+    "Asia": {
+        "bounds": {"lat_min": 0, "lat_max": 75, "lon_min": 34, "lon_max": 180},
+    },
+    "Austrailia": {
+        "bounds": {"lat_min": -44, "lat_max": -3, "lon_min": 113, "lon_max": 154},
+    },
 }
+
+
+
+def get_locations(position):
+
+    lat = position[0]
+    lon = position[1]
+
+    """
+    Identify the maritime region for given coordinates.
+    
+    Returns the most specific matching region.
+    """
+    matches = []
+    
+    for region_name, region_info in MARITIME_REGIONS.items():
+        bounds = region_info["bounds"]
+        
+        # Handle regions crossing the date line
+        if bounds["lon_min"] > bounds["lon_max"]:
+            # Region crosses date line (e.g., Bering Sea)
+            in_lon = lon >= bounds["lon_min"] or lon <= bounds["lon_max"]
+        else:
+            in_lon = bounds["lon_min"] <= lon <= bounds["lon_max"]
+        
+        in_lat = bounds["lat_min"] <= lat <= bounds["lat_max"]
+        
+        if in_lat and in_lon:
+            # Calculate how specific/small the region is (smaller = more specific)
+            area = (bounds["lat_max"] - bounds["lat_min"]) * abs(bounds["lon_max"] - bounds["lon_min"])
+            matches.append((region_name, area))
+
+
+
+    for region_name, region_info in OCEANS.items():
+        bounds = region_info["bounds"]
+        
+        # Handle regions crossing the date line
+        if bounds["lon_min"] > bounds["lon_max"]:
+            # Region crosses date line (e.g., Bering Sea)
+            in_lon = lon >= bounds["lon_min"] or lon <= bounds["lon_max"]
+        else:
+            in_lon = bounds["lon_min"] <= lon <= bounds["lon_max"]
+        
+        in_lat = bounds["lat_min"] <= lat <= bounds["lat_max"]
+        
+        if in_lat and in_lon:
+            # Calculate how specific/small the region is (smaller = more specific)
+            area = (bounds["lat_max"] - bounds["lat_min"]) * abs(bounds["lon_max"] - bounds["lon_min"])
+            matches.append((region_name, area))
+
+
+    for region_name, region_info in CONTINENTS.items():
+        bounds = region_info["bounds"]
+        
+        # Handle regions crossing the date line
+        if bounds["lon_min"] > bounds["lon_max"]:
+            # Region crosses date line (e.g., Bering Sea)
+            in_lon = lon >= bounds["lon_min"] or lon <= bounds["lon_max"]
+        else:
+            in_lon = bounds["lon_min"] <= lon <= bounds["lon_max"]
+        
+        in_lat = bounds["lat_min"] <= lat <= bounds["lat_max"]
+        
+        if in_lat and in_lon:
+            # Calculate how specific/small the region is (smaller = more specific)
+            area = (bounds["lat_max"] - bounds["lat_min"]) * abs(bounds["lon_max"] - bounds["lon_min"])
+            matches.append((region_name, area))
+    
+    if matches:
+        # Return most specific (smallest area) match
+        matches.sort(key=lambda x: x[1])
+        return matches
+    
+    return None

@@ -33,6 +33,32 @@ register()
 SmolagentsInstrumentor().instrument()
 ```
 
+## How to run things (for now)
+To experiment with the agent with no frontend:
+- Allocate a session on the slurm cluster
+- Launch the phoenix server (command above)
+- In `src/actint/mcp/` Run `python smolagent.py`
+
+**To try different queries, change the argument in `agent.run()` (line 41)**
+
+## OR to run with frontend:
+Allocate a session on Zengief or Ryu (they have open ports)
+
+The URL of the websocket defined in web_socket.py
+
+If you're using the same slurm node as someone else, pick a different port.
+Available Ports:
+- Ryu:     2000-3000
+- Zengief: 3001-3100
+- Terry:   3101-3200
+
+**Then, on the slurm node:**
+- *(Optional)* - Lauch the phoenix server in the project root directory: `python -m phoenix.server.main serve`
+- In `src/actint/web_sockets` run `python web_sockets.py`
+
+**Then, launch the React frontend on your *local machine*:**
+- In `src/actint/interactive_query_map` run `npm run dev` 
+
 # Problem scope and user
 ## Primary User
 The primary target of the ACTINT (activity intelligence) framework will be entities interested in intelligent tracking and monitering of various vehicles types, given several modalities of information. While primarily focused on military applications, this framework could extend to other fields such as shipping, public transportation, taxi fleets, and others. 

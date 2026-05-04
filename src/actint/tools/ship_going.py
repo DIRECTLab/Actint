@@ -21,7 +21,7 @@ If the ship is travelling exactly toward the target, the ratio will be 1"""
 
 """It might be a good idea to make this thing "smart" and only take the tracks that roughly follow a straight line"""
 
-VECTOR_DISTANCE_RATIO = 0.7
+VECTOR_DISTANCE_RATIO = 0.9
 DEGREE_THRESHOLD= 15
 
 def calculate_vector_and_distance_sum(ship_mmsi: str, number_detections=300, tracking_time=timedelta(hours=1)):
@@ -41,8 +41,9 @@ def calculate_vector_and_distance_sum(ship_mmsi: str, number_detections=300, tra
     for position in rescent_reversed_positions:
         print(position)
 
-        
-    if(math.hypot(total_vector[0], total_vector[1])/total_distance > VECTOR_DISTANCE_RATIO):                                                       #Caan use this to describe if the ship is going fast or slow
+    vector_distance_ratio = math.hypot(total_vector[0], total_vector[1])/total_distance
+    print("Vector distance ratio", vector_distance_ratio)
+    if(vector_distance_ratio > VECTOR_DISTANCE_RATIO):                                                       #Can use this to describe if the ship is going fast or slow
         print("The ship is going toward something")
 
         current_position = (positions[0][3], positions[0][4])
