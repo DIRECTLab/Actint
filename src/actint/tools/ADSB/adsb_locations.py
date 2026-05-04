@@ -13,8 +13,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
 
-from actint.tools.ADSB.basic_tools import get_conn, normalize_icao
-from actint.tools.utils.distance_calculation import haversine_distance_nm
+from actint.tools.ADSB.basic_tools import bbox_from_radius_nm, get_conn, icao_to_reg, normalize_icao
+from actint.tools.utils.distance_calculation import calculate_bearing, haversine_distance_nm
 
 
 @dataclass
@@ -86,20 +86,31 @@ def get_vehicle_locations(
     if limit > 5000:
         limit = 5000
 
+    where_parts: list[str] = ["icao = %s"]
+    params: list[object] = [icao_n]
+
+    if start_time is not None:
+        where_parts.append("timestamp >= %s")
+        params.append(start_time)
+
+    if end_time is not None:
+        where_parts.append("timestamp <= %s")
+        params.append(end_time)
+
     sql = (
         "SELECT "
         + ", ".join(_POSITION_COLUMNS)
         + " FROM adsb_positions "
-        "WHERE icao = %s "
-        "AND (%s IS NULL OR timestamp >= %s) "
-        "AND (%s IS NULL OR timestamp <= %s) "
-        "ORDER BY timestamp DESC "
-        "LIMIT %s;"
+        + "WHERE "
+        + " AND ".join(where_parts)
+        + " ORDER BY timestamp DESC "
+        + "LIMIT %s;"
     )
+    params.append(limit)
 
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (icao_n, start_time, start_time, end_time, end_time, limit))
+            cur.execute(sql, tuple(params))
             colnames = [d.name for d in cur.description]
             rows = [dict(zip(colnames, r)) for r in cur.fetchall()]
 
@@ -243,3 +254,78 @@ def aircraft_following(
         f"within ±{threshold_time_minutes} minutes for {hits}/{total} leader positions "
         f"over the last {lookback_hours:g} hours."
     )
+
+
+def find_nearest_aircraft(
+    lat: float,
+    lon: float,
+    *,
+    lookback_hours: float = 6.0,
+    radius_nm: float = 50.0,
+    limit: int = 5,
+) -> list[dict]:
+    """Find nearest aircraft to a location using each aircraft's latest position.
+
+    This is designed for interactive queries like "closest aircraft to airport".
+    We first compute each aircraft's latest position within a time window, then
+    filter down to a bbox/radius and score by haversine distance.
+    """
+
+    if limit <= 0:
+        limit = 5
+    if limit > 50:
+        limit = 50
+
+    if lookback_hours <= 0:
+        lookback_hours = 6.0
+
+    if radius_nm <= 0:
+        radius_nm = 50.0
+
+    lat_min, lat_max, lon_min, lon_max = bbox_from_radius_nm(lat, lon, float(radius_nm))
+
+    sql = """
+        WITH latest AS (
+            SELECT DISTINCT ON (icao)
+                id, icao, timestamp, lat, lon,
+                altitude, ground_speed, track, vertical_rate,
+                flight_number, emergency, category
+            FROM adsb_positions
+            WHERE timestamp >= NOW() - (%s || ' hours')::interval
+            ORDER BY icao, timestamp DESC
+        )
+        SELECT *
+        FROM latest
+        WHERE lat BETWEEN %s AND %s
+          AND lon BETWEEN %s AND %s
+        LIMIT 20000;
+    """
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, (float(lookback_hours), lat_min, lat_max, lon_min, lon_max))
+            colnames = [d.name for d in cur.description]
+            rows = [dict(zip(colnames, r)) for r in cur.fetchall()]
+
+        # Fetch identity fields cheaply for the final shortlist
+        scored: list[dict] = []
+        for r in rows:
+            r_lat = r.get("lat")
+            r_lon = r.get("lon")
+            if r_lat is None or r_lon is None:
+                continue
+
+            d_nm = haversine_distance_nm(lat, lon, float(r_lat), float(r_lon))
+            if d_nm > float(radius_nm):
+                continue
+
+            bearing = calculate_bearing(lat, lon, float(r_lat), float(r_lon))
+
+            out = dict(r)
+            out["distance_nm"] = d_nm
+            out["bearing_deg"] = bearing
+            out["reg_num"] = icao_to_reg(conn, str(r.get("icao", "")))
+            scored.append(out)
+
+    scored.sort(key=lambda x: x["distance_nm"])
+    return scored[:limit]

@@ -57,11 +57,11 @@ def get_conn():
         ValueError: if any required env var is missing/invalid.
         psycopg.Error: if connection fails.
     """
-    db_host = os.getenv("DB_HOST")
-    db_name = os.getenv("DB_NAME")
-    db_user = os.getenv("DB_USER")
-    db_pass = os.getenv("DB_PASS")
-    db_port_raw = os.getenv("DB_PORT")
+    db_host = "129.123.61.22"
+    db_name = "postgres"
+    db_user = "direct"
+    db_pass = "spottherobot"
+    db_port_raw = "10543"
 
     missing = [
         name
@@ -193,7 +193,7 @@ def reg_to_country_iso(conn, reg):
     
     query = """
         SELECT prefix, iso_country, notes
-        FROM reg_num_to_countries
+        FROM reg_num_to_country_iso
         WHERE %s LIKE prefix || '%%'
         ORDER BY LENGTH(prefix) DESC
         LIMIT 1;

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from transformers import AutoTokenizer
 from actint.mcp import mcp_server
+from actint.mcp import adsb_mcp_server
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
 import asyncio
@@ -38,15 +39,25 @@ conda_prefix = os.getenv("CONDA_PREFIX")
 python = str(Path(conda_prefix) / "bin" / "python")
 
 # Initialize MCP server
-server_params = StdioServerParameters(
+ais_server_params = StdioServerParameters(
     command=python,
     args=[mcp_server.__file__],
     env=os.environ.copy(),
     cwd=os.getcwd()
 )
 
-mcp_client = MCPClient(server_params, structured_output=False)
-ais_mcp_tools = mcp_client.get_tools()
+adsb_server_params = StdioServerParameters(
+    command=python,
+    args=[adsb_mcp_server.__file__],
+    env=os.environ.copy(),
+    cwd=os.getcwd()
+)
+
+ais_mcp_client = MCPClient(ais_server_params, structured_output=False)
+ais_mcp_tools = ais_mcp_client.get_tools()
+
+adsb_mcp_client = MCPClient(adsb_server_params, structured_output=False)
+adsb_mcp_tools = adsb_mcp_client.get_tools()
 
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 tokenizer.padding_side = "left"
@@ -68,6 +79,7 @@ user_agent_dict = {}
 
 async def user_agent_query(query: str, sid: str):
     if sid not in user_agent_dict:
+        # user_tools = adsb_mcp_tools + [ZoomTool(sid, sio), DrawRectangleTool(sid, sio), DrawCircleTool(sid, sio), DrawLineTool(sid, sio)]
         user_tools = ais_mcp_tools + [ZoomTool(sid, sio), DrawRectangleTool(sid, sio), DrawCircleTool(sid, sio), DrawLineTool(sid, sio)]
         user_agent_dict[sid] = ToolCallingAgent(tools=user_tools, model=model)
 

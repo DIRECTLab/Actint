@@ -33,6 +33,7 @@ nest_asyncio.apply()
 # Import tool functions from parent package
 from actint.tools.ADSB.adsb_locations import (
     aircraft_following,
+    find_nearest_aircraft,
     get_track_summary,
     get_vehicle_current_position,
     get_vehicle_locations,
@@ -206,7 +207,14 @@ def find_nearest_airports(
         lat = float(latitude)
         lon = float(longitude)
         lim = int(limit)
-        md = None if max_distance_nm is None else float(max_distance_nm)
+        md = (
+            None
+            if (
+                max_distance_nm is None
+                or (isinstance(max_distance_nm, str) and max_distance_nm.strip() == "")
+            )
+            else float(max_distance_nm)
+        )
         airports = find_nearest_airport(lat, lon, limit=lim, max_distance_nm=md)
         return _dumps(airports)
     except Exception as e:
@@ -288,6 +296,46 @@ def get_possible_airport_destinations_for_aircraft_tool(
             limit=int(limit),
         )
         return _dumps(result)
+    except Exception as e:
+        return _dumps({"error": str(e)})
+
+
+@mcp.tool()
+def find_nearest_aircraft_to_airport(
+    airport_ident: str,
+    lookback_hours: float | str = 6.0,
+    radius_nm: float | str = 50.0,
+    limit: int | str = 5,
+) -> str:
+    """Find the nearest aircraft to an airport (by ident) using latest ADS-B positions."""
+
+    try:
+        airport = get_airport_by_ident(airport_ident)
+        if airport is None:
+            return _dumps({"error": "Airport not found"})
+
+        lat = float(airport["latitude_deg"])
+        lon = float(airport["longitude_deg"])
+
+        results = find_nearest_aircraft(
+            lat,
+            lon,
+            lookback_hours=float(lookback_hours),
+            radius_nm=float(radius_nm),
+            limit=int(limit),
+        )
+
+        return _dumps(
+            {
+                "airport": {
+                    "ident": airport.get("ident"),
+                    "name": airport.get("name"),
+                    "latitude_deg": airport.get("latitude_deg"),
+                    "longitude_deg": airport.get("longitude_deg"),
+                },
+                "candidates": results,
+            }
+        )
     except Exception as e:
         return _dumps({"error": str(e)})
 
