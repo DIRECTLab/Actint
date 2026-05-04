@@ -25,9 +25,9 @@ from datetime import date, datetime
 from typing import Any
 
 from fastmcp import FastMCP
-import nest_asyncio
 
-nest_asyncio.apply()
+
+
 
 
 # Import tool functions from parent package
