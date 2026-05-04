@@ -12,6 +12,7 @@ import asyncio
 from actint.web_sockets.map_functions import draw_rectangle, draw_circle, draw_line
 from actint.web_sockets.defaults import sio, app
 from actint.mcp.map_edit_tools import ZoomTool, DrawRectangleTool, DrawCircleTool, DrawLineTool
+import sys
 
 # Register Phoenix instrumentation
 # register(project_name="Map_Actint")
@@ -49,8 +50,6 @@ model = TransformersModel(
     eos_token_id=tokenizer.eos_token_id,
 )
 
-import asyncio
-import sys
 
 user_agent_dict = {}
 

@@ -27,7 +27,6 @@ DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
 DB_DIR = DATA_DIR / "db"
 SQLITE_PATH = DB_DIR / "ais.db"
 
-nest_asyncio.apply()
 
 
 def _resolve_sqlite_path() -> Path:
