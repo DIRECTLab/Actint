@@ -100,9 +100,3 @@ body {
   cursor: pointer;
   transition: ease;
 }
-
-#simulation_settings {
-  display: flex;
-  justify-content: space-between;
-  
-}
