@@ -14,7 +14,22 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Change your directry to the interactive_query_map:
+```
+cd ~/Actint/frontent
+```
+
+### Then install all the node modules. (this might take a while)
+```
+npm install --save
+```
+
+### Finally run the development environment
+```
+npm run dev
+```
+### In your terminal, you should find: http://localhost:3050
+Open (http://localhost:3050) in your browser to see the result.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
