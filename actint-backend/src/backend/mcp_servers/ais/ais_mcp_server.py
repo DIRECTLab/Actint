@@ -17,7 +17,6 @@ from colorama import Fore, Style #TODO: Remove this before pushing
 import json
 import sqlite3
 import os
-from mario_tools import run_region
 from pathlib import Path
 from backend.mcp_servers.ais.helpers.area_context import get_future_intersections_in_area_helper
 from fastmcp import FastMCP
@@ -46,6 +45,7 @@ from backend.mcp_servers.ais.helpers.similartiy import (
     get_similar_vessel_names,
     get_similar_fleet_names,
 )
+from backend.mario_tools.main import run_region
 from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_mmsi_helper
 # from backend.data_processing.query_database import query_vessels
 
