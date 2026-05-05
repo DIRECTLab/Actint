@@ -151,7 +151,7 @@ def aircraft_table_check(cursor):
     print(f"Distinct ICAO in positions: {distinct_positions}")
 
 
-DATA_DIR = Path(__file__).parent / "data"
+DATA_DIR = Path(__file__).parent.parent / "data"
 RAW_DIR = DATA_DIR / "raw"
 OUT_DIR = DATA_DIR / "processed"
 BATCH_SIZE = 5000
