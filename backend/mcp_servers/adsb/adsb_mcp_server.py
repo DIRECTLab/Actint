@@ -31,13 +31,13 @@ from fastmcp import FastMCP
 
 
 # Import tool functions from parent package
-from actint.tools.ADSB.adsb_locations import (
+from backend.mcp_servers.adsb.helpers.adsb_locations import (
     aircraft_following,
     get_track_summary,
     get_vehicle_current_position,
     get_vehicle_locations,
 )
-from actint.tools.ADSB.airport_tools import (
+from backend.mcp_servers.adsb.helpers.airport_tools import (
     find_nearest_airport,
     get_airport_by_ident,
     get_airport_frequencies,
@@ -45,15 +45,15 @@ from actint.tools.ADSB.airport_tools import (
     get_possible_airport_destinations_for_aircraft,
     search_airports,
 )
-from actint.tools.ADSB.avi import find_nearest_navaids
-from actint.tools.ADSB.basic_tools import (
+from backend.mcp_servers.adsb.helpers.avi import find_nearest_navaids
+from backend.mcp_servers.adsb.helpers.basic_tools import (
     count_rows,
     describe_table,
     execute_readonly_query,
     get_conn,
     list_tables,
 )
-from actint.tools.ADSB.icao_to_reg_country import icao_to_country
+from backend.mcp_servers.adsb.helpers.icao_to_reg_country import icao_to_country
 
 
 mcp = FastMCP("ADSB Aircraft Intelligence", "0.1.0")

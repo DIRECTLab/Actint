@@ -7,7 +7,6 @@ from pathlib import Path
 from backend.mcp_servers.ais import ais_mcp_server
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
-from backend.transport.server_sent_events.map_events import draw_rectangle, draw_circle, draw_line
 from backend.transport.defaults import sio
 from backend.native_tools.map_edit_tools import ZoomTool, DrawRectangleTool, DrawCircleTool, DrawLineTool
 import sys
