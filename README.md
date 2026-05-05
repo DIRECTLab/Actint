@@ -22,7 +22,7 @@ editable mode from the repository root:
 ```bash
 conda create -n actint python=3.12 -y
 conda activate actint
-pip install -e ./backend
+pip install -e ./actint-backend
 ```
 
 After installation, run backend modules using package-style execution. For
