@@ -12,6 +12,7 @@ from backend.mcp_servers.adsb import adsb_mcp_server
 from backend.event_loop_registry import set_event_loop
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
+import sys
 import socket
 import requests
 
@@ -71,15 +72,26 @@ adsb_server_params = StdioServerParameters(
 adsb_mcp_client = MCPClient(adsb_server_params, structured_output=False)
 adsb_mcp_tools = adsb_mcp_client.get_tools()
 
+_agent_sessions = {}
 
-print(f"""\033[1;33mChecking connection to llm inference server {config.INFERENCE_SERVER_URL}\033[0m""", file=sys.stderr)
-print(check_openai_health(), file=sys.stderr)
+def get_or_create_agent(session_id: str, additional_tools: list = []) -> ToolCallingAgent:
+    """Creates or retrieves an agent for a given session, injecting relevant tools."""
+    if session_id not in _agent_sessions:
+        # Base tools that all agents get (e.g., MCP server tools)
+        tools = ais_mcp_tools.copy()
+        
+        # Inject context-specific tools (like UI tools or terminal tools)
+        if additional_tools:
+            tools.extend(additional_tools)
+            
+        _agent_sessions[session_id] = ToolCallingAgent(tools=tools, model=model)
+        
+    return _agent_sessions[session_id]
 
-model = OpenAIModel(
-    model_id="local",
-    api_base=config.INFERENCE_SERVER_URL,
-    api_key="dummy"
-)
+async def query_agent(query: str, session_id: str, additional_tools: list = None):
+    """Entry point for both web and terminal to query their respective agent."""
+    agent = get_or_create_agent(session_id, additional_tools)
+    return agent.run(query, reset=False)
 
 def create_agent(
     additional_tools: list = [],
