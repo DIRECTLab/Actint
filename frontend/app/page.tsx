@@ -41,26 +41,22 @@ export default function Home() {
   const [simulationSettings, setSimulationSettings] = useState<SimulationSettingsTyp>(DEFAULT_SIM_SETTIINGS);
   
 
+      // ************** DEPRECATED, DEFINITION COMPONENT FOR THE OLD SIMULATION SETTINGS. *****************//
+      // <div id="simulation_settings" className="flex-none h-1/10 overflow-hidden"> {/* 20% of screen height for SimSettings */}
+      //   <SimSettings
+      //     simulation_settings={simulationSettings}
+      //     set_simulation_settings={setSimulationSettings}
+      //     setVehicleCurrentPositions={setVehicleCurrentPositions}
+      //     setVehiclePreviousPositions={setVehiclesPreviousPositions}
+      //   />
+      // </div>
   
   
 
   return (
     <>
-      <div id="simulation_settings" className="flex-none h-1/10 overflow-hidden"> {/* 20% of screen height for SimSettings */}
-        <SimSettings
-          simulation_settings={simulationSettings}
-          set_simulation_settings={setSimulationSettings}
-          setVehicleCurrentPositions={setVehicleCurrentPositions}
-          setVehiclePreviousPositions={setVehiclesPreviousPositions}
-        />
-      </div>
 
-
-
-
-
-
-      <div id="chat_map" className="flex flex-1 h-9/10"> {/* Remaining 80% height, flex horizontally */}
+      <div id="chat_map" className="flex flex-1 h-full"> {/* Remaining 80% height, flex horizontally */}
         <div className="w-3/4"> {/* 75% width for Map */}
           <Map
             vehiclesPreviousPositions={vehiclesPreviousPositions}
