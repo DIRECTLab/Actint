@@ -16,7 +16,6 @@ Tools provided:
 import json
 import sqlite3
 import os
-from mario_tools import run_region
 from pathlib import Path
 from fastmcp import FastMCP
 
@@ -47,6 +46,7 @@ from backend.mcp_servers.ais.helpers.ship_going import (
     calculate_vector_and_distance_sum,
     get_possible_destinations,
 )
+from backend.mario_tools.main import run_region
 
 from backend.data_processing.query_database import query_vessels
 # ============================================================================

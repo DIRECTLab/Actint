@@ -232,3 +232,7 @@ results/
 # Slurm Results
 *.err
 *.out
+
+#Mario human-readable output
+#TODO: Check this isn't redundant
+./actint-backend/src/backend/mario_tools/outputs/*
