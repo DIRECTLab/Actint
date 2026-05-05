@@ -47,6 +47,7 @@ from backend.mcp_servers.ais.helpers.ship_going import (
     get_possible_destinations,
 )
 from backend.mario_tools.main import run_region
+from backend.mario_tools.src.regions import REGIONS
 
 from backend.data_processing.query_database import query_vessels
 # ============================================================================
@@ -79,7 +80,13 @@ def get_region_info(region) -> str:
         JSON information about ships in the region
     
     """
-    return run_region(region)
+    region_info = "no information for this region presently available"
+
+    #is this a region we can actually run run_region on
+    if region in REGIONS:
+        region_info = run_region(region)
+
+    return region_info
 
 
 @mcp.tool()
