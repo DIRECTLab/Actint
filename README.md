@@ -1,122 +1,259 @@
-# Activity Intelligence Framework (ACTINT) for multi-target tracking
+# Activity Intelligence Framework (ACTINT)
 
-# Setup
+This repository contains two separate projects:
 
-We use conda for environment management. To set up the environment, run the following command in the terminal, run the following from the actint directory (where this README is located):
+- `backend/` — standalone Python package for activity intelligence and
+  MCP/LLM backend logic
+- `frontend/` — separate Next.js app for the user interface
+
+## Repository Structure
+
+The backend is packaged as a Python project using `pyproject.toml`.
+
+It uses a `src/` layout, so backend modules should be run through the
+package namespace after installation. Do not run backend files directly
+by file path.
+
+## Setup
+
+Create a Python 3.12 environment and install the backend package in
+editable mode from the repository root:
 
 ```bash
-conda create -n actint python=3.12 -y 
+conda create -n actint python=3.12 -y
 conda activate actint
-pip install -r requirements.txt
-pip install -e .
+pip install -e ./backend
 ```
 
-you can then run the benchmarks
+After installation, run backend modules using package-style execution. For
+example:
 
 ```bash
-python -m actint.benchmarking.benchmark_agents --run-all-benchmarks
+python -m backend.benchmarking.benchmark_agents --run-all-benchmarks
+python -m backend.agent.agent
 ```
 
-you can inspect llm output easily with arize ai pheonix, in another terminal run 
+To run the websocket / LLM backend server:
+
+```bash
+python -m backend.transport.web_socket
+```
+
+You can also launch the ASGI app directly with Uvicorn:
+
+```bash
+uvicorn backend.transport.web_socket:app --host 0.0.0.0 --port 3050
+```
+
+If you want to launch the Phoenix telemetry server:
 
 ```bash
 python -m phoenix.server.main serve
 ```
 
-and make sure you have the following at the top of your smolagent.py file:
+### Backend-specific docs
 
-```python
-from phoenix.otel import register
-from openinference.instrumentation.smolagents import SmolagentsInstrumentor
+For backend-specific install and usage details, see `backend/README.md`.
 
-register()
-SmolagentsInstrumentor().instrument()
+## Frontend
+
+The frontend is a separate Next.js app in `frontend/`.
+
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
-## How to run things (for now)
-To experiment with the agent with no frontend:
-- Allocate a session on the slurm cluster
-- Launch the phoenix server (command above)
-- In `src/actint/mcp/` Run `python smolagent.py`
+The backend and frontend are intentionally separated: the backend package
+lives under `backend/` and is installed independently, while the frontend
+is managed by its own Node.js toolchain.
 
-**To try different queries, change the argument in `agent.run()` (line 41)**
+## How to Run Things
 
-## OR to run with frontend:
-Allocate a session on Zengief or Ryu (they have open ports)
+To experiment with the backend without the frontend:
 
-The URL of the websocket defined in web_socket.py
+- Run backend modules with `python -m backend...`
+- Run the websocket / LLM backend with
+  `python -m backend.transport.web_socket`
+- Use `python -m phoenix.server.main serve` if you need Phoenix telemetry
 
-If you're using the same slurm node as someone else, pick a different port.
-Available Ports:
-- Ryu:     2000-3000
-- Zengief: 3001-3100
-- Terry:   3101-3200
+To run the frontend interface:
 
-**Then, on the slurm node:**
-- *(Optional)* - Lauch the phoenix server in the project root directory: `python -m phoenix.server.main serve`
-- In `src/actint/web_sockets` run `python web_sockets.py`
+- Start it from `frontend/` with `npm run dev`
 
-**Then, launch the React frontend on your *local machine*:**
-- In `src/actint/interactive_query_map` run `npm run dev` 
+## Notes
 
-# Problem scope and user
+- Install the backend package before running modules so Python can resolve
+  imports from the `backend` package correctly.
+- Do not run backend modules by file path, for example:
+
+  ```bash
+  python backend/agent/agent.py
+  ```
+
+  or
+
+  ```bash
+  python src/backend/agent/agent.py
+  ```
+
+  Instead, use:
+
+  ```bash
+  python -m backend.agent.agent
+  ```
+
+- Backend package metadata and dependencies are defined in
+  `backend/pyproject.toml`.
+
+# Problem Scope and User
+
 ## Primary User
-The primary target of the ACTINT (activity intelligence) framework will be entities interested in intelligent tracking and monitering of various vehicles types, given several modalities of information. While primarily focused on military applications, this framework could extend to other fields such as shipping, public transportation, taxi fleets, and others. 
+
+The primary target of the ACTINT (Activity Intelligence) framework is
+entities interested in intelligent tracking and monitoring of various
+vehicle types given several modalities of information. While primarily
+focused on military applications, this framework could extend to other
+fields such as shipping, public transportation, taxi fleets, and others.
+
 ## Operational Setting
-The initial main focus of this system will operate and handle AIS data tracking various vessel types. Extensions will include air traffic, and may further extend to land vehicle traffic as well.
+
+The initial main focus of this system is AIS data tracking for various
+vessel types. Extensions may include air traffic and possibly land vehicle
+traffic as well.
+
 ## Core Objective
-The minimal viable product of this system, will be the handling and processing of AIS data via some new data pipeline, and an LLM in the loop system that can provide intelligent information about various aspects of the data. For example, "What is ship 0001 up to right now?", and after analyzing the appropriate data, the LLM should respond with something like "based on the trajectory of ship 0001, it seems to be heading back to port."
+
+The minimal viable product of this system is the handling and processing of
+AIS data via a new data pipeline and an LLM-in-the-loop system that can
+provide intelligent information about various aspects of the data.
+
+For example, a user might ask:
+
+> What is ship 0001 up to right now?
+
+After analyzing the appropriate data, the LLM should respond with something
+like:
+
+> Based on the trajectory of ship 0001, it seems to be heading back to
+> port.
+
 ## Entities
-The the initial entities of the system will be ships only, based on time constraints, further entities can be integrated. 
+
+The initial entities of the system will be ships only. Based on time
+constraints, further entity types can be integrated later.
+
 ## Environment Assumptions
-We will assume that we have traditional AIS data information that given at some fixed rate i.e once a minute, provides information such as latitude, longitude, ship name, ship status etc.
+
+We assume access to traditional AIS data at a fixed rate, such as once per
+minute, containing information such as latitude, longitude, ship name, ship
+status, and related attributes.
 
 # Inputs and Outputs
-## Input data types
-The primary input data type will be in tabular format containing rows of AIS data on the ships.
-## Input rate
-The input range will range from several times a minute,  to several times an hour as is traditional with AIS data.
+
+## Input Data Types
+
+The primary input data type will be tabular AIS data containing rows of
+ship-related information.
+
+## Input Rate
+
+The input rate may range from several times a minute to several times an
+hour, as is traditional with AIS data.
+
 ## Outputs
-The outputs will be in raw text format, and will come from the LLM. The LLM response should contain relevant and valuable information based on the users query. Whether we decide to restrict output to a specific type i.e json to have more predictable results will be decided later on. 
+
+The outputs will initially be raw text generated by the LLM. Responses
+should contain relevant and useful information based on the user's query.
+Whether output should later be restricted to a structured format such as
+JSON for more predictable behavior is still to be decided.
+
 ## Granularity
-With regards to what level of granularity the agent should be able to reason, ideally it should be able to reason about the data as a whole i.e "Tell me which ships are coming to port 345", and about single ships i.e "What is the status of ship 123"
 
-# Modality and task framing
-Initially the model will be a text only model, being able to answer relevant queries from the user. The LLM should be able to handle several reasoning types, from small granular questions to broader hypothesis type questions.
+Ideally, the agent should reason at multiple levels of granularity, such
+as:
 
+- Global questions, for example:
+  - `Tell me which ships are coming to port 345`
+- Single-entity questions, for example:
+  - `What is the status of ship 123?`
+
+# Modality and Task Framing
+
+Initially, the model will be text-only and should be able to answer
+relevant user queries. The LLM should handle several reasoning types,
+ranging from narrow, detail-oriented questions to broader hypothesis-driven
+questions.
 
 # Model Choices
-For now we will stick with open source models, and experiment with the effectiveness of smaller models like phi. If time permits/ if the reasoning capabilities of these models is too weak, then we will move on to more advanced models, and potentially test the idea of an agentic system that utilizes several models in succession to handle the reasons and data processing.
+
+For now, the project will use open-source models and experiment with the
+effectiveness of smaller models such as Phi. If time permits, or if the
+reasoning capabilities of these models are too weak, the system may move to
+more advanced models and potentially test an agentic architecture that
+uses several models in succession for reasoning and data processing.
 
 # Constraints
-## Deployment
-This kind of deployment will rely mainly on cloud resources, as a client-server architecture makes the most sense for development.
-## Constraints
-Initial beta testing will be constrained to resources on my local machine which are 
 
-- 96 gb vram
-- 64 gm ram
+## Deployment
+
+This deployment will rely mainly on cloud resources, as a client-server
+architecture makes the most sense for development.
+
+## Resource Constraints
+
+Initial beta testing will be constrained to resources on a local machine:
+
+- 96 GB VRAM
+- 64 GB RAM
 - 32 cores
 
-Security requirements may require the use of self hosted LLM which mean that we should probably stay in the sub 200GB  model range. If secure cloud compute is available, then this constraint can be adjusted.
+Security requirements may require the use of self-hosted LLMs, which means
+it is probably best to stay under roughly 200 GB model size. If secure
+cloud compute is available, this constraint can be adjusted.
 
 # Failures
-## Possible failures
-1. Hallucination: LLM models tend to give answers even when they don't have them, we will need to run thorough validation and data processing to ensure the LLM has the information that it needs in order to make the right decision, and if possible, validate that the LLM response is actually correct. 
-2. Time: A system like this could be subject to time constraints, especially in emergency situations. If our LLM fails to respond in a short enough time, this could be a failure that we have to work around.
+
+## Possible Failures
+
+1. Hallucination
+
+   LLMs tend to produce answers even when they do not have enough evidence.
+   The system will need strong validation and data processing so the model
+   has the information it needs to make sound decisions. If possible, the
+   LLM response itself should also be validated.
+
+2. Time
+
+   A system like this could be subject to time constraints, especially in
+   emergency situations. If the LLM fails to respond quickly enough, this
+   could be a significant failure mode.
+
 ## Explainability
-It could be extremely valuable for the LLM to show the information it used to draw the conclusions that it did, pulling directly from the data. That way users can be assured that what the LLM is saying is in fact correct or incorrect.
+
+It could be highly valuable for the LLM to show the information it used to
+draw its conclusions, ideally pulling directly from the data. That way,
+users can evaluate whether the response is justified.
 
 # Roadmap
+
 ## Outline
-With about 12 weeks left in the semester, the roadmap for development is as follows.
 
-Weeks 1-2: Architecture design
-Weeks 2-4: First prototype development and testing
-Weeks 4-6: System validation
-Weeks 6-8: Further development based on validation results
-Weeks 8-10: System deployment design and implementation
-Weeks 10-12: Fine tuning and final adjustments
+With about 12 weeks left in the semester, the roadmap for development is as
+follows:
+
+- Weeks 1-2: Architecture design
+- Weeks 2-4: First prototype development and testing
+- Weeks 4-6: System validation
+- Weeks 6-8: Further development based on validation results
+- Weeks 8-10: System deployment design and implementation
+- Weeks 10-12: Fine-tuning and final adjustments
+
 ## Evaluation Metrics
-Developing out the evaluation metrics for this kind of system will be difficult, as ensuring that an LLM is responding correctly is hard to automate. Simple tests can be developed however, initially verifying that the LLM is pulling the correct data given the user query, and going from there. 
 
+Developing evaluation metrics for this kind of system will be difficult,
+since automatically verifying whether an LLM response is correct is hard.
+However, simple tests can be developed initially, such as verifying that
+the LLM retrieves the correct data given the user query, and expanding from
+there.
