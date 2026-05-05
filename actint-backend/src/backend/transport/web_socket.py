@@ -111,4 +111,4 @@ async def disconnect(sid):
     remove_user_agent(sid)
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=3050)
+    uvicorn.run(app, host="0.0.0.0", port=3105)
