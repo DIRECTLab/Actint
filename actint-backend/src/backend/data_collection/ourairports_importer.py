@@ -20,7 +20,7 @@ def get_conn():
         # Read environment variables
         db_config = {
             "host": config.DB_HOST,
-            "dbname": config.ADSB_DB_NAME,
+            "dbname": config.DB_NAME,
             "user": config.DB_USER,
             "password": config.DB_PASS,
             "port": config.DB_PORT,

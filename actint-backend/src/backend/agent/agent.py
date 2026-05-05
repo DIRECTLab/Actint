@@ -48,12 +48,13 @@ def check_openai_health(api_key="dummy") -> str:
 model_id = config.MODEL_ID or ""
 print("\033[0;34mModel ID: \033[1;34m" + model_id + "\033[0m")
 
-if config.CONDA_PREFIX:
-    python_path = str(Path(config.CONDA_PREFIX) / "bin" / "python")
+if config.conda_prefix:
+    python_path = str(Path(config.conda_prefix) / "bin" / "python")
 else:
     python_path = sys.executable
 
-ais_server_params = StdioServerParameters(
+# Initialize MCP server
+server_params = StdioServerParameters(
     command=python_path,
     args=[ais_mcp_server.__file__],
     env=os.environ.copy(),
