@@ -16,6 +16,7 @@ Tools provided:
 import json
 import sqlite3
 import os
+from mario_tools import run_region
 from pathlib import Path
 from fastmcp import FastMCP
 
@@ -65,6 +66,20 @@ def say_hello() -> str:
     message = "Hello! The AIS Vessel Intelligence MCP server is up and running."
     print("Printed Message:", message)#, file=sys.stderr)
     return message
+
+
+@mcp.tool()
+def get_region_info(region) -> str:
+    """Tool to get information on vessels within a particular region
+    
+    Args:
+        region (str): Region being investigated
+
+    Returns:
+        JSON information about ships in the region
+    
+    """
+    return run_region(region)
 
 
 @mcp.tool()
