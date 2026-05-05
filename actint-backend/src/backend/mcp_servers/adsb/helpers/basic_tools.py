@@ -18,6 +18,7 @@ basic tools includes
 """
 
 import os
+from backend.config import config
 import psycopg
 from psycopg import sql
 from psycopg.rows import dict_row
@@ -57,11 +58,11 @@ def get_conn():
         ValueError: if any required env var is missing/invalid.
         psycopg.Error: if connection fails.
     """
-    db_host = os.getenv("DB_HOST")
-    db_name = os.getenv("DB_NAME")
-    db_user = os.getenv("DB_USER")
-    db_pass = os.getenv("DB_PASS")
-    db_port_raw = os.getenv("DB_PORT")
+    db_host = config.DB_HOST
+    db_name = config.DB_NAME
+    db_user = config.DB_USER
+    db_pass = config.DB_PASS
+    db_port_raw = config.DB_PORT
 
     missing = [
         name

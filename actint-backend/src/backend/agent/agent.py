@@ -4,6 +4,7 @@ from mcp import StdioServerParameters
 import sys
 from pathlib import Path
 
+from backend.config import config
 from backend.mcp_servers.ais import ais_mcp_server
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
@@ -29,12 +30,14 @@ else:
 model_id = "Qwen/Qwen3.5-9B"
 #model_id = "Qwen/Qwen2-7B-Instruct"
 
-conda_prefix = os.getenv("CONDA_PREFIX")
-python = str(Path(conda_prefix) / "bin" / "python")
+if config.conda_prefix:
+    python_path = str(Path(config.conda_prefix) / "bin" / "python")
+else:
+    python_path = sys.executable
 
 # Initialize MCP server
 server_params = StdioServerParameters(
-    command=python,
+    command=python_path,
     args=[ais_mcp_server.__file__],
     env=os.environ.copy(),
     cwd=os.getcwd()
