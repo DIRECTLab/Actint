@@ -38,3 +38,9 @@ huggingface_hub[mcp]
 
 #sockets for LLM streaming and data transfer
 python-socketio>=5.15
+
+# Mario's pipelines
+folium
+seaborn
+scikit-learn
+shapely<=2.1.2
