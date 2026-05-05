@@ -1,0 +1,134 @@
+[
+  {
+    "description": "Maritime Mobile Service Identity, the identifier for AIS",
+    "mode": "NULLABLE",
+    "name": "mmsi",
+    "type": "STRING"
+  },
+  {
+    "description": "year",
+    "mode": "NULLABLE",
+    "name": "year",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Flag State (ISO3 value) for the vessel as determined by the first three digits (MID) of the MMSI number",
+    "mode": "NULLABLE",
+    "name": "flag_ais",
+    "type": "STRING"
+  },
+  {
+    "description": "Flag State (ISO3 value) for the vessel as listed on vessel registries (when applicable)",
+    "mode": "NULLABLE",
+    "name": "flag_registry",
+    "type": "STRING"
+  },
+  {
+    "description": "Flag state (ISO3 value) assigned to the vessel by GFW after considering all available information",
+    "mode": "NULLABLE",
+    "name": "flag_gfw",
+    "type": "STRING"
+  },
+  {
+    "description": "Vessel class (geartype) inferred by the GFW vessel classification neural net model",
+    "mode": "NULLABLE",
+    "name": "vessel_class_inferred",
+    "type": "STRING"
+  },
+  {
+    "description": "Neural net score (0-1) for the top scoring vessel class inferred by the GFW vessel classification neural net model. Values closer to 1 indicate higher confidence by the neural net",
+    "mode": "NULLABLE",
+    "name": "vessel_class_inferred_score",
+    "type": "FLOAT"
+  },
+  {
+    "description": "Vessel class (geartype) for the vessel as listed on vessel registries (if applicable)",
+    "mode": "NULLABLE",
+    "name": "vessel_class_registry",
+    "type": "STRING"
+  },
+  {
+    "description": "Vessel class (geartype) assigned to the vessel by GFW after considering all available information",
+    "mode": "NULLABLE",
+    "name": "vessel_class_gfw",
+    "type": "STRING"
+  },
+  {
+    "description": "Whether the vessel broadcasts the 'Fishing' ship type in > 98% of AIS identity messages",
+    "mode": "NULLABLE",
+    "name": "self_reported_fishing_vessel",
+    "type": "BOOLEAN"
+  },
+  {
+    "description": "Vessel length (meters) inferred by the GFW vessel classification neural net model",
+    "mode": "NULLABLE",
+    "name": "length_m_inferred",
+    "type": "FLOAT"
+  },
+  {
+    "description": "Vessel length (meters) for the vessel as listed on vessel registries (if applicable)",
+    "mode": "NULLABLE",
+    "name": "length_m_registry",
+    "type": "FLOAT"
+  },
+  {
+    "description": "Vessel length (meters) assigned to the vessel by GFW after considering all available information",
+    "mode": "NULLABLE",
+    "name": "length_m_gfw",
+    "type": "FLOAT"
+  },
+  {
+    "description": "Engine power (kilowatts) inferred by the GFW vessel classification neural net model",
+    "mode": "NULLABLE",
+    "name": "engine_power_kw_inferred",
+    "type": "FLOAT"
+  },
+  {
+    "description": "Engine power (kilowatts) for the vessel as listed on vessel registries (if applicable)",
+    "mode": "NULLABLE",
+    "name": "engine_power_kw_registry",
+    "type": "FLOAT"
+  },
+  {
+    "description": "Engine power (kilowatts) assigned to the vessel by GFW after considering all available information",
+    "mode": "NULLABLE",
+    "name": "engine_power_kw_gfw",
+    "type": "FLOAT"
+  },
+  {
+    "description": "Tonnage (gross tons) inferred by the GFW vessel classification neural net model",
+    "mode": "NULLABLE",
+    "name": "tonnage_gt_inferred",
+    "type": "FLOAT"
+  },
+  {
+    "description": "Tonnage (gross tons) for the vessel as listed on vessel registries",
+    "mode": "NULLABLE",
+    "name": "tonnage_gt_registry",
+    "type": "FLOAT"
+  },
+  {
+    "description": "Tonnage (gross tons) assigned to the vessel by GFW after considering all available information",
+    "mode": "NULLABLE",
+    "name": "tonnage_gt_gfw",
+    "type": "FLOAT"
+  },
+  {
+    "description": "Registries where the vessel is listed and used to inform the _registry fields (if applicable)",
+    "mode": "NULLABLE",
+    "name": "registries_listed",
+    "type": "STRING"
+  },
+  {
+    "description":"Hours the vessel was broadcasting AIS and moving faster than 0.1 knots",
+    "mode":"NULLABLE",
+    "name":"active_hours",
+    "type":"FLOAT"
+  },
+  {
+    "description": "Hours the vessel was broadcasting AIS and detected as fishing by the GFW fishing detection neural net model",
+    "mode": "NULLABLE",
+    "name": "fishing_hours",
+    "type": "FLOAT"
+  }
+]
