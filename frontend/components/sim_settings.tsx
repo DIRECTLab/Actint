@@ -1,3 +1,11 @@
+// THIS FILE IS DEPRECATED. WE ARE NO LONGER PLANNING ON HAVING A LIVE SIMULATION FEATURE.
+
+
+
+
+
+
+
 import { SimulationSettingsTyp } from '@/types/simulationSettings'
 import { start_simulation } from '@/functions/web_socket_functions';
 import { vehicles_current_positions, vehicles_previous_positions } from '@/types/vehicleSettings';
