@@ -14,6 +14,10 @@ Tools provided:
 """
 
 from colorama import Fore, Style #TODO: Remove this before pushing
+import json
+import sqlite3
+import os
+from mario_tools import run_region
 from pathlib import Path
 from fastmcp import FastMCP
 # Import tool functions from parent package

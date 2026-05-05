@@ -1,0 +1,50 @@
+[
+  {
+    "region": "brazil_eez",
+    "n_vessels": 63,
+    "n_pings": 31658,
+    "macro_f1": 0.5185382660731631,
+    "weighted_f1": 0.9693515381011703,
+    "dark_fraction": 0.0,
+    "n_dark_flagged": 2,
+    "n_high_risk": 22,
+    "output_dir": "/home/basilofjesters/repos/Actint/actint-backend/src/backend/dark_vessels/outputs/brazil_eez",
+    "map_path": "/home/basilofjesters/repos/Actint/actint-backend/src/backend/dark_vessels/outputs/brazil_eez/map.html"
+  },
+  {
+    "region": "philippines_eez",
+    "n_vessels": 63,
+    "n_pings": 32133,
+    "macro_f1": 0.7323170260607319,
+    "weighted_f1": 0.9818944607418745,
+    "dark_fraction": 0.0,
+    "n_dark_flagged": 0,
+    "n_high_risk": 15,
+    "output_dir": "/home/basilofjesters/repos/Actint/actint-backend/src/backend/dark_vessels/outputs/philippines_eez",
+    "map_path": "/home/basilofjesters/repos/Actint/actint-backend/src/backend/dark_vessels/outputs/philippines_eez/map.html"
+  },
+  {
+    "region": "strait_of_malacca",
+    "n_vessels": 63,
+    "n_pings": 31593,
+    "macro_f1": 0.58683098539594,
+    "weighted_f1": 0.9707960454561663,
+    "dark_fraction": 0.0,
+    "n_dark_flagged": 1,
+    "n_high_risk": 29,
+    "output_dir": "/home/basilofjesters/repos/Actint/actint-backend/src/backend/dark_vessels/outputs/strait_of_malacca",
+    "map_path": "/home/basilofjesters/repos/Actint/actint-backend/src/backend/dark_vessels/outputs/strait_of_malacca/map.html"
+  },
+  {
+    "region": "gulf_of_guinea",
+    "n_vessels": 63,
+    "n_pings": 31268,
+    "macro_f1": 0.6658302316392201,
+    "weighted_f1": 0.9803558536198902,
+    "dark_fraction": 0.0,
+    "n_dark_flagged": 3,
+    "n_high_risk": 28,
+    "output_dir": "/home/basilofjesters/repos/Actint/actint-backend/src/backend/dark_vessels/outputs/gulf_of_guinea",
+    "map_path": "/home/basilofjesters/repos/Actint/actint-backend/src/backend/dark_vessels/outputs/gulf_of_guinea/map.html"
+  }
+]
