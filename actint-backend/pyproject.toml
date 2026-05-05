@@ -1,0 +1,43 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Activity Intelligence for AIS data"
+authors = [{ name = "Isaac Peterson", email = "isaac.peterson@usu.edu" }]
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.12"
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "numpy>=2.4.1",
+    "pandas>=3.0",
+    "matplotlib>=3.10",
+    "geopy>=2.4",
+    "reverse_geocoder>=1.5",
+    "psycopg[binary]",
+    "chromadb>=1.5.5",
+    "fastmcp>=3.0",
+    "fastapi>=0.130",
+    "uvicorn>=0.44",
+    "pydantic>=2.13",
+    "httpx>=0.28",
+    "python-dotenv>=1.0",
+    "arize-phoenix==14.12.0",
+    "smolagents[mcp,transformers,telemetry,toolkit] @ git+https://github.com/DIRECTLab/smolagents",
+    "huggingface_hub[mcp]>=1.9",
+    "python-socketio>=5.15",
+]
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["backend*"]
