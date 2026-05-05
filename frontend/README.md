@@ -23,7 +23,7 @@ npm -v # Should print "11.12.1".
 
 ### Change your directry to the interactive_query_map:
 ```
-cd ~/Actint/frontent
+cd ~/Actint/frontend
 ```
 
 ### Then install all the node modules. (this might take a while)
