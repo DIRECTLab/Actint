@@ -144,6 +144,67 @@ ORDER BY timestamp;
 * `id` is partition-local and not globally unique
 * Missing fields are expected due to variable broadcast formats
 
+<br/>
+
+
+# Connection Guide for Developers
+
+## Quick Start
+
+- **Host:** `129.123.61.22`
+- **Port:** `10543`
+- **AIS Database Name:** `actint`
+- **ADSB Database Name:** `postgres`
+- **Username:** `direct_ro`
+- **Password:** `spottherobot`
+- **SSL:** Disabled (do not request SSL in clients)
+
+use get_conn() to get a connection to the DB. Found in mcp_servers/adsb/helpers/basic_tools.py (requires env vars with login info)
+<br/>
+example function to show general pattern of usage
+```python
+def get_last_location(conn, icao): 
+
+    query = """
+        SELECT *
+        FROM adsb_positions
+        WHERE icao = %s
+            AND timestamp >= NOW() - INTERVAL '6 months'
+        ORDER BY timestamp DESC
+        LIMIT 1;
+
+    """
+
+    with conn.cursor() as cur:
+        cur.execute(query, (icao,))
+        row = cur.fetchone()
+
+    return row
+
+```
+
+## System Overview
+
+
+- **Host IP:** 129.123.61.22 
+- **Port:** 10543 (default PostgreSQL port)  
+- **AIS Database Name:** actint
+- **ADSB Database Name:** postgres
+- **Authentication Method:** SCRAM-SHA-256 (password-based) 
+- **SSL/TLS:** Not enabled
+
+## Users and Roles
+
+### direct_ro
+- **Role:** Read-only user
+- **Purpose:**
+  - Intended for applications/services that only need read access
+  - Can execute SELECT queries on all tables in the `public` schema
+  - Cannot modify data
+
+- **Credentials:**
+  - Username: `direct_ro`
+  - Password: `spottherobot`
 
 
   <br>
