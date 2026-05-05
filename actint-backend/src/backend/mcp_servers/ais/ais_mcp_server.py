@@ -45,11 +45,6 @@ from backend.mcp_servers.ais.helpers.similartiy import (
     get_similar_vessel_names,
     get_similar_fleet_names,
 )
-from backend.mario_tools.main import run_region
-from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_mmsi_helper
-# from backend.data_processing.query_database import query_vessels
-
-
 
 # ============================================================================
 # FastMCP Server Setup
@@ -167,6 +162,57 @@ def say_hello() -> str:
     message = "Hello! The AIS Vessel Intelligence MCP server is up and running."
     print("Printed Message:", message)#, file=sys.stderr)
     return message
+
+
+@mcp.tool()
+def get_region_info(region) -> str:
+    """Tool to get information on vessels within a particular region
+    
+    Args:
+        region (str): Region being investigated
+
+    Returns:
+        JSON information about ships in the region
+    
+    """
+    region_info = "no information for this region presently available"
+
+    #is this a region we can actually run run_region on
+    if region in REGIONS:
+        region_info = run_region(region)
+
+    return region_info
+
+
+@mcp.tool()
+def get_vessel_locations(mmsi: int | str) -> str:
+    """Get all recorded positions for a specific vessel identified by MMSI.
+    
+    Args:
+        mmsi (int): Maritime Mobile Service Identity number of the vessel
+    
+    Returns:
+        str: JSON list of vessel positions with coordinates, timestamps, and speed data
+    """
+    try:
+        mmsi = int(mmsi)
+        locations = get_vehicle_locations(mmsi)
+        result_data = [
+            {
+                "mmsi": loc.mmsi,
+                "vessel_name": loc.vessel_name,
+                "timestamp": loc.timestamp,
+                "latitude": loc.lat,
+                "longitude": loc.lon,
+                "speed_over_ground": loc.sog,
+                "course_over_ground": loc.cog,
+                "heading": loc.heading,
+            }
+            for loc in locations
+        ]
+        return json.dumps(result_data, indent=2)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
 
 
 @mcp.tool()
