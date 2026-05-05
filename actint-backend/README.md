@@ -29,7 +29,7 @@ You can also install it directly from the repository root:
 ```bash
 conda create -n actint python=3.12 -y
 conda activate actint
-pip install -e ./backend
+pip install -e ./actint-backend
 ```
 
 ## Usage
