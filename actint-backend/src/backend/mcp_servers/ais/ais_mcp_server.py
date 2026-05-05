@@ -148,23 +148,32 @@ def say_hello() -> str:
 
 
 @mcp.tool()
-def get_region_info(region) -> str:
-    """Tool to get information on vessels within a particular region
-    
-    Args:
-        region (str): Region being investigated
+def search_region_for_ships(region: str) -> dict:
+    if region not in REGIONS:
+        return {
+            "success": False,
+            "error": "INVALID_REGION",
+            "available_regions": [
+                {"key": k, "name": v["name"]}
+                for k, v in REGIONS.items()
+            ]
+        }
 
-    Returns:
-        JSON information about ships in the region
-    
-    """
-    region_info = "no information for this region presently available"
+    try:
+        region_data = run_region(region)
 
-    #is this a region we can actually run run_region on
-    if region in REGIONS:
-        region_info = run_region(region)
+        return {
+            "success": True,
+            "region": region,
+            "data": region_data
+        }
 
-    return region_info
+    except Exception as e:
+        return {
+            "success": False,
+            "error": "EXECUTION_ERROR",
+            "message": str(e)  # force safe serialization
+        }
 
 
 @mcp.tool()
