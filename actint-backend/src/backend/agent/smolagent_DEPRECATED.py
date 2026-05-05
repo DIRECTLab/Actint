@@ -1,6 +1,7 @@
 import os
 import socket
-from smolagents import ToolCallingAgent, TransformersModel, MCPClient, GradioUI
+from smolagents import ToolCallingAgent, TransformersModel, MCPClient
+#from smolagents import GradioUI
 from mcp import StdioServerParameters
 import sys
 from pathlib import Path
