@@ -73,6 +73,101 @@ mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 #     except Exception as e:
 #         return "Error:\n" + str(e)
 
+@mcp.tool()
+def get_region_info(region) -> str:
+    """Tool to get information on vessels within a particular region
+    
+    Args:
+        region (str): Region being investigated
+
+    Returns:
+        JSON information about ships in the region
+    
+    """
+    return run_region(region)
+
+
+@mcp.tool()
+def get_vessel_locations(mmsi: int | str) -> str:
+    """Get all recorded positions for a specific vessel identified by MMSI.
+    
+    Args:
+        mmsi (int): Maritime Mobile Service Identity number of the vessel
+    
+    Returns:
+        str: JSON list of vessel positions with coordinates, timestamps, and speed data
+    """
+    try:
+        mmsi = int(mmsi)
+        locations = get_vehicle_locations(mmsi)
+        result_data = [
+            {
+                "mmsi": loc.mmsi,
+                "vessel_name": loc.vessel_name,
+                "timestamp": loc.timestamp,
+                "latitude": loc.lat,
+                "longitude": loc.lon,
+                "speed_over_ground": loc.sog,
+                "course_over_ground": loc.cog,
+                "heading": loc.heading,
+            }
+            for loc in locations
+        ]
+        return json.dumps(result_data, indent=2)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+@mcp.tool()
+def get_vessel_current_position(mmsi: int | str) -> str:
+    """Get the most recent position of a vessel.
+    
+    Args:
+        mmsi (int): Maritime Mobile Service Identity number of the vessel
+    
+    Returns:
+        str: JSON object with current position, speed, heading, and timestamp
+    """
+    try:
+        mmsi = int(mmsi)
+        locations = get_vehicle_locations(mmsi)
+        if locations:
+            loc = locations[0]  # Most recent
+            result = {
+                "mmsi": loc.mmsi,
+                "vessel_name": loc.vessel_name,
+                "timestamp": loc.timestamp,
+                "latitude": loc.lat,
+                "longitude": loc.lon,
+                "speed_over_ground": loc.sog,
+                "course_over_ground": loc.cog,
+                "heading": loc.heading,
+            }
+            return json.dumps(result, indent=2)
+        else:
+            return json.dumps({"error": "No positions found for this vessel"})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+@mcp.tool()
+def ship_following_analysis(mmsi1: int | str, mmsi2: int | str) -> str:
+    """Determine if one vessel has been following another vessel's path.
+    
+    Args:
+        mmsi1 (int): MMSI of the initial vessel
+        mmsi2 (int): MMSI of the vessel to check if following
+    
+    Returns:
+        str: Analysis string indicating how many times vessel 2 was near vessel 1
+    """
+    try:
+        mmsi1 = int(mmsi1)
+        mmsi2 = int(mmsi2)
+        result = ship_following(mmsi1, mmsi2)
+        return json.dumps({"analysis": result})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
 
 # ============================================================================
 # Fishy Vessel Analysis Tools
