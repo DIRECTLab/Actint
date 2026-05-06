@@ -86,20 +86,32 @@ def get_vehicle_locations(
     if limit > 5000:
         limit = 5000
 
+    where_parts: list[str] = ["icao = %s"]
+    params: list[object] = [icao_n]
+
+    if start_time is not None:
+        where_parts.append("timestamp >= %s")
+        params.append(start_time)
+
+    if end_time is not None:
+        where_parts.append("timestamp <= %s")
+        params.append(end_time)
+
     sql = (
         "SELECT "
         + ", ".join(_POSITION_COLUMNS)
         + " FROM adsb_positions "
-        "WHERE icao = %s "
-        "AND (%s IS NULL OR timestamp >= %s) "
-        "AND (%s IS NULL OR timestamp <= %s) "
-        "ORDER BY timestamp DESC "
-        "LIMIT %s;"
+        + "WHERE "
+        + " AND ".join(where_parts)
+        + " ORDER BY timestamp DESC "
+        + "LIMIT %s;"
     )
+    params.append(limit)
+
 
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (icao_n, start_time, start_time, end_time, end_time, limit))
+            cur.execute(sql, tuple(params))
             colnames = [d.name for d in cur.description]
             rows = [dict(zip(colnames, r)) for r in cur.fetchall()]
 

@@ -194,7 +194,7 @@ def reg_to_country_iso(conn, reg):
     
     query = """
         SELECT prefix, iso_country, notes
-        FROM reg_num_to_countries
+        FROM reg_num_to_country_iso
         WHERE %s LIKE prefix || '%%'
         ORDER BY LENGTH(prefix) DESC
         LIMIT 1;

@@ -54,7 +54,7 @@ def search_countries(name_contains: str, limit: int = 20) -> list[dict[str, Any]
     sql = """
         SELECT id, code, name, continent
         FROM avi_countries
-        WHERE name ILIKE '%' || %s || '%'
+        WHERE name ILIKE '%%' || %s || '%%'
         ORDER BY name ASC
         LIMIT %s;
     """
@@ -101,7 +101,7 @@ def search_regions(name_contains: str, iso_country: str | None = None, limit: in
     sql = """
         SELECT id, code, name, continent, iso_country
         FROM avi_regions
-        WHERE name ILIKE '%' || %s || '%'
+        WHERE name ILIKE '%%' || %s || '%%'
           AND (%s IS NULL OR iso_country = %s)
         ORDER BY name ASC
         LIMIT %s;

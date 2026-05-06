@@ -79,8 +79,8 @@ def search_airports(
             iata_code, icao_code,
             score
         FROM airports
-        WHERE (%s = '' OR name ILIKE '%' || %s || '%')
-          AND (%s = '' OR municipality ILIKE '%' || %s || '%')
+        WHERE (%s = '' OR name ILIKE '%%' || %s || '%%')
+          AND (%s = '' OR municipality ILIKE '%%' || %s || '%%')
           AND (%s IS NULL OR iso_country = %s)
           AND (%s IS NULL OR iso_region = %s)
         ORDER BY score DESC NULLS LAST, name ASC

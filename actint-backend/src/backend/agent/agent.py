@@ -6,6 +6,7 @@ from pathlib import Path
 
 from backend.config import config
 from backend.mcp_servers.ais import ais_mcp_server
+from backend.mcp_servers.adsb import adsb_mcp_server
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
 import sys
@@ -36,16 +37,25 @@ else:
     python_path = sys.executable
 
 # Initialize MCP server
-server_params = StdioServerParameters(
+ais_server_params = StdioServerParameters(
     command=python_path,
     args=[ais_mcp_server.__file__],
     env=os.environ.copy(),
     cwd=os.getcwd()
 )
 
-mcp_client = MCPClient(server_params, structured_output=False)
-ais_mcp_tools = mcp_client.get_tools()
+adsb_server_params = StdioServerParameters(
+    command=python_path,
+    args=[adsb_mcp_server.__file__],
+    env=os.environ.copy(),
+    cwd=os.getcwd()
+)
 
+ais_mcp_client = MCPClient(ais_server_params, structured_output=False)
+ais_mcp_tools = ais_mcp_client.get_tools()
+
+adsb_mcp_client = MCPClient(adsb_server_params, structured_output=False)
+adsb_mcp_tools = adsb_mcp_client.get_tools()
 
 model = TransformersModel(
     model_id=model_id,
@@ -58,8 +68,10 @@ _agent_sessions = {}
 def get_or_create_agent(session_id: str, additional_tools: list = []) -> ToolCallingAgent:
     """Creates or retrieves an agent for a given session, injecting relevant tools."""
     if session_id not in _agent_sessions:
-        # Base tools that all agents get (e.g., MCP server tools)
-        tools = ais_mcp_tools.copy()
+        # Base tools that all agents get (e.g., MCP server tools) (toggle between the two depending on which one we want to use for testing)
+
+        # tools = ais_mcp_tools.copy()
+        tools = adsb_mcp_tools.copy()
         
         # Inject context-specific tools (like UI tools or terminal tools)
         if additional_tools:
