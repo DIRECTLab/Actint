@@ -1,4 +1,5 @@
 import asyncio
+import json
 import sys
 from datetime import datetime
 from uuid import uuid4
@@ -32,13 +33,20 @@ def record_message(sender: str, message: str) -> None:
 
 
 def save_chat(sid: str, fmt: str = "txt") -> str:
-    ext = "md" if fmt == "md" else "txt"
+    ext = fmt if fmt in {"md", "json"} else "txt"
     filename = (
         f"chat_{sid}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{ext}"
     )
 
     with open(filename, "w") as f:
-        if fmt == "md":
+        if fmt == "json":
+            payload = {
+                "session_id": sid,
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "messages": chat_history,
+            }
+            json.dump(payload, f, indent=2)
+        elif fmt == "md":
             f.write(f"# Chat Session `{sid}`\n\n")
             f.write(
                 f"**Date:** {datetime.now().strftime('%Y-%m-%d')}\n\n---\n\n"
@@ -79,7 +87,7 @@ async def query_agent_loop(debug: bool = False) -> None:
             if user_text.lower() in {"/help", "/h"}:
                 print_message(
                     "System",
-                    "Available commands: /help, /quit, /exit, /save [txt|md]",
+                    "Available commands: /help, /quit, /exit, /save [txt|md|json]",
                 )
                 continue
 
@@ -87,7 +95,7 @@ async def query_agent_loop(debug: bool = False) -> None:
             if parts[0] in {"/save", "/s"}:
                 fmt = (
                     parts[1]
-                    if len(parts) > 1 and parts[1] in {"txt", "md"}
+                    if len(parts) > 1 and parts[1] in {"txt", "md", "json"}
                     else "txt"
                 )
                 filename = save_chat(sid, fmt)
