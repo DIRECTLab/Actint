@@ -11,13 +11,13 @@ import asyncio
 _loop: asyncio.AbstractEventLoop | None = None
 
 
-def set_loop(loop: asyncio.AbstractEventLoop) -> None:
+def set_event_loop(loop: asyncio.AbstractEventLoop) -> None:
     """Registers the main event loop for the application, allowing tools and other components to access it."""
     global _loop
     _loop = loop
 
 
-def get_loop() -> asyncio.AbstractEventLoop:
+def get_event_loop() -> asyncio.AbstractEventLoop:
     """Retrieves the registered event loop for async operations. Raises an error if not set."""
     if _loop is None:
         raise RuntimeError("Event loop not registered yet.")

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from backend.config import config
 from backend.mcp_servers.ais import ais_mcp_server
-from backend.event_loop_registry import set_loop
+from backend.event_loop_registry import set_event_loop
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
 import socket
@@ -74,7 +74,7 @@ async def query_agent(
     """Entry point for both web and terminal to query their respective agent."""
 
     loop = asyncio.get_running_loop()
-    set_loop(loop)  # Register before entering the thread so tools can reach it
+    set_event_loop(loop)  # Register before entering the thread so tools can reach it
 
     agent = get_or_create_agent(session_id, additional_tools or [])
 

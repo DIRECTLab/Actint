@@ -2,7 +2,7 @@
 import asyncio
 import json
 from smolagents import Tool
-from backend.event_loop_registry import get_loop
+from backend.event_loop_registry import get_event_loop
 from backend.transport.server_sent_events.map_events import (
     set_map_position,
     draw_rectangle,
@@ -29,7 +29,7 @@ class ZoomTool(Tool):
     def forward(self, lat, lon, zoom) -> str:
         lat, lon, zoom = float(lat), float(lon), int(zoom)
         future = asyncio.run_coroutine_threadsafe(
-            set_map_position(lat, lon, zoom, sid=self.sid), get_loop()
+            set_map_position(lat, lon, zoom, sid=self.sid), get_event_loop()
         )
         future.result()
         return f"Map positioned to lat: {lat}, lon: {lon}, zoom: {zoom}"
@@ -59,7 +59,7 @@ class DrawRectangleTool(Tool):
             draw_rectangle(
                 self.sid, lat1=lat1, lon1=lon1, lat2=lat2, lon2=lon2, color=color
             ),
-            get_loop(),
+            get_event_loop(),
         )
         future.result()
         return (
@@ -95,7 +95,7 @@ class DrawCircleTool(Tool):
                 center_lon=center_lon,
                 color=color,
             ),
-            get_loop(),
+            get_event_loop(),
         )
         future.result()
         return (
@@ -125,7 +125,7 @@ class DrawLineTool(Tool):
         if isinstance(points, str):
             points = json.loads(points)
         future = asyncio.run_coroutine_threadsafe(
-            draw_line(self.sid, points=points, color=color), get_loop()
+            draw_line(self.sid, points=points, color=color), get_event_loop()
         )
         future.result()
         return f"Line drawn with points {points} in {color}"
