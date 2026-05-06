@@ -17,7 +17,6 @@ basic tools includes
     
 """
 
-import os
 from backend.config import config
 import psycopg
 from psycopg import sql
@@ -25,6 +24,7 @@ from psycopg.rows import dict_row
 
 import math
 from typing import Any, Iterable, Optional
+from contextlib import contextmanager
 
 
 def normalize_icao(icao: str) -> str:
@@ -65,14 +65,15 @@ def bbox_from_radius_nm(lat: float, lon: float, radius_nm: float) -> tuple[float
     lon_max = _normalize_lon(lon + dlon)
     return lat_min, lat_max, lon_min, lon_max
 
+@contextmanager
 def get_conn():
     """Create a Postgres connection for ADS-B tooling.
 
     Requires env vars: DB_HOST, DB_NAME, DB_USER, DB_PASS, DB_PORT.
 
     Raises:
-        ValueError: if any required env var is missing/invalid.
-        psycopg.Error: if connection fails.
+        ValueError: if any required env var is missing/invalid 
+        RuntimeError: if DB ping fails
     """
     db_host = config.DB_HOST
     db_name = config.DB_NAME
@@ -99,13 +100,35 @@ def get_conn():
     except Exception as e:
         raise ValueError("DB_PORT must be an integer") from e
 
-    return psycopg.connect(
-        host=db_host,
-        dbname=db_name,
-        user=db_user,
+    if not (1 <= db_port <= 65535):
+        raise ValueError("DB_PORT must be between 1 and 65535")
+
+    conn = psycopg.connect(
+        host=db_host.strip(),
+        dbname=db_name.strip(),
+        user=db_user.strip(),
         password=db_pass,
         port=db_port,
     )
+
+    try:
+        # ---- DB health check (lightweight ping) ----
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1;")
+            result = cur.fetchone()
+            if result is None or result[0] != 1:
+                raise RuntimeError("Database health check failed (SELECT 1 returned invalid result)")
+
+        # ---- normal transaction flow ----
+        yield conn
+        conn.commit()
+
+    except Exception:
+        conn.rollback()
+        raise
+
+    finally:
+        conn.close()
 
 
 
