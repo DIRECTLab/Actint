@@ -36,6 +36,7 @@ from backend.mcp_servers.adsb.helpers.adsb_locations import (
     get_track_summary,
     get_vehicle_current_position,
     get_vehicle_locations,
+    find_nearest_aircraft,
 )
 from backend.mcp_servers.adsb.helpers.airport_tools import (
     find_nearest_airport,
@@ -288,6 +289,46 @@ def get_possible_airport_destinations_for_aircraft_tool(
             limit=int(limit),
         )
         return _dumps(result)
+    except Exception as e:
+        return _dumps({"error": str(e)})
+
+
+@mcp.tool()
+def find_nearest_aircraft_to_airport(
+    airport_ident: str,
+    lookback_hours: float | str = 6.0,
+    radius_nm: float | str = 50.0,
+    limit: int | str = 5,
+) -> str:
+    """Find the nearest aircraft to an airport (by ident) using latest ADS-B positions."""
+
+    try:
+        airport = get_airport_by_ident(airport_ident)
+        if airport is None:
+            return _dumps({"error": "Airport not found"})
+
+        lat = float(airport["latitude_deg"])
+        lon = float(airport["longitude_deg"])
+
+        results = find_nearest_aircraft(
+            lat,
+            lon,
+            lookback_hours=float(lookback_hours),
+            radius_nm=float(radius_nm),
+            limit=int(limit),
+        )
+
+        return _dumps(
+            {
+                "airport": {
+                    "ident": airport.get("ident"),
+                    "name": airport.get("name"),
+                    "latitude_deg": airport.get("latitude_deg"),
+                    "longitude_deg": airport.get("longitude_deg"),
+                },
+                "candidates": results,
+            }
+        )
     except Exception as e:
         return _dumps({"error": str(e)})
 
