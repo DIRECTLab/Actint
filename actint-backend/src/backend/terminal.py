@@ -53,6 +53,7 @@ async def query_agent_loop(debug: bool = False) -> None:
                 response = "Agent failed to respond."
 
             print_message("ChatBot", response)
+            record_message("ChatBot", response)
 
     except KeyboardInterrupt:
         print()
