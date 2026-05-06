@@ -46,3 +46,4 @@ folium
 seaborn
 scikit-learn
 shapely<=2.1.2
+gymnasium
