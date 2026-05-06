@@ -5,6 +5,12 @@ from datetime import datetime
 from uuid import uuid4
 from sys import argv
 
+try:
+    import readline  # noqa: F401 -- enables up-arrow input history automatically
+except ImportError:
+    # readline is Unix/macOS only. Install pyreadline3 on Windows.
+    pass
+
 from backend.agent.agent import query_agent, remove_agent_session
 
 
