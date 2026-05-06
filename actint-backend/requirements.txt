@@ -46,4 +46,4 @@ folium
 seaborn
 scikit-learn
 shapely<=2.1.2
-gymnasium
+#gymnasium - uncomment if we are actually going to use train_rl_agent.py
