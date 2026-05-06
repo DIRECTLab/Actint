@@ -1,21 +1,8 @@
-import argparse
 import asyncio
-import json
 import sys
 from datetime import datetime
-from uuid import uuid4
 
-try:
-    import readline  # noqa: F401 -- enables up-arrow input history automatically
-except ImportError:
-    # readline is Unix/macOS only. Install pyreadline3 on Windows.
-    pass
-
-try:
-    import socketio
-    SOCKETIO_AVAILABLE = True
-except ImportError:
-    SOCKETIO_AVAILABLE = False
+from backend.agent.agent import get_available_tool_names, remove_user_agent, user_agent_query
 
 
 SESSION_ID = uuid4().hex[:8]  # Generate a short random session ID for terminal users
@@ -64,14 +51,12 @@ async def query_agent_loop(debug: bool = False) -> None:
                 response = "Agent failed to respond."
 
             print_message("ChatBot", response)
-            record_message("ChatBot", response)
 
     except KeyboardInterrupt:
         print()
         print_message("System", "Interrupted by user.")
     finally:
-        if remote_client:
-            await remote_client.disconnect()
+        remove_user_agent(sid)
         print_message("System", "Session closed.")
 
 
