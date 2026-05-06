@@ -1,18 +1,16 @@
 # backend/agent/agent.py
 import os
 import asyncio
-from smolagents import ToolCallingAgent, MCPClient, AgentMaxStepsError, ActionStep, TaskStep, OpenAIModel
+from smolagents import ToolCallingAgent, TransformersModel, MCPClient, AgentMaxStepsError
 from mcp import StdioServerParameters
 import sys
 from pathlib import Path
 
 from backend.config import config
 from backend.mcp_servers.ais import ais_mcp_server
-from backend.mcp_servers.adsb import adsb_mcp_server
 from backend.event_loop_registry import set_event_loop
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
-import sys
 import socket
 import requests
 
@@ -27,7 +25,7 @@ if is_port_in_use(4317):
     SmolagentsInstrumentor().instrument()
 else:
     print(
-        "\x1b[33mPhoenix telemetry server is not running on localhost:4317. Skipping instrumentation.\033[0m",
+        "Phoenix telemetry server is not running on localhost:4317. Skipping instrumentation.",
         file=sys.stderr
     )
 
@@ -52,7 +50,7 @@ if config.CONDA_PREFIX:
 else:
     python_path = sys.executable
 
-ais_server_params = StdioServerParameters(
+server_params = StdioServerParameters(
     command=python_path,
     args=[ais_mcp_server.__file__],
     env=os.environ.copy(),
@@ -69,29 +67,45 @@ adsb_server_params = StdioServerParameters(
     cwd=os.getcwd()
 )
 
-adsb_mcp_client = MCPClient(adsb_server_params, structured_output=False)
-adsb_mcp_tools = adsb_mcp_client.get_tools()
-
 _agent_sessions = {}
 
-def get_or_create_agent(session_id: str, additional_tools: list = []) -> ToolCallingAgent:
+
+def get_or_create_agent(
+    session_id: str, additional_tools: list = []
+) -> ToolCallingAgent:
     """Creates or retrieves an agent for a given session, injecting relevant tools."""
     if session_id not in _agent_sessions:
-        # Base tools that all agents get (e.g., MCP server tools)
         tools = ais_mcp_tools.copy()
-        
-        # Inject context-specific tools (like UI tools or terminal tools)
         if additional_tools:
             tools.extend(additional_tools)
-            
         _agent_sessions[session_id] = ToolCallingAgent(tools=tools, model=model)
-        
     return _agent_sessions[session_id]
 
-async def query_agent(query: str, session_id: str, additional_tools: list = None):
+
+async def query_agent(
+    query: str,
+    session_id: str,
+    additional_tools: list = None,
+) -> str:
     """Entry point for both web and terminal to query their respective agent."""
-    agent = get_or_create_agent(session_id, additional_tools)
-    return agent.run(query, reset=False)
+
+    loop = asyncio.get_running_loop()
+    set_event_loop(loop)  # Register before entering the thread so tools can reach it
+
+    agent = get_or_create_agent(session_id, additional_tools or [])
+
+    try:
+        result = await loop.run_in_executor(
+            None, lambda: agent.run(query, reset=False)
+        )
+        return result
+    except AgentMaxStepsError:
+        print(f"[session={session_id}] Agent hit max steps.", file=sys.stderr)
+        return "Agent failed to respond: maximum steps exceeded."
+    except Exception as e:
+        print(f"[session={session_id}] Agent error: {e}", file=sys.stderr)
+        return f"Agent encountered an error: {str(e)}"
+
 
 def create_agent(
     additional_tools: list = [],
