@@ -28,7 +28,7 @@ else:
     print("Phoenix telemetry server is not running on localhost:4317. Skipping instrumentation.", file=sys.stderr)
 
 
-model_id = "Qwen/Qwen3.5-9B"
+model_id = config.MODEL_ID
 #model_id = "Qwen/Qwen2-7B-Instruct"
 
 if config.CONDA_PREFIX:
@@ -59,7 +59,7 @@ adsb_mcp_tools = adsb_mcp_client.get_tools()
 
 model = TransformersModel(
     model_id=model_id,
-    max_new_tokens=4096,
+    max_new_tokens=config.MAX_NEW_TOKENS,
 )
 
 
