@@ -1,11 +1,13 @@
 import asyncio
 import sys
 from datetime import datetime
+from uuid import uuid4
+from sys import argv
 
-from backend.agent.agent import get_available_tool_names, remove_user_agent, user_agent_query
+from backend.agent.agent import query_agent, remove_agent_session
 
 
-SESSION_ID = "tui-session"
+SESSION_ID = uuid4().hex[:8]  # Generate a short random session ID for terminal users
 
 
 async def ainput(prompt: str) -> str:
@@ -17,8 +19,10 @@ def print_message(sender: str, message: str) -> None:
     print(f"[{timestamp}] {sender}: {message}")
 
 
-async def query_agent_loop() -> None:
+async def query_agent_loop(debug: bool = False) -> None:
     sid = SESSION_ID
+    if debug:
+        print_message("System", f"Debug mode enabled. Session ID: {sid}")
     print_message("System", "Terminal chat started.")
     print_message("System", "Type '/quit' or '/exit' to stop.")
 
@@ -29,7 +33,8 @@ async def query_agent_loop() -> None:
             if not user_text:
                 continue
 
-            if user_text.lower() in {"/quit", "/exit"}:
+            if user_text.lower() in {"/quit", "/exit", "/q"}:
+                remove_agent_session(sid)
                 break
 
             if user_text.lower() in {"/help", "/h"}:
@@ -38,12 +43,10 @@ async def query_agent_loop() -> None:
 
             print(f"Message from {sid}: {user_text}", file=sys.stderr)
 
-            allowed_tools = set(get_available_tool_names()["ais"])
-
-            response = await user_agent_query(
+            response = await query_agent(
                 user_text,
-                sid=sid,
-                allowed_tools=allowed_tools,
+                session_id=sid,
+                additional_tools=[],
             )
 
             if response is None:
@@ -55,9 +58,11 @@ async def query_agent_loop() -> None:
         print()
         print_message("System", "Interrupted by user.")
     finally:
-        remove_user_agent(sid)
         print_message("System", "Session closed.")
 
 
 if __name__ == "__main__":
-    asyncio.run(query_agent_loop())
+    if len(argv) > 1 and argv[1] in {"--debug", "-d"}:
+        asyncio.run(query_agent_loop(debug=True))
+    else:
+        asyncio.run(query_agent_loop())
