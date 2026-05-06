@@ -2,7 +2,7 @@
 import asyncio
 import json
 from smolagents import Tool
-from backend.loop_registry import get_loop
+from backend.event_loop_registry import get_loop
 from backend.transport.server_sent_events.map_events import (
     set_map_position,
     draw_rectangle,

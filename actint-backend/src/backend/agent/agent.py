@@ -8,7 +8,7 @@ from pathlib import Path
 
 from backend.config import config
 from backend.mcp_servers.ais import ais_mcp_server
-from backend.loop_registry import set_loop
+from backend.event_loop_registry import set_loop
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
 import socket

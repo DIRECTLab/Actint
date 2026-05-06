@@ -7,7 +7,7 @@ from backend.agent.agent import remove_agent_session, query_agent
 from backend.ui_tools.map_edit_tools import ZoomTool, DrawCircleTool, DrawLineTool, DrawRectangleTool
 from backend.transport.defaults import sio, app
 from backend.config import config
-from backend.loop_registry import set_loop
+from backend.event_loop_registry import set_loop
 
 @sio.event
 async def connect(sid, environ):
