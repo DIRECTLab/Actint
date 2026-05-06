@@ -1,17 +1,17 @@
 import uvicorn
 import sys
-import os
+import asyncio
 from datetime import datetime
-
-from smolagents import RunResult
 
 from backend.agent.agent import remove_agent_session, query_agent
 from backend.ui_tools.map_edit_tools import ZoomTool, DrawCircleTool, DrawLineTool, DrawRectangleTool
 from backend.transport.defaults import sio, app
 from backend.config import config
+from backend.loop_registry import set_loop
 
 @sio.event
 async def connect(sid, environ):
+    set_loop(asyncio.get_event_loop())
     print(f"User {sid} connected!", file=sys.stderr)
 
 # ==================================================

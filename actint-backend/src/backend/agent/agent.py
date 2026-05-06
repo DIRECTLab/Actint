@@ -1,3 +1,4 @@
+# backend/agent/agent.py
 import os
 import asyncio
 from smolagents import ToolCallingAgent, TransformersModel, MCPClient, AgentMaxStepsError
@@ -7,13 +8,16 @@ from pathlib import Path
 
 from backend.config import config
 from backend.mcp_servers.ais import ais_mcp_server
+from backend.loop_registry import set_loop
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
 import socket
 
+
 def is_port_in_use(port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex(('localhost', port)) == 0
+
 
 if is_port_in_use(4317):
     register(project_name="Map_Actint")
@@ -25,7 +29,6 @@ else:
     )
 
 model_id = config.MODEL_ID
-
 print("Model ID: " + model_id)
 
 if config.CONDA_PREFIX:
@@ -50,7 +53,10 @@ model = TransformersModel(
 
 _agent_sessions = {}
 
-def get_or_create_agent(session_id: str, additional_tools: list = []) -> ToolCallingAgent:
+
+def get_or_create_agent(
+    session_id: str, additional_tools: list = []
+) -> ToolCallingAgent:
     if session_id not in _agent_sessions:
         tools = ais_mcp_tools.copy()
         if additional_tools:
@@ -58,16 +64,21 @@ def get_or_create_agent(session_id: str, additional_tools: list = []) -> ToolCal
         _agent_sessions[session_id] = ToolCallingAgent(tools=tools, model=model)
     return _agent_sessions[session_id]
 
+
 async def query_agent(
     query: str,
     session_id: str,
-    additional_tools: list = None
+    additional_tools: list = None,
 ) -> str:
     """Entry point for both web and terminal to query their respective agent."""
+    print(f"Additional Tools: {additional_tools}", file=sys.stderr)
+
+    loop = asyncio.get_running_loop()
+    set_loop(loop)  # Register before entering the thread so tools can reach it
+
     agent = get_or_create_agent(session_id, additional_tools or [])
-    loop = asyncio.get_event_loop()
+
     try:
-        # Run the synchronous agent.run() in a thread so we don't block the event loop
         result = await loop.run_in_executor(
             None, lambda: agent.run(query, reset=False)
         )
@@ -78,6 +89,7 @@ async def query_agent(
     except Exception as e:
         print(f"[session={session_id}] Agent error: {e}", file=sys.stderr)
         return f"Agent encountered an error: {str(e)}"
+
 
 def remove_agent_session(session_id: str):
     if session_id in _agent_sessions:
