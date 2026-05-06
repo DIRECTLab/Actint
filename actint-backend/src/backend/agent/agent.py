@@ -45,8 +45,8 @@ def check_openai_health(api_key="dummy") -> str:
         return f"\033[31mNetwork/Connection failure: {str(e)}\033[0m"
 
 
-model_id = config.MODEL_ID or ""
-print("\033[0;34mModel ID: \033[1;34m" + model_id + "\033[0m")
+model_id = config.MODEL_ID
+#model_id = "Qwen/Qwen2-7B-Instruct"
 
 if config.CONDA_PREFIX:
     python_path = str(Path(config.CONDA_PREFIX) / "bin" / "python")

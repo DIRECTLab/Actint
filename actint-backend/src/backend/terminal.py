@@ -1,8 +1,10 @@
 import asyncio
 import sys
 from datetime import datetime
+from uuid import uuid4
+from sys import argv
 
-from backend.agent.agent import get_available_tool_names, remove_user_agent, user_agent_query
+from backend.agent.agent import query_agent, remove_agent_session
 
 
 SESSION_ID = uuid4().hex[:8]  # Generate a short random session ID for terminal users
@@ -56,7 +58,6 @@ async def query_agent_loop(debug: bool = False) -> None:
         print()
         print_message("System", "Interrupted by user.")
     finally:
-        remove_user_agent(sid)
         print_message("System", "Session closed.")
 
 
