@@ -72,6 +72,13 @@ def search_airports(
     iso_country_q = (iso_country or "").strip().upper()
     iso_region_q = (iso_region or "").strip().upper()
 
+    # Be forgiving: callers often confuse iso_region with iso_country (e.g., pass "US").
+    # Airports use ISO 3166-2 style region codes like "US-UT".
+    if iso_country_q and len(iso_country_q) != 2:
+        iso_country_q = ""
+    if iso_region_q and "-" not in iso_region_q:
+        iso_region_q = ""
+
     sql = """
         SELECT
             id, ident, type, name,

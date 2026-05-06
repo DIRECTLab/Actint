@@ -21,6 +21,7 @@ Tools provided (initial, simple set):
 from __future__ import annotations
 
 import json
+import re
 from datetime import date, datetime
 from typing import Any
 
@@ -548,39 +549,105 @@ def count_adsb_rows(table_name: str) -> str:
 
 
 @mcp.tool()
-def query_adsb_database(sql_query: str, params_json: str | None = None, max_rows: int | str = 200) -> str:
+def query_adsb_database(
+    sql_query: str, params_json: str | list[Any] | None = None, max_rows: int | str = 200
+) -> str:
     """Execute a read-only SQL query against ADS-B Postgres and return results.
 
     Args:
         sql_query: Read-only query starting with SELECT or WITH.
-        params_json: Optional JSON-encoded array of positional parameters for %s placeholders.
+        params_json: Optional positional parameters for %s placeholders.
+
+            Accepts either:
+            - a JSON-encoded array (e.g. `[]`, `["US", 123]`), or
+            - a JSON-encoded string containing an array (e.g. `"[]"`), or
+            - an actual Python list (some MCP clients may send this).
         max_rows: Maximum number of rows to return.
 
     Returns:
         str: JSON object with rows/columns/metadata, or an error object.
     """
 
+    def _parse_params(params_value: str | list[Any] | None) -> list[Any]:
+        def _normalize_list(lst: list[Any]) -> list[Any]:
+            # Common model bug: params_json='["[]"]' -> list ['[]']
+            if len(lst) == 1 and isinstance(lst[0], str):
+                candidate = lst[0].strip()
+                if candidate == "" or candidate.lower() == "null":
+                    return []
+                if candidate.startswith("[") and candidate.endswith("]"):
+                    try:
+                        nested: Any = json.loads(candidate)
+                        # Sometimes nested is a JSON-encoded string of JSON.
+                        for _ in range(2):
+                            if isinstance(nested, str):
+                                nested = json.loads(nested)
+                            else:
+                                break
+                        if isinstance(nested, list):
+                            return nested
+                    except Exception:
+                        pass
+            return lst
+
+        if params_value is None or params_value == "":
+            return []
+
+        if isinstance(params_value, list):
+            return _normalize_list(params_value)
+
+        raw = params_value.strip()
+        if raw == "" or raw.lower() == "null":
+            return []
+
+        # Some models/tool-callers mistakenly double-encode JSON, e.g. params_json='"[]"'.
+        parsed: Any = json.loads(raw)
+        if parsed is None:
+            return []
+
+        # Unwrap up to a couple layers of JSON-encoded strings.
+        for _ in range(2):
+            if isinstance(parsed, str):
+                parsed = json.loads(parsed)
+            else:
+                break
+
+        if parsed is None:
+            return []
+
+        if not isinstance(parsed, list):
+            raise ValueError("params_json must be a JSON array")
+        return _normalize_list(parsed)
+
+    def _count_percent_s_placeholders(query: str) -> int:
+        # Approximate placeholder count for psycopg `%s` placeholders.
+        # Ignores escaped percents like `%%s` (literal "%s").
+        return len(re.findall(r"(?<!%)%s", query or ""))
+
     try:
         max_rows_i = int(max_rows)
-        params: list[Any] = []
-        if params_json:
-            parsed = json.loads(params_json)
-            if not isinstance(parsed, list):
-                return _dumps({"error": "params_json must be a JSON array"})
-            params = parsed
+        params = _parse_params(params_json)
+
+        placeholder_count = _count_percent_s_placeholders(sql_query)
+        warning: str | None = None
+        if placeholder_count == 0 and params:
+            # Another common model bug: always sending params even when the query has no placeholders.
+            warning = "Query has 0 %s placeholders; ignoring provided params_json."
+            params = []
 
         with get_conn() as conn:
             rows = execute_readonly_query(conn, sql_query, params=params, max_rows=max_rows_i)
 
         columns = sorted({k for r in rows for k in r.keys()})
-        return _dumps(
-            {
-                "columns": columns,
-                "row_count": len(rows),
-                "max_rows": max_rows_i,
-                "rows": rows,
-            }
-        )
+        payload: dict[str, Any] = {
+            "columns": columns,
+            "row_count": len(rows),
+            "max_rows": max_rows_i,
+            "rows": rows,
+        }
+        if warning:
+            payload["warning"] = warning
+        return _dumps(payload)
     except Exception as e:
         return _dumps({"error": str(e)})
 
