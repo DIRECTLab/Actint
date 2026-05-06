@@ -70,35 +70,6 @@ def say_hello() -> str:
 
 
 @mcp.tool()
-def search_region_for_ships(region: str) -> dict:
-    if region not in REGIONS:
-        return {
-            "success": False,
-            "error": "INVALID_REGION",
-            "available_regions": [
-                {"key": k, "name": v["name"]}
-                for k, v in REGIONS.items()
-            ]
-        }
-
-    try:
-        region_data = run_region(region)
-
-        return {
-            "success": True,
-            "region": region,
-            "data": region_data
-        }
-
-    except Exception as e:
-        return {
-            "success": False,
-            "error": "EXECUTION_ERROR",
-            "message": str(e)  # force safe serialization
-        }
-
-
-@mcp.tool()
 def get_vessel_locations(mmsi: int | str) -> str:
     """Get all recorded positions for a specific vessel identified by MMSI.
     
@@ -179,6 +150,38 @@ def ship_following_analysis(mmsi1: int | str, mmsi2: int | str) -> str:
         return json.dumps({"analysis": result})
     except Exception as e:
         return json.dumps({"error": str(e)})
+    
+
+# ============================================================================
+# Tools: Using tools that Mario originally wrote
+# ============================================================================
+@mcp.tool()
+def search_region_for_ships(region: str) -> dict:
+    if region not in REGIONS:
+        return {
+            "success": False,
+            "error": "INVALID_REGION",
+            "available_regions": [
+                {"key": k, "name": v["name"]}
+                for k, v in REGIONS.items()
+            ]
+        }
+
+    try:
+        region_data = run_region(region)
+
+        return {
+            "success": True,
+            "region": region,
+            "data": region_data
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": "EXECUTION_ERROR",
+            "message": str(e)  # force safe serialization
+        }
 
 # ============================================================================
 # Tools: Translation
