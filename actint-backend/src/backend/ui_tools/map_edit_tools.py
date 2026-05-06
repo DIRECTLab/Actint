@@ -1,6 +1,14 @@
+# backend/ui_tools/map_edit_tools.py
 import asyncio
+import json
 from smolagents import Tool
-from backend.transport.server_sent_events.map_events import set_map_position, draw_rectangle, draw_circle, draw_line
+from backend.event_loop_registry import get_event_loop
+from backend.transport.server_sent_events.map_events import (
+    set_map_position,
+    draw_rectangle,
+    draw_circle,
+    draw_line,
+)
 
 
 class ZoomTool(Tool):
@@ -9,7 +17,7 @@ class ZoomTool(Tool):
     inputs = {
         "lat": {"type": "string", "description": "Latitude"},
         "lon": {"type": "string", "description": "Longitude"},
-        "zoom": {"type": "string", "description": "Zoom level"}
+        "zoom": {"type": "string", "description": "Zoom level"},
     }
     output_type = "string"
 
@@ -18,12 +26,13 @@ class ZoomTool(Tool):
         self.sid = sid
         self.sio = sio_instance
 
-    def forward(self, lat: float | int | str, lon: float | int | str, zoom: int | str) -> str:
-        lat = float(lat)
-        lon = float(lon)
-        zoom = int(zoom)
-        asyncio.create_task(set_map_position(lat, lon, zoom, sid=self.sid))
-        return f"Map positioned to lat: {lat}, lon: {lon}, zoom: {zoom}, sid is {self.sid}"
+    def forward(self, lat, lon, zoom) -> str:
+        lat, lon, zoom = float(lat), float(lon), int(zoom)
+        future = asyncio.run_coroutine_threadsafe(
+            set_map_position(lat, lon, zoom, sid=self.sid), get_event_loop()
+        )
+        future.result()
+        return f"Map positioned to lat: {lat}, lon: {lon}, zoom: {zoom}"
 
 
 class DrawRectangleTool(Tool):
@@ -34,7 +43,7 @@ class DrawRectangleTool(Tool):
         "lon1": {"type": "string", "description": "Longitude of first corner"},
         "lat2": {"type": "string", "description": "Latitude of opposite corner"},
         "lon2": {"type": "string", "description": "Longitude of opposite corner"},
-        "color": {"type": "string", "description": "Color of the rectangle"}
+        "color": {"type": "string", "description": "Color of the rectangle"},
     }
     output_type = "string"
 
@@ -43,14 +52,21 @@ class DrawRectangleTool(Tool):
         self.sid = sid
         self.sio = sio_instance
 
-    def forward(self, lat1: float | int | str, lon1: float | int | str, lat2: float | int | str, lon2: float | int | str, color: str) -> str:
-        lat1 = float(lat1)
-        lon1 = float(lon1)
-        lat2 = float(lat2)
-        lon2 = float(lon2)
-        asyncio.create_task(draw_rectangle(self.sid, lat1=lat1, lon1=lon1, lat2=lat2, lon2=lon2, color=color))
-        return f"Rectangle drawn with corners ({lat1}, {lon1}) and ({lat2}, {lon2}) in color {color} for sid {self.sid}"
-    
+    def forward(self, lat1, lon1, lat2, lon2, color) -> str:
+        lat1, lon1 = float(lat1), float(lon1)
+        lat2, lon2 = float(lat2), float(lon2)
+        future = asyncio.run_coroutine_threadsafe(
+            draw_rectangle(
+                self.sid, lat1=lat1, lon1=lon1, lat2=lat2, lon2=lon2, color=color
+            ),
+            get_event_loop(),
+        )
+        future.result()
+        return (
+            f"Rectangle drawn with corners ({lat1}, {lon1}) "
+            f"and ({lat2}, {lon2}) in {color}"
+        )
+
 
 class DrawCircleTool(Tool):
     name = "draw_circle"
@@ -59,7 +75,7 @@ class DrawCircleTool(Tool):
         "center_lat": {"type": "string", "description": "Latitude of the center"},
         "center_lon": {"type": "string", "description": "Longitude of the center"},
         "radius": {"type": "string", "description": "Radius of the circle in meters"},
-        "color": {"type": "string", "description": "Color of the circle"}
+        "color": {"type": "string", "description": "Color of the circle"},
     }
     output_type = "string"
 
@@ -68,19 +84,35 @@ class DrawCircleTool(Tool):
         self.sid = sid
         self.sio = sio_instance
 
-    def forward(self, center_lat: float | int | str, center_lon: float | int | str, radius: float | int | str, color: str) -> str:
-        center_lat = float(center_lat)
-        center_lon = float(center_lon)
+    def forward(self, center_lat, center_lon, radius, color) -> str:
+        center_lat, center_lon = float(center_lat), float(center_lon)
         radius = float(radius)
-        asyncio.create_task(draw_circle(self.sid, radius=radius, center_lat=center_lat, center_lon=center_lon, color=color))
-        return f"Circle drawn with center ({center_lat}, {center_lon}), radius {radius}m in color {color} for sid {self.sid}"
-    
+        future = asyncio.run_coroutine_threadsafe(
+            draw_circle(
+                self.sid,
+                radius=radius,
+                center_lat=center_lat,
+                center_lon=center_lon,
+                color=color,
+            ),
+            get_event_loop(),
+        )
+        future.result()
+        return (
+            f"Circle drawn at ({center_lat}, {center_lon}), "
+            f"radius {radius}m in {color}"
+        )
+
+
 class DrawLineTool(Tool):
     name = "draw_line"
     description = "Draws a line on the map given a list of lat/lon points and a color."
     inputs = {
-        "points": {"type": "string", "description": "List of (lat, lon) tuples defining the line"},
-        "color": {"type": "string", "description": "Color of the line"}
+        "points": {
+            "type": "string",
+            "description": "List of (lat, lon) tuples defining the line",
+        },
+        "color": {"type": "string", "description": "Color of the line"},
     }
     output_type = "string"
 
@@ -89,9 +121,11 @@ class DrawLineTool(Tool):
         self.sid = sid
         self.sio = sio_instance
 
-    def forward(self, points: list | str, color: str) -> str:
+    def forward(self, points, color) -> str:
         if isinstance(points, str):
-            import json
             points = json.loads(points)
-        asyncio.create_task(draw_line(self.sid, points=points, color=color))
-        return f"Line drawn with points {points} in color {color} for sid {self.sid}"
+        future = asyncio.run_coroutine_threadsafe(
+            draw_line(self.sid, points=points, color=color), get_event_loop()
+        )
+        future.result()
+        return f"Line drawn with points {points} in {color}"
