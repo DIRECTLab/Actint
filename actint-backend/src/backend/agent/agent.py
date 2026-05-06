@@ -4,11 +4,10 @@ from mcp import StdioServerParameters
 import sys
 from pathlib import Path
 
+from backend.config import config
 from backend.mcp_servers.ais import ais_mcp_server
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
-from backend.transport.defaults import sio
-from backend.native_tools.map_edit_tools import ZoomTool, DrawRectangleTool, DrawCircleTool, DrawLineTool
 import sys
 import socket
 
@@ -31,12 +30,14 @@ else:
 model_id = "Qwen/Qwen3.5-9B"
 #model_id = "Qwen/Qwen2-7B-Instruct"
 
-conda_prefix = os.getenv("CONDA_PREFIX")
-python = str(Path(conda_prefix) / "bin" / "python")
+if config.conda_prefix:
+    python_path = str(Path(config.conda_prefix) / "bin" / "python")
+else:
+    python_path = sys.executable
 
 # Initialize MCP server
 server_params = StdioServerParameters(
-    command=python,
+    command=python_path,
     args=[ais_mcp_server.__file__],
     env=os.environ.copy(),
     cwd=os.getcwd()
@@ -52,16 +53,27 @@ model = TransformersModel(
 )
 
 
-user_agent_dict = {}
+_agent_sessions = {}
 
-async def user_agent_query(query: str, sid: str):
-    if sid not in user_agent_dict:
-        user_tools = ais_mcp_tools + [ZoomTool(sid, sio), DrawRectangleTool(sid, sio), DrawCircleTool(sid, sio), DrawLineTool(sid, sio)]
-        user_agent_dict[sid] = ToolCallingAgent(tools=user_tools, model=model)
+def get_or_create_agent(session_id: str, additional_tools: list = []) -> ToolCallingAgent:
+    """Creates or retrieves an agent for a given session, injecting relevant tools."""
+    if session_id not in _agent_sessions:
+        # Base tools that all agents get (e.g., MCP server tools)
+        tools = ais_mcp_tools.copy()
+        
+        # Inject context-specific tools (like UI tools or terminal tools)
+        if additional_tools:
+            tools.extend(additional_tools)
+            
+        _agent_sessions[session_id] = ToolCallingAgent(tools=tools, model=model)
+        
+    return _agent_sessions[session_id]
 
-    result = user_agent_dict[sid].run(query, reset=False)
-    return result
+async def query_agent(query: str, session_id: str, additional_tools: list = None):
+    """Entry point for both web and terminal to query their respective agent."""
+    agent = get_or_create_agent(session_id, additional_tools)
+    return agent.run(query, reset=False)
 
-def remove_user_agent(sid: str):
-    if sid in user_agent_dict:
-        del user_agent_dict[sid]
+def remove_agent_session(session_id: str):
+    if session_id in _agent_sessions:
+        del _agent_sessions[session_id]

@@ -21,8 +21,9 @@ import io
 from alive_progress import alive_bar
 import re
 import gc
-import os
 import psycopg
+
+from backend.config import config
 
 # Paths
 
@@ -730,11 +731,11 @@ def get_conn():
     try:
         # Read environment variables
         db_config = {
-            "host": os.getenv("DB_HOST"),
-            "dbname": os.getenv("DB_NAME"),
-            "user": os.getenv("DB_USER"),
-            "password": os.getenv("DB_PASS"),
-            "port": int(os.getenv("DB_PORT")),
+            "host": config.DB_HOST,
+            "dbname": config.DB_NAME,
+            "user": config.DB_USER,
+            "password": config.DB_PASS,
+            "port": config.DB_PORT,
         }
 
         # Validate required vars

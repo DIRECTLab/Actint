@@ -15,12 +15,12 @@ by file path.
 
 Create a Python 3.12 environment and install the package in editable mode.
 
-From the `backend/` directory:
+From the `actint-backend/` directory:
 
 ```bash
 conda create -n actint python=3.12 -y
 conda activate actint
-cd backend
+cd actint-backend
 pip install -e .
 ```
 
@@ -29,7 +29,7 @@ You can also install it directly from the repository root:
 ```bash
 conda create -n actint python=3.12 -y
 conda activate actint
-pip install -e ./backend
+pip install -e ./actint-backend
 ```
 
 ## Usage
