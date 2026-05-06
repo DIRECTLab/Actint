@@ -77,7 +77,11 @@ def _dumps(payload: Any) -> str:
 
 @mcp.tool()
 def say_hello() -> str:
-    """Simple tool to test connectivity and responsiveness of the MCP server."""
+    """Simple tool to test connectivity and responsiveness of the MCP server.
+
+    Returns:
+        str: Plain-text greeting confirming the server is running.
+    """
 
     return "Hello! The ADS-B Aircraft Intelligence MCP server is up and running."
 
@@ -99,7 +103,7 @@ def get_aircraft_locations(
         limit: Max number of positions to return (newest-first).
 
     Returns:
-        JSON list of positions.
+        str: JSON list of position objects (newest-first).
     """
 
     try:
@@ -129,7 +133,14 @@ def get_aircraft_locations(
 
 @mcp.tool()
 def get_aircraft_current_position(icao: str) -> str:
-    """Get the most recent position of an aircraft."""
+    """Get the most recent position of an aircraft.
+
+    Args:
+        icao: ICAO hex identifier (e.g., "a1b2c3") of the aircraft.
+
+    Returns:
+        str: JSON object with the latest position fields, or an error object.
+    """
 
     try:
         p = get_vehicle_current_position(icao)
@@ -163,7 +174,18 @@ def aircraft_following_analysis(
     threshold_distance_nm: float | str = 5.0,
     lookback_hours: float | str = 6.0,
 ) -> str:
-    """Determine if one aircraft has been following another aircraft's path."""
+    """Determine if one aircraft has been following another aircraft's path.
+
+    Args:
+        leader_icao: ICAO hex for the leader aircraft.
+        follower_icao: ICAO hex for the follower aircraft.
+        threshold_time_minutes: Time tolerance for a match.
+        threshold_distance_nm: Distance threshold (nautical miles).
+        lookback_hours: How far back to analyze.
+
+    Returns:
+        str: JSON object with a human-readable analysis string, or an error object.
+    """
 
     try:
         analysis = aircraft_following(
@@ -180,7 +202,15 @@ def aircraft_following_analysis(
 
 @mcp.tool()
 def get_aircraft_track_summary(icao: str, lookback_hours: float | str = 6.0) -> str:
-    """Return simple aggregate stats for an aircraft track."""
+    """Return simple aggregate stats for an aircraft track.
+
+    Args:
+        icao: ICAO hex identifier of the aircraft.
+        lookback_hours: How far back to summarize.
+
+    Returns:
+        str: JSON object with summary statistics, or an error object.
+    """
 
     try:
         summary = get_track_summary(icao, lookback_hours=float(lookback_hours))
@@ -201,7 +231,19 @@ def find_nearest_airports(
     limit: int | str = 5,
     max_distance_nm: float | str | None = None,
 ) -> str:
-    """Find nearest airports to a lat/lon."""
+    """Find nearest airports to a lat/lon.
+
+    Args:
+        latitude: Latitude in decimal degrees.
+        longitude: Longitude in decimal degrees.
+        limit: Max number of airports to return.
+        max_distance_nm: Optional max search radius (nautical miles). If omitted/blank,
+            the helper may expand the radius until results are found.
+
+    Returns:
+        str: JSON list of airport objects with distance/bearing fields when available,
+            or an error object.
+    """
 
     try:
         lat = float(latitude)
@@ -223,7 +265,14 @@ def find_nearest_airports(
 
 @mcp.tool()
 def get_airport(ident: str) -> str:
-    """Lookup airport by ident (e.g., "KJFK", "EGLL")."""
+    """Lookup airport by ident (e.g., "KJFK", "EGLL").
+
+    Args:
+        ident: Airport ident/code.
+
+    Returns:
+        str: JSON airport object, or an error object if not found.
+    """
 
     try:
         airport = get_airport_by_ident(ident)
@@ -242,7 +291,18 @@ def search_airports_tool(
     municipality_contains: str | None = None,
     limit: int | str = 50,
 ) -> str:
-    """Search airports by name/region/country."""
+    """Search airports by name/region/country.
+
+    Args:
+        name_contains: Substring match against airport name.
+        iso_country: Optional ISO country code filter.
+        iso_region: Optional ISO region code filter.
+        municipality_contains: Substring match against municipality.
+        limit: Max number of rows to return.
+
+    Returns:
+        str: JSON list of matching airports, or an error object.
+    """
 
     try:
         results = search_airports(
@@ -259,7 +319,14 @@ def search_airports_tool(
 
 @mcp.tool()
 def get_airport_runways_tool(airport_ident: str) -> str:
-    """Get runways for an airport ident."""
+    """Get runways for an airport ident.
+
+    Args:
+        airport_ident: Airport ident/code.
+
+    Returns:
+        str: JSON list of runway records, or an error object.
+    """
 
     try:
         return _dumps(get_airport_runways(airport_ident=airport_ident))
@@ -269,7 +336,15 @@ def get_airport_runways_tool(airport_ident: str) -> str:
 
 @mcp.tool()
 def get_airport_frequencies_tool(airport_ident: str, freq_type: str | None = None) -> str:
-    """Get radio frequencies for an airport ident."""
+    """Get radio frequencies for an airport ident.
+
+    Args:
+        airport_ident: Airport ident/code.
+        freq_type: Optional frequency type filter.
+
+    Returns:
+        str: JSON list of frequency records, or an error object.
+    """
 
     try:
         return _dumps(get_airport_frequencies(airport_ident=airport_ident, freq_type=freq_type))
@@ -285,7 +360,19 @@ def get_possible_airport_destinations_for_aircraft_tool(
     tolerance_deg: float | str = 15.0,
     limit: int | str = 10,
 ) -> str:
-    """Suggest candidate destination airports based on recent direction of travel."""
+    """Suggest candidate destination airports based on recent direction of travel.
+
+    Args:
+        icao: ICAO hex identifier of the aircraft.
+        n_points: Number of recent points to estimate direction.
+        radius_nm: Search radius for candidate airports (nautical miles).
+        tolerance_deg: Allowed heading deviation in degrees.
+        limit: Max number of candidates.
+
+    Returns:
+        str: JSON object including current position, inferred direction, and candidate airports,
+            or an error object.
+    """
 
     try:
         result = get_possible_airport_destinations_for_aircraft(
@@ -307,7 +394,17 @@ def find_nearest_aircraft_to_airport(
     radius_nm: float | str = 50.0,
     limit: int | str = 5,
 ) -> str:
-    """Find the nearest aircraft to an airport (by ident) using latest ADS-B positions."""
+    """Find the nearest aircraft to an airport (by ident) using latest ADS-B positions.
+
+    Args:
+        airport_ident: Airport ident/code.
+        lookback_hours: Lookback window for "latest" positions.
+        radius_nm: Search radius around the airport (nautical miles).
+        limit: Max number of aircraft candidates.
+
+    Returns:
+        str: JSON object with airport metadata and a candidate list, or an error object.
+    """
 
     try:
         airport = get_airport_by_ident(airport_ident)
@@ -352,7 +449,17 @@ def find_nearest_navaids_tool(
     radius_nm: float | str = 100.0,
     limit: int | str = 10,
 ) -> str:
-    """Find nearest navigation aids (VOR/NDB/etc) within radius."""
+    """Find nearest navigation aids (VOR/NDB/etc) within radius.
+
+    Args:
+        latitude: Latitude in decimal degrees.
+        longitude: Longitude in decimal degrees.
+        radius_nm: Search radius (nautical miles).
+        limit: Max number of navaids to return.
+
+    Returns:
+        str: JSON list of navaid records with distance fields, or an error object.
+    """
 
     try:
         lat = float(latitude)
@@ -365,7 +472,14 @@ def find_nearest_navaids_tool(
 
 @mcp.tool()
 def icao_to_country_tool(icao: str) -> str:
-    """Resolve ICAO hex -> registration -> ISO country -> country name."""
+    """Resolve ICAO hex -> registration -> ISO country -> country name.
+
+    Args:
+        icao: ICAO hex identifier.
+
+    Returns:
+        str: JSON object with registration and country fields, or an error object.
+    """
 
     try:
         result = icao_to_country(icao)
@@ -381,7 +495,11 @@ def icao_to_country_tool(icao: str) -> str:
 
 @mcp.tool()
 def list_adsb_tables() -> str:
-    """List public tables in the ADS-B Postgres database."""
+    """List public tables in the ADS-B Postgres database.
+
+    Returns:
+        str: JSON object containing table names and count, or an error object.
+    """
 
     try:
         with get_conn() as conn:
@@ -393,7 +511,14 @@ def list_adsb_tables() -> str:
 
 @mcp.tool()
 def describe_adsb_table(table_name: str) -> str:
-    """Describe a Postgres table (columns, types, nullable)."""
+    """Describe a Postgres table (columns, types, nullable).
+
+    Args:
+        table_name: Table name to describe.
+
+    Returns:
+        str: JSON object with column metadata, or an error object.
+    """
 
     try:
         with get_conn() as conn:
@@ -405,7 +530,14 @@ def describe_adsb_table(table_name: str) -> str:
 
 @mcp.tool()
 def count_adsb_rows(table_name: str) -> str:
-    """Count rows in a table."""
+    """Count rows in a table.
+
+    Args:
+        table_name: Table name to count.
+
+    Returns:
+        str: JSON object with row count, or an error object.
+    """
 
     try:
         with get_conn() as conn:
@@ -425,7 +557,7 @@ def query_adsb_database(sql_query: str, params_json: str | None = None, max_rows
         max_rows: Maximum number of rows to return.
 
     Returns:
-        JSON object with rows and metadata.
+        str: JSON object with rows/columns/metadata, or an error object.
     """
 
     try:
