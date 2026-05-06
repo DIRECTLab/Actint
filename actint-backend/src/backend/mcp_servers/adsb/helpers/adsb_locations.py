@@ -284,26 +284,41 @@ def find_nearest_aircraft(
 
     lat_min, lat_max, lon_min, lon_max = bbox_from_radius_nm(lat, lon, float(radius_nm))
 
-    sql = """
-        WITH latest AS (
+    base_sql = """
+        WITH ref AS (
+            SELECT COALESCE(MAX(timestamp), NOW()) AS t_ref
+            FROM adsb_positions
+        ),
+        latest AS (
             SELECT DISTINCT ON (icao)
                 id, icao, timestamp, lat, lon,
                 altitude, ground_speed, track, vertical_rate,
                 flight_number, emergency, category
-            FROM adsb_positions
-            WHERE timestamp >= NOW() - (%s || ' hours')::interval
+            FROM adsb_positions, ref
+            WHERE timestamp >= (ref.t_ref - (%s || ' hours')::interval)
             ORDER BY icao, timestamp DESC
         )
         SELECT *
         FROM latest
         WHERE lat BETWEEN %s AND %s
+    """
+
+    if lon_min <= lon_max:
+        sql = base_sql + """
           AND lon BETWEEN %s AND %s
         LIMIT 20000;
-    """
+        """
+        params = (float(lookback_hours), lat_min, lat_max, lon_min, lon_max)
+    else:
+        sql = base_sql + """
+          AND (lon >= %s OR lon <= %s)
+        LIMIT 20000;
+        """
+        params = (float(lookback_hours), lat_min, lat_max, lon_min, lon_max)
 
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (float(lookback_hours), lat_min, lat_max, lon_min, lon_max))
+            cur.execute(sql, params)
             colnames = [d.name for d in cur.description]
             rows = [dict(zip(colnames, r)) for r in cur.fetchall()]
 

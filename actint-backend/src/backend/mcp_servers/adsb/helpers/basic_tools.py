@@ -38,16 +38,32 @@ def bearing_diff_deg(a: float, b: float) -> float:
 
 
 def bbox_from_radius_nm(lat: float, lon: float, radius_nm: float) -> tuple[float, float, float, float]:
-    """Approximate lat/lon bounding box for a radius in nautical miles."""
+    """Approximate lat/lon bounding box for a radius in nautical miles.
+
+    Returns (lat_min, lat_max, lon_min, lon_max) where longitudes are normalized
+    to [-180, 180]. If the bbox crosses the International Date Line, then
+    lon_min will be > lon_max (wraparound).
+    """
+
+    def _normalize_lon(lon_deg: float) -> float:
+        return ((lon_deg + 180.0) % 360.0) - 180.0
+
     if radius_nm <= 0:
-        return lat, lat, lon, lon
+        lon_n = _normalize_lon(lon)
+        return lat, lat, lon_n, lon_n
 
     # 1 degree latitude ~= 60 nm
     dlat = radius_nm / 60.0
+
     # 1 degree longitude ~= 60 nm * cos(latitude)
-    denom = 60.0 * max(math.cos(math.radians(lat)), 1e-6)
-    dlon = radius_nm / denom
-    return lat - dlat, lat + dlat, lon - dlon, lon + dlon
+    cos_lat = max(math.cos(math.radians(lat)), 1e-6)
+    dlon = radius_nm / (60.0 * cos_lat)
+
+    lat_min = max(-90.0, lat - dlat)
+    lat_max = min(90.0, lat + dlat)
+    lon_min = _normalize_lon(lon - dlon)
+    lon_max = _normalize_lon(lon + dlon)
+    return lat_min, lat_max, lon_min, lon_max
 
 def get_conn():
     """Create a Postgres connection for ADS-B tooling.

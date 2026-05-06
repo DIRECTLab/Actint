@@ -98,18 +98,20 @@ def search_regions(name_contains: str, iso_country: str | None = None, limit: in
     if limit > 200:
         limit = 200
 
-    sql = """
-        SELECT id, code, name, continent, iso_country
-        FROM avi_regions
-        WHERE name ILIKE '%%' || %s || '%%'
-          AND (%s IS NULL OR iso_country = %s)
-        ORDER BY name ASC
-        LIMIT %s;
-    """
+        iso_q = (iso_country or "").strip().upper()
+
+        sql = """
+                SELECT id, code, name, continent, iso_country
+                FROM avi_regions
+                WHERE name ILIKE '%%' || %s || '%%'
+                    AND (%s = '' OR iso_country = %s)
+                ORDER BY name ASC
+                LIMIT %s;
+        """
 
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (q, iso_country, iso_country, limit))
+            cur.execute(sql, (q, iso_q, iso_q, limit))
             cols = [d.name for d in cur.description]
             return [dict(zip(cols, r)) for r in cur.fetchall()]
 
@@ -184,21 +186,32 @@ def find_nearest_navaids(
     if radius_nm is None or radius_nm <= 0:
         radius_nm = 200.0
 
-    lat_min, lat_max, lon_min, lon_max = bbox_from_radius_nm(lat, lon, float(radius_nm))
-    type_q = (navaid_type or "").strip() if navaid_type else None
+        lat_min, lat_max, lon_min, lon_max = bbox_from_radius_nm(lat, lon, float(radius_nm))
+        type_q = (navaid_type or "").strip()
 
-    sql = """
-        SELECT id, ident, name, type, frequency_khz, latitude_deg, longitude_deg, iso_country, associated_airport
-        FROM avi_navaids
-        WHERE (%s IS NULL OR type = %s)
-          AND latitude_deg BETWEEN %s AND %s
-          AND longitude_deg BETWEEN %s AND %s
-        LIMIT 20000;
-    """
+        base_sql = """
+                SELECT id, ident, name, type, frequency_khz, latitude_deg, longitude_deg, iso_country, associated_airport
+                FROM avi_navaids
+                WHERE (%s = '' OR type = %s)
+                    AND latitude_deg BETWEEN %s AND %s
+        """
+
+        if lon_min <= lon_max:
+                sql = base_sql + """
+                    AND longitude_deg BETWEEN %s AND %s
+                LIMIT 20000;
+                """
+                params = (type_q, type_q, lat_min, lat_max, lon_min, lon_max)
+        else:
+                sql = base_sql + """
+                    AND (longitude_deg >= %s OR longitude_deg <= %s)
+                LIMIT 20000;
+                """
+                params = (type_q, type_q, lat_min, lat_max, lon_min, lon_max)
 
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (type_q, type_q, lat_min, lat_max, lon_min, lon_max))
+            cur.execute(sql, params)
             cols = [d.name for d in cur.description]
             rows = [dict(zip(cols, r)) for r in cur.fetchall()]
 

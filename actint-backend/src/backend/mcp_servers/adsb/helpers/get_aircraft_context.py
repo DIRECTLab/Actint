@@ -1,6 +1,6 @@
 #return the aircraft table line for a given ICAO
 
-from actint.tools.ADSB.basic_tools import get_conn
+from backend.mcp_servers.adsb.helpers.basic_tools import get_conn, normalize_icao
 import json
 
 
@@ -14,7 +14,9 @@ def get_aircraft_context(icao: str) -> str:
         str: JSON with context result including icao, registration, type, description, several T/F flags, first seen and last seen timestamps 
     """
     try:
-        conn = get_conn()
+        icao_n = normalize_icao(icao)
+        if not icao_n:
+            return json.dumps({"error": "icao is required"})
 
         query = """
             SELECT icao, reg_num, type, description, db_flags, military, first_seen, last_seen
@@ -23,25 +25,26 @@ def get_aircraft_context(icao: str) -> str:
             LIMIT 1;
         """
 
-        with conn.cursor() as cur:
-            cur.execute(query, (icao,))
-            row = cur.fetchone()
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, (icao_n,))
+                row = cur.fetchone()
 
         if not row:
             return json.dumps({"error": f"icao {icao} not found in database"})
 
         result = {
-                "icao": row[0],
-                "reg_num": row[1],
-                "type": row[2],
-                "description": row[3],
-                "military": row[5],
-                "interesting": True if (row[4] & 2) else False,
-                "pia": True if (row[4] & 4) else False,
-                "ladd": True if (row[4] & 8) else False,
-                "first_seen": row[6].isoformat(),
-                "last_seen": row[7].isoformat(),
-            }
+            "icao": row[0],
+            "reg_num": row[1],
+            "type": row[2],
+            "description": row[3],
+            "military": row[5],
+            "interesting": True if (row[4] & 2) else False,
+            "pia": True if (row[4] & 4) else False,
+            "ladd": True if (row[4] & 8) else False,
+            "first_seen": row[6].isoformat() if row[6] else None,
+            "last_seen": row[7].isoformat() if row[7] else None,
+        }
 
         return json.dumps(result, indent=2)
     

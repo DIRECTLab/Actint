@@ -69,6 +69,8 @@ def search_airports(
 
     name_q = (name_contains or "").strip()
     muni_q = (municipality_contains or "").strip()
+    iso_country_q = (iso_country or "").strip().upper()
+    iso_region_q = (iso_region or "").strip().upper()
 
     sql = """
         SELECT
@@ -81,8 +83,8 @@ def search_airports(
         FROM airports
         WHERE (%s = '' OR name ILIKE '%%' || %s || '%%')
           AND (%s = '' OR municipality ILIKE '%%' || %s || '%%')
-          AND (%s IS NULL OR iso_country = %s)
-          AND (%s IS NULL OR iso_region = %s)
+                    AND (%s = '' OR iso_country = %s)
+                    AND (%s = '' OR iso_region = %s)
         ORDER BY score DESC NULLS LAST, name ASC
         LIMIT %s;
     """
@@ -96,10 +98,10 @@ def search_airports(
                     name_q,
                     muni_q,
                     muni_q,
-                    iso_country,
-                    iso_country,
-                    iso_region,
-                    iso_region,
+                    iso_country_q,
+                    iso_country_q,
+                    iso_region_q,
+                    iso_region_q,
                     limit,
                 ),
             )
@@ -118,7 +120,7 @@ def get_airport_runways(
     if limit > 2000:
         limit = 2000
 
-    ident_q = (airport_ident or "").strip().upper() if airport_ident else None
+    ident_q = (airport_ident or "").strip().upper()
 
     sql = """
         SELECT
@@ -128,8 +130,8 @@ def get_airport_runways(
             le_ident, le_latitude_deg, le_longitude_deg, le_elevation_ft, le_heading_degt,
             he_ident, he_latitude_deg, he_longitude_deg, he_elevation_ft, he_heading_degt
         FROM runways
-        WHERE (%s IS NULL OR airport_ident = %s)
-          AND (%s IS NULL OR airport_ref = %s)
+                WHERE (%s = '' OR airport_ident = %s)
+                    AND (%s::int IS NULL OR airport_ref = %s)
         ORDER BY length_ft DESC NULLS LAST
         LIMIT %s;
     """
@@ -153,15 +155,15 @@ def get_airport_frequencies(
     if limit > 2000:
         limit = 2000
 
-    ident_q = (airport_ident or "").strip().upper() if airport_ident else None
-    type_q = (freq_type or "").strip() if freq_type else None
+    ident_q = (airport_ident or "").strip().upper()
+    type_q = (freq_type or "").strip()
 
     sql = """
         SELECT id, airport_ref, airport_ident, type, description, frequency_mhz
         FROM airport_frequencies
-        WHERE (%s IS NULL OR airport_ident = %s)
-          AND (%s IS NULL OR airport_ref = %s)
-          AND (%s IS NULL OR type = %s)
+                WHERE (%s = '' OR airport_ident = %s)
+                    AND (%s::int IS NULL OR airport_ref = %s)
+                    AND (%s = '' OR type = %s)
         ORDER BY type ASC, frequency_mhz ASC
         LIMIT %s;
     """
@@ -179,10 +181,13 @@ def find_nearest_airport(
     *,
     limit: int = 5,
     max_distance_nm: float | None = None,
+
 ) -> list[dict[str, Any]]:
     """Find nearest airports to a location.
 
-    Uses a bbox prefilter in SQL and refines distance with haversine.
+    Uses DB-side distance ordering (efficient) and supports dateline wraparound.
+    If `max_distance_nm` is not provided, it expands the search radius until at least
+    one airport is found.
     """
 
     if limit <= 0:
@@ -190,39 +195,86 @@ def find_nearest_airport(
     if limit > 50:
         limit = 50
 
-    prefilter_nm = max_distance_nm if (max_distance_nm and max_distance_nm > 0) else 500.0
-    lat_min, lat_max, lon_min, lon_max = bbox_from_radius_nm(lat, lon, prefilter_nm)
 
-    sql = """
-        SELECT
-            id, ident, type, name,
-            latitude_deg, longitude_deg,
-            iso_country, iso_region,
-            municipality, iata_code, icao_code
-        FROM airports
-        WHERE latitude_deg BETWEEN %s AND %s
-          AND longitude_deg BETWEEN %s AND %s
-        LIMIT 5000;
-    """
+    # Earth mean radius in nautical miles
+    earth_radius_nm = 3440.065
 
     with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute(sql, (lat_min, lat_max, lon_min, lon_max))
-            cols = [d.name for d in cur.description]
-            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        def _query(radius_nm: float) -> list[dict[str, Any]]:
+            lat_min, lat_max, lon_min, lon_max = bbox_from_radius_nm(lat, lon, radius_nm)
 
-    scored: list[dict[str, Any]] = []
-    for ap in rows:
-        d_nm = haversine_distance_nm(lat, lon, float(ap["latitude_deg"]), float(ap["longitude_deg"]))
-        if max_distance_nm is not None and max_distance_nm > 0 and d_nm > max_distance_nm:
-            continue
-        ap2 = dict(ap)
-        ap2["distance_nm"] = d_nm
-        ap2["bearing_deg"] = calculate_bearing(lat, lon, float(ap["latitude_deg"]), float(ap["longitude_deg"]))
-        scored.append(ap2)
+            base_query = """
+                SELECT
+                    id,
+                    ident,
+                    type,
+                    name,
+                    latitude_deg,
+                    longitude_deg,
+                    iso_country,
+                    iso_region,
+                    municipality,
+                    iata_code,
+                    icao_code,
+                    (%s * acos(
+                        LEAST(1, GREATEST(-1,
+                            cos(radians(%s)) *
+                            cos(radians(latitude_deg)) *
+                            cos(radians(longitude_deg) - radians(%s)) +
+                            sin(radians(%s)) *
+                            sin(radians(latitude_deg))
+                        ))
+                    )) AS distance_nm
+                FROM airports
+                WHERE latitude_deg IS NOT NULL
+                  AND longitude_deg IS NOT NULL
+                  AND type != 'closed'
+                  AND latitude_deg BETWEEN %s AND %s
+            """
 
-    scored.sort(key=lambda x: x["distance_nm"])
-    return scored[:limit]
+            params: list[Any] = [earth_radius_nm, lat, lon, lat, lat_min, lat_max]
+
+            if lon_min <= lon_max:
+                query = base_query + """
+                  AND longitude_deg BETWEEN %s AND %s
+                ORDER BY distance_nm ASC
+                LIMIT %s;
+                """
+                params.extend([lon_min, lon_max, limit])
+            else:
+                query = base_query + """
+                  AND (longitude_deg >= %s OR longitude_deg <= %s)
+                ORDER BY distance_nm ASC
+                LIMIT %s;
+                """
+                params.extend([lon_min, lon_max, limit])
+
+            with conn.cursor() as cur:
+                cur.execute(query, params)
+                cols = [d.name for d in cur.description]
+                rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+
+            for r in rows:
+                try:
+                    r["bearing_deg"] = calculate_bearing(
+                        lat, lon, float(r["latitude_deg"]), float(r["longitude_deg"])
+                    )
+                except Exception:
+                    r["bearing_deg"] = None
+            return rows
+
+        if max_distance_nm is not None and max_distance_nm > 0:
+            return _query(float(max_distance_nm))
+
+        radius_nm = 15.0
+        max_radius_nm = 3000.0
+        while radius_nm <= max_radius_nm:
+            rows = _query(radius_nm)
+            if rows:
+                return rows
+            radius_nm *= 2.0
+
+    return []
 
 
 def _bearing_from_vector(direction_vector: tuple[float, float]) -> float:
@@ -264,17 +316,28 @@ def get_possible_airport_destinations(
 
     lat_min, lat_max, lon_min, lon_max = bbox_from_radius_nm(lat, lon, radius_nm)
 
-    sql = """
+    base_sql = """
         SELECT id, ident, name, type, latitude_deg, longitude_deg, iso_country, iso_region, municipality
         FROM airports
         WHERE latitude_deg BETWEEN %s AND %s
+    """
+
+    if lon_min <= lon_max:
+        sql = base_sql + """
           AND longitude_deg BETWEEN %s AND %s
         LIMIT 10000;
-    """
+        """
+        params: tuple[Any, ...] = (lat_min, lat_max, lon_min, lon_max)
+    else:
+        sql = base_sql + """
+          AND (longitude_deg >= %s OR longitude_deg <= %s)
+        LIMIT 10000;
+        """
+        params = (lat_min, lat_max, lon_min, lon_max)
 
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (lat_min, lat_max, lon_min, lon_max))
+            cur.execute(sql, params)
             cols = [d.name for d in cur.description]
             airports = [dict(zip(cols, r)) for r in cur.fetchall()]
 
