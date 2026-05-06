@@ -141,35 +141,6 @@ def re_evaluate_region(region):
 #         return "Error:\n" + str(e)
 
 @mcp.tool()
-def search_region_for_ships(region: str) -> dict:
-    if region not in REGIONS:
-        return {
-            "success": False,
-            "error": "INVALID_REGION",
-            "available_regions": [
-                {"key": k, "name": v["name"]}
-                for k, v in REGIONS.items()
-            ]
-        }
-
-    try:
-        region_data = run_region(region)
-
-        return {
-            "success": True,
-            "region": region,
-            "data": region_data
-        }
-
-    except Exception as e:
-        return {
-            "success": False,
-            "error": "EXECUTION_ERROR",
-            "message": str(e)  # force safe serialization
-        }
-
-
-@mcp.tool()
 def get_vessel_locations(mmsi: int | str) -> str:
     """Get all recorded positions for a specific vessel identified by MMSI.
     
