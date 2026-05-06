@@ -30,8 +30,8 @@ else:
 model_id = "Qwen/Qwen3.5-9B"
 #model_id = "Qwen/Qwen2-7B-Instruct"
 
-if config.conda_prefix:
-    python_path = str(Path(config.conda_prefix) / "bin" / "python")
+if config.CONDA_PREFIX:
+    python_path = str(Path(config.CONDA_PREFIX) / "bin" / "python")
 else:
     python_path = sys.executable
 
