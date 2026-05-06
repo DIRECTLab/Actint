@@ -29,4 +29,11 @@ options for how to do this:
     cons    have to scrap and navigate other peoples data
             not as customizable 
             only has point to point routes and doesn't capture all the segments of a flight 
+
+            
+data structure end goal
+
+1. table of all route segments (id, start_lat, start_long, end_lat, end_long) for basic info with additional metadata (want to capture summary stats of this route, how many planes a day, which planes and their frequency)
+2. table of flights (id, start airport, end airport, flight number, associated route segments, flight duration, distance, any others?)
+3. table of segment probabilities (route_id1, route_id2, idk how to relate these probablistically)
 """
