@@ -57,6 +57,7 @@ _agent_sessions = {}
 def get_or_create_agent(
     session_id: str, additional_tools: list = []
 ) -> ToolCallingAgent:
+    """Creates or retrieves an agent for a given session, injecting relevant tools."""
     if session_id not in _agent_sessions:
         tools = ais_mcp_tools.copy()
         if additional_tools:
@@ -71,7 +72,6 @@ async def query_agent(
     additional_tools: list = None,
 ) -> str:
     """Entry point for both web and terminal to query their respective agent."""
-    print(f"Additional Tools: {additional_tools}", file=sys.stderr)
 
     loop = asyncio.get_running_loop()
     set_loop(loop)  # Register before entering the thread so tools can reach it
