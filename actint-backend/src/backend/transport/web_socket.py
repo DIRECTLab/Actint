@@ -3,6 +3,8 @@ import sys
 import os
 from datetime import datetime
 
+from smolagents import RunResult
+
 from backend.agent.agent import remove_agent_session, query_agent
 from backend.ui_tools.map_edit_tools import ZoomTool, DrawCircleTool, DrawLineTool, DrawRectangleTool
 from backend.transport.defaults import sio, app
@@ -19,27 +21,26 @@ async def connect(sid, environ):
 @sio.on("recieve_message")
 async def handle_agent_query(sid, data):
     user_text = data.get("message", "")
-    
-    # Define transport-specific tools tied to this UI session
+
     ui_tools = [
-        ZoomTool(sid, sio), 
-        DrawRectangleTool(sid, sio), 
-        DrawCircleTool(sid, sio), 
-        DrawLineTool(sid, sio)
+        ZoomTool(sid, sio),
+        DrawRectangleTool(sid, sio),
+        DrawCircleTool(sid, sio),
+        DrawLineTool(sid, sio),
     ]
-    
-    # Pass them into the generic query function
-    agent_response_text = await query_agent(user_text, session_id=sid, additional_tools=ui_tools)
-    
+
+    agent_response_text = await query_agent(
+        user_text, session_id=sid, additional_tools=ui_tools
+    )
+
     new_msg = {
-        "message": agent_response_text,
-        "sentTime": datetime.now().strftime("%H:%M:%S"), # Dynamic time
-        "sender": 'ChatBot',
-        "direction": 'incoming',
-        "position": 'single',
+        "message": agent_response_text or "Agent failed to respond.",
+        "sentTime": datetime.now().strftime("%H:%M:%S"),
+        "sender": "ChatBot",
+        "direction": "incoming",
+        "position": "single",
     }
 
-    # Send the response back to the specific client
     await sio.emit("send_response", new_msg, to=sid)
 
 
