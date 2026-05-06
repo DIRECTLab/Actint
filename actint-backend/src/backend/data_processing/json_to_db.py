@@ -1,3 +1,5 @@
+# I'm pretty sure this is deprecated.
+
 """
 AIS JSON to SQLite + ChromaDB processing pipeline.
 
