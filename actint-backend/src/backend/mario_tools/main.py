@@ -53,7 +53,7 @@ OUTPUT_DIR = Path("outputs")
 
 #log errors so json output isn't compromised
 def log(*args, **kwargs):
-    log(*args, file=sys.stderr, **kwargs)
+    print(*args, file=sys.stderr, **kwargs)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
