@@ -17,7 +17,7 @@ class Config:
     # can't be converted to an int
     DB_PORT: int | None = int(getenv("DB_PORT", None)) if getenv("DB_PORT") else None
     # LLM Model Configuration (Hugging Face model ID and generation parameters)
-    MODEL_ID: str = getenv("MODEL_ID", "Qwen/Qwen3.5-2B")
+    MODEL_ID: str = getenv("MODEL_ID", "Qwen/Qwen3.5-9B")
     MAX_NEW_TOKENS: int = int(getenv("MAX_NEW_TOKENS", "4096"))
     
 config = Config()
