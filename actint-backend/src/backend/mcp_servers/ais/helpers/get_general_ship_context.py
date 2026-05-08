@@ -13,6 +13,7 @@ from typing import Optional, Tuple
 from functools import lru_cache
 from backend.mcp_servers.utils.distance_calculation import haversine_distance_nm, calculate_bearing, bearing_to_cardinal
 from backend.mcp_servers.utils.important_locations import MARITIME_REGIONS, MAJOR_PORTS, STRATEGIC_WATERWAYS, CONTINENTS
+from backend.mcp_servers.ais.helpers.vessel_query import get_latest_vessel_position
 
 try:
     from geopy.geocoders import Nominatim
@@ -236,8 +237,7 @@ def reverse_geocode_offline(lat: float, lon: float) -> dict:
 # ============================================================================
 
 def get_location_context(
-    lat: float, 
-    lon: float,
+    mmsi: int,
     use_online_geocoding: bool = False,
 ) -> LocationContext:
     """
@@ -253,6 +253,10 @@ def get_location_context(
     Returns:
         LocationContext with all available information
     """
+
+    current_position = get_latest_vessel_position(mmsi)
+    lat = current_position['lat']
+    lon = current_position['lon']
     context = LocationContext(lat=lat, lon=lon)
     
     # Maritime region
@@ -317,80 +321,3 @@ def get_distance_between(lat1: float, lon1: float, lat2: float, lon2: float) -> 
         "description": f"{distance:.1f} nm at bearing {bearing:.0f}° ({cardinal})",
     }
 
-
-# ============================================================================
-# Tool definitions for LLM function calling
-# ============================================================================
-
-TOOL_DEFINITIONS = [
-    {
-        "name": "get_location_context",
-        "description": "Get geographic and maritime context for a latitude/longitude coordinate. Returns information about the maritime region, nearest port, nearest strategic waterway, and reverse geocoding data.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "lat": {
-                    "type": "number",
-                    "description": "Latitude in decimal degrees (e.g., 36.39538)"
-                },
-                "lon": {
-                    "type": "number", 
-                    "description": "Longitude in decimal degrees (e.g., -122.66816)"
-                },
-            },
-            "required": ["lat", "lon"]
-        }
-    },
-    {
-        "name": "get_distance_between",
-        "description": "Calculate the distance and bearing between two geographic points.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "lat1": {"type": "number", "description": "Latitude of first point"},
-                "lon1": {"type": "number", "description": "Longitude of first point"},
-                "lat2": {"type": "number", "description": "Latitude of second point"},
-                "lon2": {"type": "number", "description": "Longitude of second point"},
-            },
-            "required": ["lat1", "lon1", "lat2", "lon2"]
-        }
-    },
-]
-
-
-# ============================================================================
-# CLI for testing
-# ============================================================================
-
-if __name__ == "__main__":
-    import sys
-    
-    # Test coordinates
-    test_locations = [
-        ("USS KIDD example position", 36.39538, -122.66816),
-        ("USS MONTGOMERY example position", 32.60973, -117.39904),
-        ("USS MILWAUKEE example position", 18.45901, -66.09607),
-        ("Mid-Pacific", 25.0, -160.0),
-        ("Persian Gulf", 26.5, 51.5),
-    ]
-    
-    print("=" * 70)
-    print("Latitude/Longitude Context Tool")
-    print("=" * 70)
-    
-    for name, lat, lon in test_locations:
-        print(f"\n{name}:")
-        print("-" * 50)
-        context = get_location_context(lat, lon)
-        print(context.to_context_string())
-    
-    # Test distance calculation
-    print("\n" + "=" * 70)
-    print("Distance Calculation Test")
-    print("=" * 70)
-    
-    lat1, lon1 = 36.39538, -122.66816  # USS KIDD
-    lat2, lon2 = 32.60973, -117.39904  # USS MONTGOMERY
-    
-    result = get_distance_between(lat1, lon1, lat2, lon2)
-    print(f"\nUSS KIDD to USS MONTGOMERY: {result['description']}")

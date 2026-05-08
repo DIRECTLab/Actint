@@ -1,16 +1,10 @@
-import uvicorn
 import sys
-import os
 from datetime import datetime
 
 from backend.agent.agent import remove_agent_session, query_agent
 from backend.ui_tools.map_edit_tools import ZoomTool, DrawCircleTool, DrawLineTool, DrawRectangleTool
-from backend.transport.defaults import sio, app
+from backend.transport.connection import sio, app
 from backend.config import config
-
-@sio.event
-async def connect(sid, environ):
-    print(f"User {sid} connected!", file=sys.stderr)
 
 # ==================================================
 # Chat Manager
@@ -48,5 +42,3 @@ async def disconnect(sid):
     print(f"User {sid} left.", file=sys.stderr)
     remove_agent_session(sid)
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=config.WEB_SOCKET_PORT)

@@ -34,7 +34,7 @@ def _resolve_sqlite_path() -> Path:
 
 # Import tool functions from parent package
 from backend.mcp_servers.ais.helpers.previous_locations import get_vehicle_locations, ship_following
-from backend.mcp_servers.ais.helpers.lat_lon_context import (
+from backend.mcp_servers.ais.helpers.get_general_ship_context import (
     get_location_context as get_geolocation_context,
     get_distance_between as calc_distance_between,
     identify_maritime_region as identify_region,
@@ -47,24 +47,13 @@ from backend.mcp_servers.ais.helpers.ship_going import (
     get_possible_destinations,
 )
 
-from backend.data_processing.query_database import query_vessels
+# from backend.data_processing.query_database import query_vessels
+
 # ============================================================================
 # FastMCP Server Setup
 # ============================================================================
 
 mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
-
-
-# ============================================================================
-# Health & Info Endpoints
-# ============================================================================
-
-@mcp.tool()
-def say_hello() -> str:
-    """Simple tool to test connectivity and responsiveness of the MCP server."""
-    message = "Hello! The AIS Vessel Intelligence MCP server is up and running."
-    print("Printed Message:", message)#, file=sys.stderr)
-    return message
 
 
 @mcp.tool()
@@ -77,13 +66,12 @@ def get_vessel_locations(mmsi: int | str) -> str:
     Returns:
         str: JSON list of vessel positions with coordinates, timestamps, and speed data
     """
+    print("started")
     try:
         mmsi = int(mmsi)
         locations = get_vehicle_locations(mmsi)
-        result_data = [
+        data = [
             {
-                "mmsi": loc.mmsi,
-                "vessel_name": loc.vessel_name,
                 "timestamp": loc.timestamp,
                 "latitude": loc.lat,
                 "longitude": loc.lon,
@@ -93,7 +81,9 @@ def get_vessel_locations(mmsi: int | str) -> str:
             }
             for loc in locations
         ]
-        return json.dumps(result_data, indent=2)
+        result_data = { "mmsi": mmsi, "positions": data}
+        # return json.dumps(result_data, indent=2)
+        return result_data
     except Exception as e:
         return json.dumps({"error": str(e)})
 

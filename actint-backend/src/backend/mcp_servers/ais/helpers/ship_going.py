@@ -1,5 +1,5 @@
 from backend.mcp_servers.utils.important_locations import *
-from backend.data_processing.query_database import query_ais_positions
+from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_position_history, get_latest_vessel_position
 from backend.mcp_servers.utils.distance_calculation import calculate_bearing, haversine_distance_nm
 from backend.mcp_servers.ais.helpers.lat_lon_context import identify_maritime_region
 from datetime import datetime, timedelta
@@ -25,14 +25,14 @@ VECTOR_DISTANCE_RATIO = 0.9
 DEGREE_THRESHOLD= 15
 
 def calculate_vector_and_distance_sum(ship_mmsi: str, number_detections=300, tracking_time=timedelta(hours=1)):
-    positions = query_ais_positions({"mmsi": ship_mmsi}, sort=True)
+    positions = get_vessel_position_history(ship_mmsi)
     
     position1 = positions[number_detections]
     rescent_reversed_positions = reversed(positions[:number_detections])
     total_vector = [0.0, 0.0]
     total_distance = 0
     for position2 in rescent_reversed_positions:
-        latlng = vectorize(position1[3], position1[4], position2[3], position2[4])
+        latlng = vectorize(position1['lat'], position1['lon'], position2['lat'], position2['lon'])
         total_vector[0] += latlng[0]
         total_vector[1] += latlng[1]
         total_distance += math.hypot(latlng[0], latlng[1])
@@ -46,7 +46,7 @@ def calculate_vector_and_distance_sum(ship_mmsi: str, number_detections=300, tra
     if(vector_distance_ratio > VECTOR_DISTANCE_RATIO):                                                       #Can use this to describe if the ship is going fast or slow
         print("The ship is going toward something")
 
-        current_position = (positions[0][3], positions[0][4])
+        current_position = (positions[0]['lat'], positions[0]['lon'])
         print(get_possible_destinations(current_position, total_vector))
 
     else:
@@ -114,11 +114,10 @@ def get_possible_destinations(current_position, direction_vector):
 
         for continent_name, bounding_box in CONTINENTS.items():
             
-            
-            lat_min = bounding_box['lat_min']
-            lat_max = bounding_box['lat_max']
-            lon_min = bounding_box['lon_min']
-            lon_max = bounding_box['lon_max']
+            lat_min = bounding_box['bounds']['lat_min']
+            lat_max = bounding_box['bounds']['lat_max']
+            lon_min = bounding_box['bounds']['lon_min']
+            lon_max = bounding_box['bounds']['lon_max']
 
             current_lat = current_position[0]
             current_lon = current_position[1]
@@ -179,19 +178,10 @@ def get_possible_destinations(current_position, direction_vector):
                 if total_fov_degrees > max_fov_degree:
                     max_fov_degree = total_fov_degrees
                     max_fov_maritime_name = continent_name
-
-            #store these values
-
-
-
-        #get the max fov continent and ocean (aside from the ocean the boat is in)
-
-        #The ship is going through {closest_ocean} to {closest_continent}
-
         
     return f"The ship is in going toward {maritime_name} to {max_fov_continent_name}"
     
 
 
 if __name__ == "__main__":
-    calculate_vector_and_distance_sum(368011000)
+    calculate_vector_and_distance_sum(369970707)
