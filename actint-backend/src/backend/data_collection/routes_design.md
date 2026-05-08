@@ -91,7 +91,7 @@ Individual flight instances reconstructed from ADS-B data — a single aircraft 
 | `departure_time` | timestamp | |
 | `arrival_time` | timestamp | |
 | `duration_seconds` | int | |
-| `distance_nm` | float | |
+| `distance_nm` | float |nautical miles |
 | `route_id` | FK → routes | |
 
 ---
@@ -104,9 +104,14 @@ Ordered spatial-temporal trajectory segments for each flight, used for path reco
 | `id` | PK | |
 | `flight_id` | FK → flights | |
 | `geom` | geometry | |
-| `start_lat` / `start_lon` | float | |
-| `end_lat` / `end_lon` | float | |
-| `start_time` / `end_time` | timestamp | |
+| `start_lat` |float||
+| `start_lon` | float | |
+| `start_alt` | int||
+| `end_lat` |float||
+| `end_lon` | float | |
+| `end_alt` | int||
+| `start_time` | timestamp | |
+| `end_time` | timestamp | |
 | `altitude_avg` | float | |
 | `speed_avg` | float | |
 
@@ -123,7 +128,7 @@ Aggregated airport-to-airport connections derived from multiple flights, forming
 | `flight_count` | int | |
 | `aircraft_count` | int | |
 | `avg_duration_seconds` | int | |
-| `avg_distance_km` | float | |
+| `avg_distance_nm` | float | |
 | `confidence` | float | |
 | `last_updated` | timestamp | |
 

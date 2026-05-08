@@ -156,7 +156,7 @@ ORDER BY timestamp;
 - **AIS Database Name:** `actint`
 - **ADSB Database Name:** `postgres`
 - **Username:** `direct_ro`
-- **Password:** `spottherobot`
+- **Password:** `ask someone`
 - **SSL:** Disabled (do not request SSL in clients)
 
 use get_conn() to get a connection to the DB. Found in mcp_servers/adsb/helpers/basic_tools.py (requires env vars with login info)
@@ -204,7 +204,7 @@ def get_last_location(conn, icao):
 
 - **Credentials:**
   - Username: `direct_ro`
-  - Password: `spottherobot`
+  - Password: `ask someone`
 
 
   <br>

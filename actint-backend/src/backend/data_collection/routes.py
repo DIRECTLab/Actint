@@ -1,68 +1,327 @@
 """
-route predictor and detector
+ADS-B Route Heatmap (H3) Aggregator
+-----------------------------------
 
-goal -  get routes for airplanes that tie flight numbers to departing and arriving airports 
-        could also get detailed paths by decimating the pos data of a flight to get more accurate routes 
+Goal:
+Convert ADS-B flight data into a route-density heatmap.
 
-options for how to do this:
-1. use our ADS-B pos data to approximate which airports are tied to which flight number routes using new leg and flight number changes
-    psuedocode
-    loop over position data for each aircraft
-        find changes in flight numbers and get all position entries between the change
-        find all airports within a radius (radius could be estimated off of altitude and descent rate)
-        find most likely airport based on heading, point to point and directional cone calc
-        say that is the airport and record it to the flight number
+Method:
+- Use H3 (res 9) to spatially bin positions
+- Sort data by ICAO + timestamp
+- For each aircraft, collapse consecutive identical H3 cells
+- Count ONLY cell entries (not raw messages)
 
-    pros    we could also do a path decimation pass to get common way points on the route (better than just airport to airport)
-            easier to customize and get exactly what we want
-    
-    cons    potential for error as ADS-B data isn't perfectly transmitted during landings and taxi
-            potential for long run time
-            somewhat longer development time and troubleshooting
+Result:
+Each H3 cell = number of aircraft that passed through it.
 
-    
-2. use a web scrapper and get routes based on flight numbers and airport to airport 
-    could use this but not sure how easy it is to get flight numbers from the website they scrap (see https://github.com/Jonty/airline-route-data/blob/main/scrape_airline_routes.py)
+Meaning:
+"traffic flow density" (routes), not message volume.
 
-    pros    no guessing on what airport flight numbers are attached to
+Why:
+Removes ADS-B spam, holding patterns, and transmit-rate bias.
 
-    cons    have to scrap and navigate other peoples data
-            not as customizable 
-            only has point to point routes and doesn't capture all the segments of a flight 
+Output:
+(h3_cell → traversal_count)
 
-3. go full ML and make a model that predicts next ADSB message lat, long, altitude, and time given the previous n ADSB messages 
+Pseudo code:
 
-    pros    potential to be the most accurate
-            don't have to manually assign probability to segment transitions based on some data 
+FOR each aircraft (icao) ordered by time:
 
-    cons    not clear how it reaches its conclusions
-            training time (probably similar to build the routes db but still)
-            
-data structure end goal
+    prev_cell = NONE
+    prev_time = NONE
 
-1. table of all route segments (id, start_lat, start_long, start altitude, end_lat, end_long, end_altitude) for basic info with additional metadata (want to capture summary stats of this route, how many planes a day, which planes and their frequency)
-2. table of flights (id, start airport, end airport, flight number, associated route segments, flight duration, distance, any others?)
-3. table of segment transitions with probabilities (id, from_segment_id, to_segment_id, aircraft_type, airline, altitude_band, time_of_day, transition_count, probability, confidence, last_updated)
+    FOR each ADS-B point:
 
-AI table schema design
+        cell = H3(lat, lon, res=9)
+        time = timestamp
 
-flights — Stores individual flight instances reconstructed from ADS-B data, representing a single aircraft movement from departure to arrival.
-flights (id, aircraft_icao, flight_number, departure_airport, arrival_airport, departure_time, arrival_time, duration_seconds, distance_nm, route_id)
+        IF prev_time is not NONE:
+            dt = time - prev_time
 
-route_segments — Breaks each flight into ordered spatial-temporal trajectory segments used for path reconstruction and analysis.
-route_segments (id, flight_id, geom, start_lat, start_lon, end_lat, end_lon, start_time, end_time, altitude_avg, speed_avg)
+            IF dt < MIN_TIME_DELTA:
+                CONTINUE   // optional time decimation
 
-routes — Represents aggregated airport-to-airport connections derived from multiple flights as a canonical route definition.
-routes (id, origin_airport, destination_airport, flight_count, aircraft_count, avg_duration_seconds, avg_distance_km, confidence, last_updated)
+        IF cell == prev_cell:
+            CONTINUE   // collapse spatial duplicates
 
-flight_route_mapping — Stores probabilistic assignments linking individual flights to candidate routes along with confidence and inference method metadata.
-flight_route_mapping (id, flight_id, route_id, confidence, method, features)
+        heatmap[cell] += 1   // count entry event
 
-segment_transitions — Models learned probabilities of movement between trajectory segments to enable next-segment prediction and behavior modeling.
-segment_transitions (id, from_segment_id, to_segment_id, aircraft_type, db_flags, altitude_band, time_of_day, transition_count, probability, confidence, last_updated)
-
-segment_route_mapping — Links fine-grained trajectory segments to higher-level routes with probabilistic weighting for explainability and refinement.
-segment_route_mapping (segment_id, route_id, probability)
-
+        prev_cell = cell
+        prev_time = time
 
 """
+
+from h3 import latlng_to_cell, cell_to_parent, cell_to_latlng
+from collections import defaultdict
+import time 
+from backend.mcp_servers.adsb.helpers.basic_tools import get_conn
+
+RES = 9
+MIN_DT = 15
+BATCH = 10_000
+FLUSH = 20_000
+
+
+
+def flush(table, cur, agg):
+    """
+    agg: dict {h3_cell(str) -> count}
+    """
+
+    rows = []
+
+    for h3_cell, count in agg.items():
+
+        lat_c, lon_c = cell_to_latlng(h3_cell)
+
+        rows.append((
+            int(h3_cell, 16),
+            lat_c,
+            lon_c,
+            count
+        ))
+
+    cur.executemany(f"""
+        INSERT INTO {table} (
+            h3_index,
+            lat_center,
+            lon_center,
+            traversal_count
+        )
+        VALUES (%s, %s, %s, %s)
+
+        ON CONFLICT (h3_index)
+        DO UPDATE SET
+            traversal_count =
+                {table}.traversal_count +
+                EXCLUDED.traversal_count
+    """, rows)
+
+
+
+def build_heat_map():
+
+    TABLE = "heatmap_h3_res9_routes"
+
+    CREATE_TABLE = f"""
+    CREATE TABLE IF NOT EXISTS {TABLE} (
+        h3_index BIGINT PRIMARY KEY,
+        lat_center DOUBLE PRECISION,
+        lon_center DOUBLE PRECISION,
+        traversal_count BIGINT NOT NULL
+    );
+    """
+
+    CREATE_INDEX = f"""
+    CREATE INDEX IF NOT EXISTS idx_{TABLE}_count
+    ON {TABLE}(traversal_count DESC);
+    """
+
+    heat_map = defaultdict(int)
+
+    last_icao = None
+    last_cell = None
+    last_ts = None
+
+    rows = traversals = 0
+
+    start = time.time()
+
+
+    with get_conn() as write_conn:
+        #conn.autocommit = False
+        with write_conn.cursor() as cur:
+            cur.execute(CREATE_TABLE)
+            cur.execute(CREATE_INDEX)
+        write_conn.commit()
+
+        with get_conn() as read_conn:
+
+            #read_conn.read_only = True
+
+            with read_conn.cursor(name="stream") as read_cur:
+                read_cur.itersize = BATCH
+                read_cur.execute("""
+                    SELECT icao, timestamp, lat, lon
+                    FROM adsb_positions
+                    WHERE lat IS NOT NULL AND lon IS NOT NULL
+                    AND timestamp >= '2025-01-1'
+                    AND timestamp <  '2025-12-31'
+                    ORDER BY icao, timestamp
+                """)
+
+
+                with write_conn.cursor() as write_cur:
+
+                    while True:
+                        batch = read_cur.fetchmany(BATCH)
+                        #print("batch found!")
+
+                        if not batch:
+                            break
+                        
+                            
+
+                        for icao, ts, lat, lon in batch:
+                            rows += 1
+
+                            if icao != last_icao:
+                                last_icao = icao
+                                last_cell = None
+                                last_ts = None
+
+                            if last_ts:
+                                dt = (ts - last_ts).total_seconds()
+
+                                if dt < MIN_DT:
+                                    continue
+
+                            last_ts = ts
+
+                            cell = latlng_to_cell(lat, lon, RES)
+
+                            if cell == last_cell:
+                                continue
+
+                            last_cell = cell
+
+                            heat_map[cell] += 1
+                            traversals += 1
+
+                        if len(heat_map) >= FLUSH:
+                            flush(TABLE, write_cur, heat_map)
+                            write_conn.commit()
+                            heat_map.clear()
+
+                            print(
+                                f"{rows:,} rows | "
+                                f"{traversals:,} traversals"
+                            )
+                    if heat_map:
+                        flush(TABLE, write_cur, heat_map)
+                        write_conn.commit()
+
+
+    elapsed = time.time() - start
+
+    print(
+        f"DONE | "
+        f"{rows:,} rows | "
+        f"{traversals:,} traversals | "
+        f"{elapsed:.1f}s"
+    )
+
+
+
+
+
+def build_resn_heatmap(src_res, dst_res):
+
+    SRC_TABLE = f"heatmap_h3_res{src_res}_routes"
+    DST_TABLE = f"heatmap_h3_res{dst_res}_routes"
+
+    CREATE_TABLE = f"""
+    CREATE TABLE IF NOT EXISTS {DST_TABLE} (
+        h3_index BIGINT PRIMARY KEY,
+        lat_center DOUBLE PRECISION,
+        lon_center DOUBLE PRECISION,
+        traversal_count BIGINT NOT NULL
+    );
+    """
+
+    CREATE_INDEX = f"""
+    CREATE INDEX IF NOT EXISTS idx_{DST_TABLE}_count
+    ON {DST_TABLE}(traversal_count DESC);
+    """
+
+    start = time.time()
+
+    rows = 0
+    agg = defaultdict(int)
+
+    # --------------------------------------------------------
+    # WRITE CONNECTION
+    # --------------------------------------------------------
+
+    with get_conn() as write_conn:
+
+        with write_conn.cursor() as cur:
+            cur.execute(CREATE_TABLE)
+            cur.execute(CREATE_INDEX)
+
+        write_conn.commit()
+
+        # ----------------------------------------------------
+        # READ CONNECTION
+        # ----------------------------------------------------
+
+        with get_conn() as read_conn:
+
+            with read_conn.cursor(name="stream") as read_cur:
+
+                read_cur.itersize = BATCH
+
+                read_cur.execute(f"""
+                    SELECT
+                        h3_index,
+                        traversal_count
+                    FROM {SRC_TABLE}
+                """)
+
+                with write_conn.cursor() as write_cur:
+
+                    while True:
+
+                        batch = read_cur.fetchmany(BATCH)
+
+                        if not batch:
+                            break
+
+                        for h3_index, count in batch:
+
+                            rows += 1
+
+                            # bigint -> hex string
+                            res_src_cell = hex(h3_index)[2:]
+
+                            # parent conversion
+                            res_dst_cell = cell_to_parent(
+                                res_src_cell,
+                                dst_res
+                            )
+
+                            agg[res_dst_cell] += count
+
+                        # periodic flush
+                        if len(agg) >= BATCH:
+
+                            flush(DST_TABLE, write_cur, agg)
+                            write_conn.commit()
+                            agg.clear()
+
+                            print(f"{rows:,} rows processed")
+
+                    # final flush
+                    if agg:
+
+                        flush(DST_TABLE, write_cur, agg)
+                        write_conn.commit()
+
+    elapsed = time.time() - start
+
+    print(
+        f"DONE | "
+        f"{rows:,} rows | "
+        f"{elapsed:.1f}s"
+    )
+
+
+if __name__ == "__main__":
+    
+    build_heat_map()
+    build_resn_heatmap(9,7)
+    build_resn_heatmap(7,6)
+    build_resn_heatmap(6,5)
+
+# cell = latlng_to_cell(41.7355, -111.834, 9)
+# print(f"cell: {cell}")
