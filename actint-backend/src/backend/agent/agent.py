@@ -60,9 +60,18 @@ def get_or_create_agent(
     """Creates or retrieves an agent for a given session, injecting relevant tools."""
     if session_id not in _agent_sessions:
         tools = ais_mcp_tools.copy()
+        managed_agents = []
         if additional_tools:
-            tools.extend(additional_tools)
-        _agent_sessions[session_id] = ToolCallingAgent(tools=tools, model=model)
+            # tools.extend(additional_tools)
+            map_agent = ToolCallingAgent(
+                tools=additional_tools,
+                model=model,
+                max_steps=5,
+                name="map_ui_agent",
+                description="Can show things to the user on a map. Can move, zoom, and draw basic shapes on the map."
+            )
+            managed_agents.append(map_agent)
+        _agent_sessions[session_id] = ToolCallingAgent(tools=tools, model=model, managed_agents=managed_agents)
     return _agent_sessions[session_id]
 
 
