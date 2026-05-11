@@ -232,3 +232,4 @@ results/
 # Slurm Results
 *.err
 *.out
+*.slurm

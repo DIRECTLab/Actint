@@ -56,10 +56,10 @@ from collections import defaultdict
 import time 
 from backend.mcp_servers.adsb.helpers.basic_tools import get_conn
 
-RES = 9
+RES = 7
 MIN_DT = 15
 BATCH = 10_000
-FLUSH = 20_000
+FLUSH = 200_000
 
 
 
@@ -101,7 +101,7 @@ def flush(table, cur, agg):
 
 def build_heat_map():
 
-    TABLE = "heatmap_h3_res9_routes"
+    TABLE = f"heatmap_h3_res{RES}_routes"
 
     CREATE_TABLE = f"""
     CREATE TABLE IF NOT EXISTS {TABLE} (
@@ -319,7 +319,6 @@ def build_resn_heatmap(src_res, dst_res):
 if __name__ == "__main__":
     
     build_heat_map()
-    build_resn_heatmap(9,7)
     build_resn_heatmap(7,6)
     build_resn_heatmap(6,5)
 
