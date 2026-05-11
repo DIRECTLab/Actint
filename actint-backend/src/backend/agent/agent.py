@@ -66,7 +66,7 @@ def get_or_create_agent(
             map_agent = ToolCallingAgent(
                 tools=additional_tools,
                 model=model,
-                max_steps=5,
+                max_steps=10,
                 name="map_ui_agent",
                 description="Can show things to the user on a map. Can move, zoom, and draw basic shapes on the map."
             )
