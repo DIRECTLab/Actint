@@ -18,6 +18,34 @@ import sqlite3
 import os
 from pathlib import Path
 from fastmcp import FastMCP
+import sys
+
+# Import tool functions from parent package
+from backend.mcp_servers.ais.helpers.previous_locations import ship_following
+from backend.mcp_servers.ais.helpers.get_general_ship_context import (
+    get_vessel_general_information_helper,
+    # get_location_context_helper as get_geolocation_context_helper,
+    # get_distance_between as calc_distance_between,
+    identify_maritime_region_helper,
+    identify_nearest_port_helper,
+    identify_nearest_waterway_helper,
+)
+from backend.mcp_servers.ais.helpers.fleet_information import (
+    get_fleet_position_helper, ship_near_fleet_helper
+)
+from backend.mcp_servers.ais.helpers.vessel_query import (
+    get_similar_mmsis,
+    get_similar_vessel_names,
+    get_vessel_position_history_helper,
+    get_vessel_latest_location_helper,
+    get_vessel_name_helper,
+    get_vessel_mmsi_helper,
+)
+from backend.mcp_servers.ais.helpers.ship_going import (
+    calculate_vector_and_distance_sum,
+    get_possible_destinations_helper,
+)
+# from backend.data_processing.query_database import query_vessels
 
 # Database path
 DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
@@ -32,117 +60,12 @@ def _resolve_sqlite_path() -> Path:
         return Path(override).expanduser().resolve()
     return SQLITE_PATH
 
-# Import tool functions from parent package
-from backend.mcp_servers.ais.helpers.previous_locations import get_vehicle_locations, ship_following
-from backend.mcp_servers.ais.helpers.get_general_ship_context import (
-    get_location_context as get_geolocation_context,
-    get_distance_between as calc_distance_between,
-    identify_maritime_region as identify_region,
-    find_nearest_port as find_closest_port,
-    find_nearest_waterway as find_closest_waterway,
-)
-from backend.mcp_servers.ais.helpers.close_to_fleet import calculate_fleet_position as calc_fleet_position, is_ship_in_fleet as check_ship_in_fleet
-from backend.mcp_servers.ais.helpers.ship_going import (
-    calculate_vector_and_distance_sum,
-    get_possible_destinations,
-)
-
-# from backend.data_processing.query_database import query_vessels
-
 # ============================================================================
 # FastMCP Server Setup
 # ============================================================================
-
 mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 
 
-@mcp.tool()
-def get_vessel_locations(mmsi: int | str) -> str:
-    """Get all recorded positions for a specific vessel identified by MMSI.
-    
-    Args:
-        mmsi (int): Maritime Mobile Service Identity number of the vessel
-    
-    Returns:
-        str: JSON list of vessel positions with coordinates, timestamps, and speed data
-    """
-    print("started")
-    try:
-        mmsi = int(mmsi)
-        locations = get_vehicle_locations(mmsi)
-        data = [
-            {
-                "timestamp": loc.timestamp,
-                "latitude": loc.lat,
-                "longitude": loc.lon,
-                "speed_over_ground": loc.sog,
-                "course_over_ground": loc.cog,
-                "heading": loc.heading,
-            }
-            for loc in locations
-        ]
-        result_data = { "mmsi": mmsi, "positions": data}
-        # return json.dumps(result_data, indent=2)
-        return result_data
-    except Exception as e:
-        return json.dumps({"error": str(e)})
-
-
-@mcp.tool()
-def get_vessel_current_position(mmsi: int | str) -> str:
-    """Get the most recent position of a vessel.
-    
-    Args:
-        mmsi (int): Maritime Mobile Service Identity number of the vessel
-    
-    Returns:
-        str: JSON object with current position, speed, heading, and timestamp
-    """
-    try:
-        mmsi = int(mmsi)
-        locations = get_vehicle_locations(mmsi)
-        if locations:
-            loc = locations[0]  # Most recent
-            result = {
-                "mmsi": loc.mmsi,
-                "vessel_name": loc.vessel_name,
-                "timestamp": loc.timestamp,
-                "latitude": loc.lat,
-                "longitude": loc.lon,
-                "speed_over_ground": loc.sog,
-                "course_over_ground": loc.cog,
-                "heading": loc.heading,
-            }
-            return json.dumps(result, indent=2)
-        else:
-            return json.dumps({"error": "No positions found for this vessel"})
-    except Exception as e:
-        return json.dumps({"error": str(e)})
-
-
-@mcp.tool()
-def ship_following_analysis(mmsi1: int | str, mmsi2: int | str) -> str:
-    """Determine if one vessel has been following another vessel's path.
-    
-    Args:
-        mmsi1 (int): MMSI of the initial vessel
-        mmsi2 (int): MMSI of the vessel to check if following
-    
-    Returns:
-        str: Analysis string indicating how many times vessel 2 was near vessel 1
-    """
-    try:
-        mmsi1 = int(mmsi1)
-        mmsi2 = int(mmsi2)
-        result = ship_following(mmsi1, mmsi2)
-        return json.dumps({"analysis": result})
-    except Exception as e:
-        return json.dumps({"error": str(e)})
-
-# ============================================================================
-# Tools: Translation
-# ============================================================================
- 
 @mcp.tool()
 def get_vessel_mmsi(vessel_name: str) -> int:
     """Get the MMSI for a given vessel.
@@ -151,78 +74,65 @@ def get_vessel_mmsi(vessel_name: str) -> int:
         vessel_name (str): The name of the vessel (case insenstive)
 
     Returns:
-        int: The MMSI number of the vessel as an int. Returns -1 if no vessels match the given name.
+        int: The MMSI number of the vessel as an int. Returns an error message if no vessels match the given name.
     """
-    result = query_vessels({"vessel_name": vessel_name.upper()})
-    if result and result[0]:
-        return result[0][0]
-    else:
-        return -1
+    vessel_mmsi = get_vessel_mmsi_helper(vessel_name)
+    try:
+        if vessel_mmsi:
+            return f"The mmsi for vessel {vessel_name} is {vessel_mmsi}."
+    except ValueError as e:
+        similar_names = get_similar_vessel_names(vessel_name, 10)
+        similar_names_str = ""
+        for name in similar_names:
+            similar_names_str += f"- {name}\n"
+        
+        return f"""
+Could not find the mmsi for vessel {vessel_name}.
 
-# ============================================================================
-# Tools: Geographic Context
-# ============================================================================
+Here are a list of all the vessels' names:
+{similar_names_str}
+
+Please either call this function again with the correct vessel name or alert the user that there is no vessel with that name.
+"""
+        
 
 @mcp.tool()
-def get_location_context(latitude: float | str, longitude: float | str) -> str:
-    """Get geographic context for a lat/lon including maritime region, nearest ports, and strategic waterways.
+def get_vessel_general_information(mmsi: int) -> str:
+    """Get information about a vessel. This includes the name, time and most rescent location, heading, cargo, course and speed overground, ect.
     
-    Args:
-        latitude (float): Latitude in decimal degrees
-        longitude (float): Longitude in decimal degrees
-    
-    Returns:
-        str: JSON with maritime region, nearest port, nearest waterway, and reverse geocoding info
+    Args: 
+        mmsi (int): Maritime Mobile Service Identity number of the vessel
+        
+    Returns: 
+        str: Informatioon about the vessel
     """
     try:
-        latitude = float(latitude)
-        longitude = float(longitude)
-        context = get_geolocation_context(latitude, longitude)
-        result = {
-            "latitude": latitude,
-            "longitude": longitude,
-            "maritime_region": context.maritime_region,
-            "nearest_port": {
-                "name": context.nearest_port_name,
-                "distance_nm": context.nearest_port_distance_nm,
-            } if context.nearest_port_name else None,
-            "nearest_waterway": {
-                "name": context.nearest_waterway_name,
-                "distance_nm": context.nearest_waterway_distance_nm,
-            } if context.nearest_waterway_name else None,
-            "reverse_geocoding": context.reverse_geocoding_result,
-        }
-        return json.dumps(result, indent=2)
+        mmsi = int(mmsi)
+        general_information = get_vessel_general_information_helper(mmsi)
+
+    except ValueError as e:
+        similar_mmsis = get_similar_mmsis(mmsi, 10)
+        similar_mmsis_str = ""
+        for mmsi in similar_mmsis:
+            similar_mmsis_str += f"- {mmsi}\n"
+        return f"""
+Could not find vessel information for MMSI {mmsi}.
+
+Similar MMSIs are: 
+{similar_mmsis_str}
+
+Please enter a valid mmsi, if you are not confident the mmsi was a typo, please alert the user and tell them potential correct MMSIs.
+"""
     except Exception as e:
-        return json.dumps({"error": str(e)})
+        return "Error:\n" + e
+
+
+
+
 
 
 @mcp.tool()
-def get_distance_between(lat1: float | str, lon1: float | str, lat2: float | str, lon2: float | str) -> str:
-    """Calculate distance and bearing between two geographic points.
-    
-    Args:
-        lat1 (float): Latitude of first point
-        lon1 (float): Longitude of first point
-        lat2 (float): Latitude of second point
-        lon2 (float): Longitude of second point
-    
-    Returns:
-        str: JSON with distance in nautical miles and bearing in degrees
-    """
-    try:
-        lat1 = float(lat1)
-        lon1 = float(lon1)
-        lat2 = float(lat2)
-        lon2 = float(lon2)
-        result = calc_distance_between(lat1, lon1, lat2, lon2)
-        return json.dumps(result, indent=2)
-    except Exception as e:
-        return json.dumps({"error": str(e)})
-
-
-@mcp.tool()
-def identify_maritime_region(latitude: float | str, longitude: float | str) -> str:
+def identify_maritime_region(latitude: float | str, longitude: float | str) -> str:   # Ideally the AI should just know what maritime region it is in based on the latitude and longitude
     """Identify which maritime region a lat/lon coordinate is in.
     
     Args:
@@ -235,7 +145,7 @@ def identify_maritime_region(latitude: float | str, longitude: float | str) -> s
     try:
         latitude = float(latitude)
         longitude = float(longitude)
-        region = identify_region(latitude, longitude)
+        region = identify_maritime_region_helper(latitude, longitude)
         result = {"region": region if region else "Unknown"}
         return json.dumps(result, indent=2)
     except Exception as e:
@@ -243,7 +153,7 @@ def identify_maritime_region(latitude: float | str, longitude: float | str) -> s
 
 
 @mcp.tool()
-def find_nearest_port(latitude: float | str, longitude: float | str) -> str:
+def identify_nearest_port(latitude: float | str, longitude: float | str) -> str:    # Ideally the AI should just know what maritime region it is in based on the latitude and longitude
     """Find the nearest major port to a given lat/lon.
     
     Args:
@@ -256,7 +166,7 @@ def find_nearest_port(latitude: float | str, longitude: float | str) -> str:
     try:
         latitude = float(latitude)
         longitude = float(longitude)
-        port_name, distance = find_closest_port(latitude, longitude)
+        port_name, distance = identify_nearest_port_helper(latitude, longitude)
         result = {"port_name": port_name, "distance_nm": distance}
         return json.dumps(result, indent=2)
     except Exception as e:
@@ -264,7 +174,7 @@ def find_nearest_port(latitude: float | str, longitude: float | str) -> str:
 
 
 @mcp.tool()
-def find_nearest_waterway(latitude: float | str, longitude: float | str) -> str:
+def identify_nearest_waterway(latitude: float | str, longitude: float | str) -> str:    # Ideally the AI should just know what maritime region it is in based on the latitude and longitude
     """Find the nearest strategic waterway to a given lat/lon.
     
     Args:
@@ -277,7 +187,7 @@ def find_nearest_waterway(latitude: float | str, longitude: float | str) -> str:
     try:
         latitude = float(latitude)
         longitude = float(longitude)
-        waterway_name, distance = find_closest_waterway(latitude, longitude)
+        waterway_name, distance = identify_nearest_waterway_helper(latitude, longitude)
         result = {"waterway_name": waterway_name, "distance_nm": distance}
         return json.dumps(result, indent=2)
     except Exception as e:
@@ -289,7 +199,7 @@ def find_nearest_waterway(latitude: float | str, longitude: float | str) -> str:
 # ============================================================================
 
 @mcp.tool()
-def calculate_fleet_position(fleet_name: str) -> str:
+def get_fleet_position(fleet_name: str) -> str:
     """Calculate the average position of a fleet of vessels.
     
     Args:
@@ -299,7 +209,7 @@ def calculate_fleet_position(fleet_name: str) -> str:
         str: JSON with fleet position (latitude and longitude)
     """
     try:
-        lat, lon = calc_fleet_position(fleet_name)
+        lat, lon = get_fleet_position_helper(fleet_name)
         result = {
             "fleet_name": fleet_name,
             "fleet_position": {"latitude": lat, "longitude": lon}
@@ -309,22 +219,6 @@ def calculate_fleet_position(fleet_name: str) -> str:
         return json.dumps({"error": str(e)})
 
 
-@mcp.tool()
-def is_ship_in_fleet(mmsi: int | str) -> str:
-    """Check if a vessel is within fleet proximity (10 nautical miles).
-    
-    Args:
-        mmsi (int): MMSI of the vessel to check
-    
-    Returns:
-        str: String indicating if ship is in fleet or outside fleet proximity
-    """
-    try:
-        mmsi = int(mmsi)
-        result_str = check_ship_in_fleet(mmsi)
-        return json.dumps({"proximity_check": result_str})
-    except Exception as e:
-        return json.dumps({"error": str(e)})
 
 
 # ============================================================================
@@ -332,7 +226,7 @@ def is_ship_in_fleet(mmsi: int | str) -> str:
 # ============================================================================
 
 @mcp.tool()
-def get_vessel_destination(mmsi: int | str, number_detections: int | str = 300) -> str:
+def get_vessel_destination(mmsi: int | str, number_detections: int | str = 300) -> str:         # This might need to be modified to use the ship's heading and course over ground instead of this. 
     """Predict where a vessel is heading based on recent trajectory.
     
     Args:
@@ -365,7 +259,7 @@ def _quote_sqlite_identifier(identifier: str) -> str:
 
 
 @mcp.tool()
-def get_database_info() -> str:
+def get_database_info() -> str:                                                     # This should maybe be in a helper function or in the system prompt
     """Get basic SQLite database schema info (tables and column definitions).
 
     Returns:
@@ -427,7 +321,7 @@ def get_database_info() -> str:
 # ============================================================================
 
 @mcp.tool()
-def query_database(sql_query: str, max_rows: int | str = 200) -> str:
+def query_database(sql_query: str, max_rows: int | str = 200) -> str:               
     """Execute a read-only SQL query against the AIS database and return results.
     
     Args:
@@ -501,6 +395,197 @@ def query_database(sql_query: str, max_rows: int | str = 200) -> str:
         return json.dumps({"error": f"Database error: {str(e)}"})
     except Exception as e:
         return json.dumps({"error": f"Query error: {str(e)}"})
+    
+
+
+
+
+
+
+
+
+
+
+
+# @mcp.tool()
+# def ship_near_fleet(mmsi: int | str) -> str:                               # Ideally the AI should know if the ship is approximately "in the fleet" based on the data it can get for the ship's location and the fleet's location
+#     """Check if a vessel is within fleet proximity (10 nautical miles).
+    
+#     Args:
+#         mmsi (int): MMSI of the vessel to check
+    
+#     Returns:
+#         str: String indicating if ship is in fleet or outside fleet proximity
+#     """
+#     try:
+#         mmsi = int(mmsi)
+#         result_str = ship_near_fleet_helper(mmsi)
+#         return result_str
+#     except Exception as e:
+#         return "error: " + str(e)
+
+
+
+# @mcp.tool()                                                                   #It is probably better to do a get_ship_general_information tool and have the name included
+# def get_vessel_name(mmsi: int | str) -> str:
+#     """Get the name of a vessel given its MMSI.
+    
+#     Args:
+#         mmsi (int): Maritime Mobile Service Identity number of the vessel
+    
+#     Returns:
+#         str: The name of the vessel or an error message
+#     """
+#     try:
+#         mmsi = int(mmsi)
+#         info = get_vessel_name_helper(mmsi)
+#         if isinstance(info, dict):
+#             return info.get("vessel_name", "Unknown")
+#         else:
+#             return "No Vessel with that MMSI."
+#     except Exception as e:
+#         print(e, file=sys.stderr)
+#         return f"Error retrieving vessel name. That function does not seem to be working right now. You can try a different function or alert the user."
+
+# @mcp.tool()
+# def ship_following_analysis(mmsi1: int | str, mmsi2: int | str) -> str:
+#     """Determine if one vessel has been following another vessel's path.
+    
+#     Args:
+#         mmsi1 (int): MMSI of the initial vessel
+#         mmsi2 (int): MMSI of the vessel to check if following
+    
+#     Returns:
+#         str: Analysis string indicating how many times vessel 2 was near vessel 1
+#     """
+#     try:
+#         mmsi1 = int(mmsi1)
+#         mmsi2 = int(mmsi2)
+#         result = ship_following(mmsi1, mmsi2)
+#         return json.dumps({"analysis": result})
+#     except Exception as e:
+#         return json.dumps({"error": str(e)})
+
+# ============================================================================
+# Tools: Translation
+# ============================================================================
+ 
+
+# ============================================================================
+# Tools: Geographic Context
+# ============================================================================
+
+# @mcp.tool()
+# def get_location_context(latitude: float | str, longitude: float | str) -> str:
+#     """Get geographic context for a lat/lon including maritime region, nearest ports, and strategic waterways.
+    
+#     Args:
+#         latitude (float): Latitude in decimal degrees
+#         longitude (float): Longitude in decimal degrees
+    
+#     Returns:
+#         str: JSON with maritime region, nearest port, nearest waterway, and reverse geocoding info
+#     """
+#     try:
+#         latitude = float(latitude)
+#         longitude = float(longitude)
+#         context = get_geolocation_context(latitude, longitude)
+#         result = {
+#             "latitude": latitude,
+#             "longitude": longitude,
+#             "maritime_region": context.maritime_region,
+#             "nearest_port": {
+#                 "name": context.nearest_port_name,
+#                 "distance_nm": context.nearest_port_distance_nm,
+#             } if context.nearest_port_name else None,
+#             "nearest_waterway": {
+#                 "name": context.nearest_waterway_name,
+#                 "distance_nm": context.nearest_waterway_distance_nm,
+#             } if context.nearest_waterway_name else None,
+#             "reverse_geocoding": context.reverse_geocoding_result,
+#         }
+#         return json.dumps(result, indent=2)
+#     except Exception as e:
+#         return json.dumps({"error": str(e)})
+
+
+# @mcp.tool()
+# def get_distance_between(lat1: float | str, lon1: float | str, lat2: float | str, lon2: float | str) -> str:  # The AI ideally should be able to know the approximate distance between two different lattitude and longitude points
+#     """Calculate distance and bearing between two geographic points.
+    
+#     Args:
+#         lat1 (float): Latitude of first point
+#         lon1 (float): Longitude of first point
+#         lat2 (float): Latitude of second point
+#         lon2 (float): Longitude of second point
+    
+#     Returns:
+#         str: JSON with distance in nautical miles and bearing in degrees
+#     """
+#     try:
+#         lat1 = float(lat1)
+#         lon1 = float(lon1)
+#         lat2 = float(lat2)
+#         lon2 = float(lon2)
+#         result = calc_distance_between(lat1, lon1, lat2, lon2)
+#         return json.dumps(result, indent=2)
+#     except Exception as e:
+#         return json.dumps({"error": str(e)})
+
+
+# @mcp.tool() # I need to make this so that it doesn't give me a buttload of locations that caused autistic siezures with the AI
+# def get_vessel_locations(mmsi: int | str) -> str:
+#     """Get all recorded positions for a specific vessel identified by MMSI.
+    
+#     Args:
+#         mmsi (int): Maritime Mobile Service Identity number of the vessel
+    
+#     Returns:
+#         str: JSON list of vessel positions with coordinates, timestamps, and speed data
+#     """
+#     print("started")
+#     try:
+#         mmsi = int(mmsi)
+#         locations = get_vessel_position_history(mmsi)
+#         data = [
+#             {
+#                 "timestamp": loc.timestamp,
+#                 "latitude": loc.lat,
+#                 "longitude": loc.lon,
+#                 "speed_over_ground": loc.sog,
+#                 "course_over_ground": loc.cog,
+#                 "heading": loc.heading,
+#             }
+#             for loc in locations
+#         ]
+#         result_data = { "mmsi": mmsi, "positions": data}
+#         # return json.dumps(result_data, indent=2)
+#         return result_data
+#     except Exception as e:
+#         return json.dumps({"error": str(e)})
+
+
+#@mcp.tool()
+# def get_vessel_latest_location(mmsi: int | str) -> str:
+#     """Get the most recent position of a vessel.
+    
+#     Args:
+#         mmsi (int): Maritime Mobile Service Identity number of the vessel
+    
+#     Returns:
+#         str: Information about the latest position of the vessel
+#     """
+#     try:
+#         mmsi = int(mmsi)
+#         location = get_vessel_latest_location_helper(mmsi)
+#         if location:
+#             result = "Current Vessel information:\n"
+#             result += location
+#             return result
+#         else:
+#             return "Error: No positions found for this vessel, this may be becuase of a wrong mmsi"
+#     except Exception as e:
+#         return "Error:\n" + str(e)
 
 
 # ============================================================================

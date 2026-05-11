@@ -1,7 +1,7 @@
 from backend.mcp_servers.utils.important_locations import *
-from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_position_history, get_latest_vessel_position
+from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_position_history_helper, get_vessel_latest_location_helper
 from backend.mcp_servers.utils.distance_calculation import calculate_bearing, haversine_distance_nm
-from backend.mcp_servers.ais.helpers.lat_lon_context import identify_maritime_region
+from backend.mcp_servers.ais.helpers.get_general_ship_context import identify_maritime_region_helper, identify_maritime_region_helper
 from datetime import datetime, timedelta
 import math
 
@@ -25,7 +25,7 @@ VECTOR_DISTANCE_RATIO = 0.9
 DEGREE_THRESHOLD= 15
 
 def calculate_vector_and_distance_sum(ship_mmsi: str, number_detections=300, tracking_time=timedelta(hours=1)):
-    positions = get_vessel_position_history(ship_mmsi)
+    positions = get_vessel_position_history_helper(ship_mmsi)
     
     position1 = positions[number_detections]
     rescent_reversed_positions = reversed(positions[:number_detections])
@@ -47,7 +47,7 @@ def calculate_vector_and_distance_sum(ship_mmsi: str, number_detections=300, tra
         print("The ship is going toward something")
 
         current_position = (positions[0]['lat'], positions[0]['lon'])
-        print(get_possible_destinations(current_position, total_vector))
+        print(get_possible_destinations_helper(current_position, total_vector))
 
     else:
         for position in reversed(positions[:number_detections]):
@@ -68,7 +68,7 @@ def within_angle(a, b, tolerance=15):
     return diff <= tolerance
 
 
-def get_possible_destinations(current_position, direction_vector):
+def get_possible_destinations_helper(current_position, direction_vector):
 
     current_lat = current_position[0]
     current_lon = current_position[1]
@@ -147,7 +147,7 @@ def get_possible_destinations(current_position, direction_vector):
         
         for maritime_name, bounding_box in MARITIME_REGIONS.items():
             
-            maritime_name = identify_maritime_region(current_lat, current_lon)
+            maritime_name = identify_maritime_region_helper(current_lat, current_lon)
             if continent_name == maritime_name:
                 continue
             

@@ -16,5 +16,7 @@ class Config:
     # DB_PORT is set to None if undefined, and errors if set to something that
     # can't be converted to an int
     DB_PORT: int | None = int(getenv("DB_PORT")) if getenv("DB_PORT") else None
+
+    MAX_AGENT_STEPS: int = 20
     
 config = Config()
