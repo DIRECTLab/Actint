@@ -51,41 +51,32 @@ model = TransformersModel(
     max_new_tokens=config.MAX_NEW_TOKENS,
 )
 
-_agent_sessions = {}
-
-
-def get_or_create_agent(
-    session_id: str, additional_tools: list = []
+def create_agent(
+    additional_tools: list = []
 ) -> ToolCallingAgent:
-    """Creates or retrieves an agent for a given session, injecting relevant tools."""
-    if session_id not in _agent_sessions:
-        tools = ais_mcp_tools.copy()
-        managed_agents = []
-        if additional_tools:
-            # tools.extend(additional_tools)
-            map_agent = ToolCallingAgent(
-                tools=additional_tools,
-                model=model,
-                max_steps=10,
-                name="map_ui_agent",
-                description="Can show things to the user on a map. Can move, zoom, and draw basic shapes on the map."
-            )
-            managed_agents.append(map_agent)
-        _agent_sessions[session_id] = ToolCallingAgent(tools=tools, model=model, managed_agents=managed_agents)
-    return _agent_sessions[session_id]
+    """Creates an agent, injecting relevant tools."""
+    tools = ais_mcp_tools.copy()
+    managed_agents = []
+    if additional_tools:
+        # tools.extend(additional_tools)
+        map_agent = ToolCallingAgent(
+            tools=additional_tools,
+            model=model,
+            max_steps=10,
+            name="map_ui_agent",
+            description="Can show things to the user on a map. Can move, zoom, and draw basic shapes on the map."
+        )
+        managed_agents.append(map_agent)
+    return ToolCallingAgent(tools=tools, model=model, managed_agents=managed_agents)
 
-
-async def query_agent(
+async def query_agent_instance(
+    agent: ToolCallingAgent,
     query: str,
-    session_id: str,
-    additional_tools: list = None,
 ) -> str:
-    """Entry point for both web and terminal to query their respective agent."""
+    """Entry point for both web and terminal to query an agent instance."""
 
     loop = asyncio.get_running_loop()
     set_event_loop(loop)  # Register before entering the thread so tools can reach it
-
-    agent = get_or_create_agent(session_id, additional_tools or [])
 
     try:
         result = await loop.run_in_executor(
@@ -93,13 +84,8 @@ async def query_agent(
         )
         return result
     except AgentMaxStepsError:
-        print(f"[session={session_id}] Agent hit max steps.", file=sys.stderr)
+        print(f"Agent hit max steps.", file=sys.stderr)
         return "Agent failed to respond: maximum steps exceeded."
     except Exception as e:
-        print(f"[session={session_id}] Agent error: {e}", file=sys.stderr)
+        print(f"Agent error: {e}", file=sys.stderr)
         return f"Agent encountered an error: {str(e)}"
-
-
-def remove_agent_session(session_id: str):
-    if session_id in _agent_sessions:
-        del _agent_sessions[session_id]
