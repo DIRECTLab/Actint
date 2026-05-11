@@ -21,7 +21,7 @@ def get_fleet_position_helper(canonical_name):
     vessels_in_fleet = query_static_data_helper({"fleet": canonical_name})
     
     if not vessels_in_fleet:
-        return f"No Vessels in fleet {canonical_name}"
+        raise ValueError(f"No vessels in fleet {canonical_name}")
     
     # Get latest positions: assuming format [mmsi, timestamp_ms, lat, lon]
     vessels_most_recent_positions = []

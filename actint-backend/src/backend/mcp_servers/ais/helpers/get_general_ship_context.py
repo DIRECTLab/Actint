@@ -33,8 +33,10 @@ from backend.mcp_servers.ais.helpers.vessel_query import query_static_data_helpe
 
 
 def get_vessel_general_information_helper(mmsi: int):
-    vessel_info = query_static_data_helper({"mmsi": mmsi})[0]
-    if not vessel_info:
+    vessel_info = query_static_data_helper({"mmsi": mmsi})
+    if vessel_info:
+        vessel_info = vessel_info[0]
+    else:
         raise ValueError(f"No vessel found with MMSI {mmsi}")
     latest_location_info = get_vessel_latest_location_helper(mmsi)
     print("vessel info:", str(vessel_info) + "\n\n\n\n")

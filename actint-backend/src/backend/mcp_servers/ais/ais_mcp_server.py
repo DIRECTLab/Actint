@@ -36,9 +36,9 @@ from backend.mcp_servers.ais.helpers.fleet_information import (
 from backend.mcp_servers.ais.helpers.vessel_query import (
     get_similar_mmsis,
     get_similar_vessel_names,
+    get_similar_fleet_names,
     get_vessel_position_history_helper,
     get_vessel_latest_location_helper,
-    get_vessel_name_helper,
     get_vessel_mmsi_helper,
 )
 from backend.mcp_servers.ais.helpers.ship_going import (
@@ -76,12 +76,12 @@ def get_vessel_mmsi(vessel_name: str) -> int:
     Returns:
         int: The MMSI number of the vessel as an int. Returns an error message if no vessels match the given name.
     """
-    vessel_mmsi = get_vessel_mmsi_helper(vessel_name)
     try:
+        vessel_mmsi = get_vessel_mmsi_helper(vessel_name)
         if vessel_mmsi:
             return f"The mmsi for vessel {vessel_name} is {vessel_mmsi}."
     except ValueError as e:
-        similar_names = get_similar_vessel_names(vessel_name, 10)
+        similar_names = get_similar_vessel_names(vessel_name, 4)
         similar_names_str = ""
         for name in similar_names:
             similar_names_str += f"- {name}\n"
@@ -92,12 +92,12 @@ Could not find the mmsi for vessel {vessel_name}.
 Here are a list of all the vessels' names:
 {similar_names_str}
 
-Please either call this function again with the correct vessel name or alert the user that there is no vessel with that name.
+If this was a very minor typo, please proceed with the most accurate option, otherwise alert the user that their input was invalid and give them examples of valid vessel names.
 """
         
 
 @mcp.tool()
-def get_vessel_general_information(mmsi: int) -> str:
+def get_vessel_general_information(mmsi: str) -> str:
     """Get information about a vessel. This includes the name, time and most rescent location, heading, cargo, course and speed overground, ect.
     
     Args: 
@@ -111,7 +111,7 @@ def get_vessel_general_information(mmsi: int) -> str:
         general_information = get_vessel_general_information_helper(mmsi)
 
     except ValueError as e:
-        similar_mmsis = get_similar_mmsis(mmsi, 10)
+        similar_mmsis = get_similar_mmsis(str(mmsi), 4)
         similar_mmsis_str = ""
         for mmsi in similar_mmsis:
             similar_mmsis_str += f"- {mmsi}\n"
@@ -121,11 +121,12 @@ Could not find vessel information for MMSI {mmsi}.
 Similar MMSIs are: 
 {similar_mmsis_str}
 
-Please enter a valid mmsi, if you are not confident the mmsi was a typo, please alert the user and tell them potential correct MMSIs.
+If this was a very minor typo, please proceed with the most accurate option, otherwise alert the user that their input was invalid and give them examples of valid mmsis.
 """
     except Exception as e:
         return "Error:\n" + e
 
+    return general_information
 
 
 
@@ -199,7 +200,7 @@ def identify_nearest_waterway(latitude: float | str, longitude: float | str) -> 
 # ============================================================================
 
 @mcp.tool()
-def get_fleet_position(fleet_name: str) -> str:
+def get_fleet_position(fleet_query: str) -> str:
     """Calculate the average position of a fleet of vessels.
     
     Args:
@@ -209,14 +210,23 @@ def get_fleet_position(fleet_name: str) -> str:
         str: JSON with fleet position (latitude and longitude)
     """
     try:
-        lat, lon = get_fleet_position_helper(fleet_name)
-        result = {
-            "fleet_name": fleet_name,
-            "fleet_position": {"latitude": lat, "longitude": lon}
-        }
-        return json.dumps(result, indent=2)
+        lat, lon = get_fleet_position_helper(fleet_query)
+        return f"The position of fleet {fleet_query} is lat {lat}, lon {lon}"
+    except ValueError as e:
+        similar_fleets = get_similar_fleet_names(str(fleet_query), 4)
+        similar_fleets_str = ""
+        for fleet_name in similar_fleets:
+            similar_fleets_str += f"- {fleet_name}\n"
+        return f"""
+Could not find vessel information for fleet {fleet_query}.
+
+Similar fleets are: 
+{similar_fleets_str}
+
+If this was a very minor typo, please proceed with the most accurate option, otherwise alert the user that their input was invalid and give them examples of valid fleets.
+"""
     except Exception as e:
-        return json.dumps({"error": str(e)})
+        return str(e)
 
 
 

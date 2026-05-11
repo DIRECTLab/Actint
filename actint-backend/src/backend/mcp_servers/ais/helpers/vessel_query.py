@@ -40,6 +40,16 @@ def get_all_mmsis() -> list[int]:
     clean_mmsis = [row[0] for row in results if row[0] is not None]
     return clean_mmsis
 
+def get_all_fleet_names() -> list[str]:
+    conn = get_conn()
+    cursor=conn.cursor()
+    cursor.execute("SELECT fleet FROM ais_static_data;")
+    results = cursor.fetchall()
+    conn.close()
+    clean_names = [row[0] for row in results if row[0] is not None]
+    return clean_names
+
+
 
 def get_vessel_name_helper(mmsi: int) -> str:
     """Get the name of a vessel given its MMSI."""
@@ -72,17 +82,28 @@ def get_similar_vessel_names(query: str, number_results: int) -> list[str]:
     names = [match[0] for match in matches]
     return names
 
-def get_similar_mmsis(query: str, number_results: int) -> list[int]:
-    mmsis = get_all_mmsis()
+def get_similar_mmsis(query: str | int, number_results: int) -> list[int]:
+    mmsis_int = get_all_mmsis()
+    mmsis_str = [str(mmsi) for mmsi in mmsis_int]
     matches = process.extract(
-        query,
-        mmsis, 
+        str(query),
+        mmsis_str, 
         limit=number_results,
         processor=utils.default_process # Handles case and whitespace automatically
     )
     mmsis = [match[0] for match in matches]
     return mmsis
     
+def get_similar_fleet_names(query: str, number_results: int) -> list[str]:
+    names = get_all_fleet_names()
+    matches = process.extract(
+        query,
+        names, 
+        limit=number_results,
+        processor=utils.default_process # Handles case and whitespace automatically
+    )
+    names = [match[0] for match in matches]
+    return names
 
 
 def get_vessel_position_history_helper(mmsi: int) -> list[dict]:
