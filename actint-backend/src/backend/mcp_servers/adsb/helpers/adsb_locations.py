@@ -282,7 +282,7 @@ def find_nearest_aircraft(
     if radius_nm <= 0:
         radius_nm = 50.0
 
-    lat_min, lat_max, lon_min, lon_max = bbox_from_radius_nm(lat, lon, float(radius_nm))
+    lat_min, lat_max, lon_min, lon_max, wrapped = bbox_from_radius_nm(lat, lon, float(radius_nm))
 
     base_sql = """
         WITH ref AS (

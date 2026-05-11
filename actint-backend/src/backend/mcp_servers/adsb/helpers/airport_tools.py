@@ -201,7 +201,7 @@ def find_nearest_airport(
 
     with get_conn() as conn:
         def _query(radius_nm: float) -> list[dict[str, Any]]:
-            lat_min, lat_max, lon_min, lon_max = bbox_from_radius_nm(lat, lon, radius_nm)
+            lat_min, lat_max, lon_min, lon_max, wrapped = bbox_from_radius_nm(lat, lon, radius_nm)
 
             base_query = """
                 SELECT
@@ -314,7 +314,7 @@ def get_possible_airport_destinations(
 
     heading = _bearing_from_vector(direction_vector)
 
-    lat_min, lat_max, lon_min, lon_max = bbox_from_radius_nm(lat, lon, radius_nm)
+    lat_min, lat_max, lon_min, lon_max, wrapped = bbox_from_radius_nm(lat, lon, radius_nm)
 
     base_sql = """
         SELECT id, ident, name, type, latitude_deg, longitude_deg, iso_country, iso_region, municipality

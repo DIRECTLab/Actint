@@ -186,7 +186,7 @@ def find_nearest_navaids(
     if radius_nm is None or radius_nm <= 0:
         radius_nm = 200.0
 
-        lat_min, lat_max, lon_min, lon_max = bbox_from_radius_nm(lat, lon, float(radius_nm))
+        lat_min, lat_max, lon_min, lon_max, wrapped = bbox_from_radius_nm(lat, lon, float(radius_nm))
         type_q = (navaid_type or "").strip()
 
         base_sql = """

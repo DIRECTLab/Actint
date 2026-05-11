@@ -37,7 +37,7 @@ def bearing_diff_deg(a: float, b: float) -> float:
     return abs((a - b + 180.0) % 360.0 - 180.0)
 
 
-def bbox_from_radius_nm(lat: float, lon: float, radius_nm: float) -> tuple[float, float, float, float]:
+def bbox_from_radius_nm(lat: float, lon: float, radius_nm: float) -> tuple[float, float, float, float, bool]:
     """Approximate lat/lon bounding box for a radius in nautical miles.
 
     Returns (lat_min, lat_max, lon_min, lon_max) where longitudes are normalized
@@ -61,9 +61,17 @@ def bbox_from_radius_nm(lat: float, lon: float, radius_nm: float) -> tuple[float
 
     lat_min = max(-90.0, lat - dlat)
     lat_max = min(90.0, lat + dlat)
+    lon_min_raw = lon - dlon
+    lon_max_raw = lon + dlon
     lon_min = _normalize_lon(lon - dlon)
     lon_max = _normalize_lon(lon + dlon)
-    return lat_min, lat_max, lon_min, lon_max
+
+    wrapped = False
+
+    if lon_min_raw < -180 or lon_max_raw > 180:
+        wrapped = True
+
+    return lat_min, lat_max, lon_min, lon_max, wrapped
 
 @contextmanager
 def get_conn():
