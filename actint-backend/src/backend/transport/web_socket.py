@@ -5,7 +5,7 @@ from datetime import datetime
 
 from backend.agent.agent import create_agent, query_agent_instance
 from backend.ui_tools.map_edit_tools import ZoomTool, DrawCircleTool, DrawLineTool, DrawRectangleTool
-from backend.transport.defaults import sio, app
+from backend.transport.connection import sio, app
 from backend.config import config
 from backend.event_loop_registry import set_event_loop
 
@@ -15,6 +15,7 @@ user_agents = {}
 async def connect(sid, environ):
     set_event_loop(asyncio.get_event_loop())
     print(f"User {sid} connected! New user.", file=sys.stderr)
+
 
 # ==================================================
 # Chat Manager
