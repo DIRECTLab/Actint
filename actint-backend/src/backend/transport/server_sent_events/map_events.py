@@ -1,5 +1,5 @@
 import asyncio
-from backend.transport.defaults import sio
+from backend.transport.connection import sio
 
 
 async def set_map_position(lat, lon, zoom, sid=None):
