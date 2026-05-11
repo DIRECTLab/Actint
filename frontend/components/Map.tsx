@@ -7,6 +7,8 @@ import { useEffect } from 'react'
 import { Map as LeafletMap } from 'leaflet'; // Import the type
 import { create_map_functions } from '@/functions/web_socket_functions'
 import { useRef, useState } from 'react'
+import { useMap } from 'react-leaflet'
+import 'leaflet.heat'
 
 'use client'
 
@@ -29,6 +31,33 @@ type Props = {
   vehicleCurrentPositions: vehicles_current_positions,
 }
 
+function HeatMapLayer({ points, max }: { points: number[][], max: number }) {
+  const map = useMap()
+
+  useEffect(() => {
+
+    const heat = (L as any).heatLayer(
+      points,
+      {
+        radius: 35,
+        blur: 25,
+        maxZoom: 10,
+        minOpacity: 0.3,
+        max,
+      }
+    )
+
+    heat.addTo(map)
+
+    return () => {
+      map.removeLayer(heat)
+    }
+
+  }, [map, points, max])
+
+  return null
+}
+
 //Some different themes, uncomment the one you want to use and comment the others
 
 // URL for different themes:https://leaflet-extras.github.io/leaflet-providers/preview/
@@ -36,6 +65,10 @@ type Props = {
 
 export default function Map({ vehiclesPreviousPositions, vehicleCurrentPositions }: Props) {
   const [AI_objects, setAI_objects] = useState<any[]>([]);
+
+  const [heatMapPoints, setHeatMapPoints] = useState<number[][]>([])
+  const [heatMapMax, setHeatMapMax] = useState<number>(1)
+
   const mapRef = useRef<LeafletMap | null>(null);
 
   const handleManualMove = (lat: number, lng: number, zoom: number) => {
@@ -47,7 +80,7 @@ export default function Map({ vehiclesPreviousPositions, vehicleCurrentPositions
   };
   useEffect(() => {
     create_map_functions({handleManualMove, setAI_objects});
-  })
+  }, [])
   
   return (
     <div style={{ height: '100%', width: '100%', background: '#000'}}>
@@ -59,7 +92,7 @@ export default function Map({ vehiclesPreviousPositions, vehicleCurrentPositions
         style={{ height: '100%', width: '100%', background: '#000' }}
         ref={mapRef}
       >
-
+        
         {/* A bunch of different themes you can pick from: */}
 
         {/* Basic map */}
@@ -115,6 +148,11 @@ export default function Map({ vehiclesPreviousPositions, vehicleCurrentPositions
           url="https://sgx.geodatenzentrum.de/wmts_topplus_open/tile/1.0.0/web/default/WEBMERCATOR/{z}/{y}/{x}.png"
           maxZoom={18}
         /> */}
+
+        <HeatMapLayer
+          points={heatMapPoints}
+          max={heatMapMax}
+        />
 
         <HandleMarkers
           vehiclesPreviousPositions={vehiclesPreviousPositions}
