@@ -2,7 +2,6 @@ import { socket } from "@/defaults/web_socket";
 
 export type HeatmapPayload = {
   points: number[][];
-  max: number;
 };
 
 export type ConnectionStatus =
@@ -51,13 +50,13 @@ type Props1 = {
   setAI_objects: React.Dispatch<React.SetStateAction<any[]>>;
   setHeatmapData: (data: {
     points: number[][];
-    max: number;
   }) => void;
 };
 
 export const create_map_functions = ({
   handleManualMove,
   setAI_objects,
+  setHeatmapData,
 }: Props1) => {
   socket.on("set_map_position", (data) => {
     console.log("set map position", data);
@@ -78,8 +77,9 @@ export const create_map_functions = ({
     console.log("set AI objects", data);
     setAI_objects((prev) => [...prev, { type: "line", data }]);
   });
+
   socket.on("set_heatmap", (data: HeatmapPayload) => {
     console.log("set heatmap", data);
-    setAI_objects((prev) => [...prev, { type: "heatmap", data }]);
+    setHeatmapData({points: data.points || []});
   });
 };

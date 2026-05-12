@@ -9,6 +9,7 @@ import { create_map_functions } from '@/functions/web_socket_functions'
 import { useRef, useState } from 'react'
 import { useMap } from 'react-leaflet'
 import 'leaflet.heat'
+import { socket } from "@/defaults/web_socket";
 
 'use client'
 
@@ -31,32 +32,37 @@ type Props = {
   vehicleCurrentPositions: vehicles_current_positions,
 }
 
-function HeatMapLayer({ points, max }: { points: number[][], max: number }) {
+function HeatMapLayer({ points }: { points: number[][] }) {
   const map = useMap()
+  //console.log("heatLayer exists:", (L as any).heatLayer)
 
   useEffect(() => {
+    //if (!points || points.length === 0) return
 
-    const heat = (L as any).heatLayer(
-      points,
-      {
-        radius: 35,
-        blur: 25,
-        maxZoom: 10,
-        minOpacity: 0.3,
-        max,
-      }
-    )
+
+    const test = [
+      [40.7, -111.9, 1],
+      [40.71, -111.91, 0.8],
+      [40.72, -111.92, 0.6],
+    ]
+
+    const heat = (L as any).heatLayer(points, {
+      radius: 15,
+      blur: 10,
+      maxZoom: 10,
+      minOpacity: 0.3,
+    })
 
     heat.addTo(map)
 
     return () => {
       map.removeLayer(heat)
     }
-
-  }, [map, points, max])
+  }, [map, points])
 
   return null
 }
+
 
 //Some different themes, uncomment the one you want to use and comment the others
 
@@ -67,7 +73,6 @@ export default function Map({ vehiclesPreviousPositions, vehicleCurrentPositions
   const [AI_objects, setAI_objects] = useState<any[]>([]);
 
   const [heatMapPoints, setHeatMapPoints] = useState<number[][]>([])
-  const [heatMapMax, setHeatMapMax] = useState<number>(1)
 
   const mapRef = useRef<LeafletMap | null>(null);
 
@@ -78,15 +83,20 @@ export default function Map({ vehiclesPreviousPositions, vehicleCurrentPositions
       });
     }
   };
+
   useEffect(() => {
     create_map_functions({
     handleManualMove,
     setAI_objects,
     setHeatmapData: (data: any) => {
-      setHeatMapPoints(data.points);
-      setHeatMapMax(data.max);
+      console.log("heatmap received", data)
+      setHeatMapPoints(data.points || [])
     }
     });
+  }, [])
+
+  useEffect(() => {
+    socket.emit("get_heatmap")
   }, [])
   
   return (
@@ -158,7 +168,6 @@ export default function Map({ vehiclesPreviousPositions, vehicleCurrentPositions
 
         <HeatMapLayer
           points={heatMapPoints}
-          max={heatMapMax}
         />
 
         <HandleMarkers
