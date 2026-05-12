@@ -13,6 +13,7 @@ except ImportError:
 
 try:
     import socketio
+
     SOCKETIO_AVAILABLE = True
 except ImportError:
     SOCKETIO_AVAILABLE = False
@@ -31,15 +32,31 @@ class RemoteAgentClient:
         self.url = f"http://{host}:{port}"
         self._sio = socketio.AsyncClient()
         self._response_queue: asyncio.Queue[dict] = asyncio.Queue()
+        self._user_initiated = False
 
         @self._sio.on("send_response")
         async def on_response(data: dict) -> None:
             await self._response_queue.put(data)
 
+        @self._sio.on("disconnect")
+        async def on_disconnect() -> None:
+            if self._user_initiated:
+                print_message(
+                    "System",
+                    "Disconnected from remote backend (client initiated).",
+                )
+            else:
+                print_message(
+                    "System",
+                    "Disconnected from remote backend"
+                    " (server closed the connection).",
+                )
+
     async def connect(self) -> None:
         await self._sio.connect(self.url)
 
     async def disconnect(self) -> None:
+        self._user_initiated = True
         if self._sio.connected:
             await self._sio.disconnect()
 
@@ -71,9 +88,7 @@ def record_message(sender: str, message: str) -> None:
 
 def save_chat(sid: str, fmt: str = "txt") -> str:
     ext = fmt if fmt in {"md", "json"} else "txt"
-    filename = (
-        f"chat_{sid}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{ext}"
-    )
+    filename = f"chat_{sid}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{ext}"
 
     with open(filename, "w") as f:
         if fmt == "json":
@@ -128,13 +143,15 @@ async def query_agent_loop(
             if user_text.lower() in {"/quit", "/exit", "/q"}:
                 if not remote_client:
                     from backend.agent.agent import remove_agent_session
+
                     remove_agent_session(sid)
                 break
 
             if user_text.lower() in {"/help", "/h"}:
                 print_message(
                     "System",
-                    "Available commands: /help, /quit, /exit, /save [txt|md|json]",
+                    "Available commands: /help, /quit, /exit,"
+                    " /save [txt|md|json]",
                 )
                 continue
 
@@ -155,6 +172,7 @@ async def query_agent_loop(
                 response = await remote_client.query(user_text)
             else:
                 from backend.agent.agent import query_agent
+
                 print(f"Message from {sid}: {user_text}", file=sys.stderr)
                 response = await query_agent(
                     user_text,
@@ -179,14 +197,17 @@ async def query_agent_loop(
 async def main() -> None:
     parser = argparse.ArgumentParser(description="Terminal chat client")
     parser.add_argument(
-        "--debug", "-d",
+        "--debug",
+        "-d",
         action="store_true",
         help="Enable debug mode",
     )
     parser.add_argument(
-        "--remote", "-r",
+        "--remote",
+        "-r",
         action="store_true",
-        help="Connect to a remote backend via WebSocket instead of running locally",
+        help="Connect to a remote backend via WebSocket instead of"
+        " running locally",
     )
     parser.add_argument(
         "--host",
