@@ -18,6 +18,7 @@ import sqlite3
 import os
 from pathlib import Path
 from fastmcp import FastMCP
+from backend.data_processing.query_database import get_conn
 import sys
 
 # Import tool functions from parent package
@@ -401,7 +402,7 @@ def query_database(sql_query: str, max_rows: int | str = 200) -> str:
         if max_rows > 5000:
             max_rows = 5000
 
-        conn = sqlite3.connect(str(_resolve_sqlite_path()))
+        conn = get_conn()
         cursor = conn.cursor()
 
         cursor.execute(query)
