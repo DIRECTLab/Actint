@@ -1,6 +1,6 @@
-import sqlite3 
 from datetime import datetime
 import os
+import psycopg
 
 from pathlib import Path
 
@@ -10,87 +10,45 @@ SQLITE_PATH_AIS = DB_DIR / "ais.db"
 SQLITE_PATH_ADSB = DB_DIR / "adsb.db"
 
 
-def _resolve_sqlite_path() -> Path:
-    """Resolve SQLite path, allowing benchmark overrides via env var."""
-    override = os.getenv("ACTINT_SQLITE_PATH")
-    if override:
-        return Path(override).expanduser().resolve()
-    return SQLITE_PATH_AIS
+def get_conn():
+    from backend.config import config
+    try:
+        # Read environment variables
+        db_config = {
+            "host": config.DB_HOST,
+            "dbname": config.AIS_DB_NAME,
+            "user": config.DB_USER,
+            "password": config.DB_PASS,
+            "port": config.DB_PORT,
+        }
 
-def _get_sqlite_connection() -> sqlite3.Connection:
-    """Get a SQLite connection."""
-    return sqlite3.connect(_resolve_sqlite_path())
+        # Validate required vars
+        for key, value in db_config.items():
+            if value is None:
+                raise ValueError(f"Missing environment variable: {key}")
 
-
-def _resolve_sqlite_path_asdb() -> Path:
-    """Resolve SQLite path, allowing benchmark overrides via env var."""
-    override = os.getenv("ACTINT_SQLITE_PATH")
-    if override:
-        return Path(override).expanduser().resolve()
-    return SQLITE_PATH_ADSB
-
-
-
-def _get_sqlite_connection_asdb() -> sqlite3.Connection:
-    """Get a SQLite connection."""
-    return sqlite3.connect(_resolve_sqlite_path_asdb())
-
-
-
-
-###################################### Functions for AIS/boats #######################################
-
-def query_ais_positions(searchQuery: dict, sort=False):
-    conn = _get_sqlite_connection()
-    cursor = conn.cursor()
-    for key, value in searchQuery.items():
-        cursor.execute(f"SELECT * FROM ais_positions WHERE {key} = ?", (value,))
-    results = cursor.fetchall()
-    print(results[0][2])
-    conn.close()
-    if(results and sort):
-        sorted_vessels = sorted(
-            results,
-            key=lambda x: datetime.strptime(x[2], "%Y-%m-%dT%H:%M:%S.%f"),
-            reverse=True
-        )
-        return sorted_vessels
-    return results
-
-
-
-def query_fleets(searchQuery: dict):
-    conn = _get_sqlite_connection()
-    cursor = conn.cursor()
-    for key, value in searchQuery.items():
-        cursor.execute(f"SELECT * FROM fleets WHERE {key} = ?", (value,))
-    results = cursor.fetchall()
-    conn.close()
-    return results
-
-
-
-def query_vessels(searchQuery: dict):
-    conn = _get_sqlite_connection()
-    cursor = conn.cursor()
-    for key, value in searchQuery.items():
-        cursor.execute(f"SELECT * FROM vessels WHERE {key} = ?", (value,))
-    results = cursor.fetchall()
-    conn.close()
-    return results
-
-
+        # Connect
+        conn = psycopg.connect(**db_config)
+        return conn
+        
+    except Exception as e:
+        print("Error:")
+        print(e)
 
 
 
 ######################################### Functions for planes ##########################################
 
-
 def query_adsb_positions(searchQuery: dict, sort=False):
-    conn = _get_sqlite_connection_asdb()
+    conn = get_conn()
     cursor = conn.cursor()
+
+    prompt = "SELECT * FROM adsb_positions WHERE "
     for key, value in searchQuery.items():
-        cursor.execute(f"SELECT * FROM adsb_positions WHERE {key} = ?", (value,))
+        prompt += f"{key} = %s AND "
+    prompt = prompt[:-5] + ";"  # Remove trailing ' AND ' and add semicolon
+    
+    cursor.execute(prompt, tuple(searchQuery.values()))
     results = cursor.fetchall()
     conn.close()
     if results and sort:
@@ -104,3 +62,6 @@ def query_adsb_positions(searchQuery: dict, sort=False):
     return results
 
 
+if (__name__ == "__main__"):
+    results = query_ais_positions({"MMSI": 368011000})
+    print(results)

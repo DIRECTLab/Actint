@@ -232,3 +232,6 @@ results/
 # Slurm Results
 *.err
 *.out
+
+actint-backend/.env
+actint-backend/src/backend/mcp_servers/ais/test.py

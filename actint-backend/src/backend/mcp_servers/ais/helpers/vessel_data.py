@@ -5,13 +5,14 @@ from typing import Optional
 class VesselPosition:
     """Represents a vessel's position at a point in time."""
     mmsi: int
-    vessel_name: str
     timestamp: str
     lat: float
     lon: float
     sog: Optional[float] = None  # Speed Over Ground
     cog: Optional[float] = None  # Course Over Ground
     heading: Optional[float] = None
+    status: Optional[int] = None
+    cargo: Optional[str] = None
     
     def to_context_string(self) -> str:
         """Format position as a human-readable context string."""
