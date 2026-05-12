@@ -366,11 +366,6 @@ If this was a very minor typo, please proceed with the most accurate option, oth
 # def query_database(sql_query: str, max_rows: int | str = 200) -> str:               
 #     """Execute a read-only SQL query against the AIS database and return results.
     
-#     Args:
-#         sql_query (str): Read-only SQL query to execute (SELECT / WITH ... SELECT)
-#         max_rows (int): Maximum number of rows to return (default: 200)
-    
-#     Returns:
 #         str: JSON with query results and column names, or error message
 #     """
 #     try:

@@ -25,11 +25,11 @@ except ImportError:
 
 try:
     import reverse_geocoder as rg
-    HAS_REVERSE_GEOCODER = True
 except ImportError:
-    HAS_REVERSE_GEOCODER = False
-
 from backend.mcp_servers.ais.helpers.vessel_query import query_static_data_helper, get_vessel_latest_location_helper, get_vessel_position_history_helper
+=======
+from backend.mcp_servers.ais.helpers.vessel_query import query_static_data_helper, get_vessel_latest_location_helper
+>>>>>>> master
 
 
 def get_vessel_general_information_helper(mmsi: str):
@@ -76,7 +76,6 @@ def get_vessel_locations_helper(mmsi: str, page: str = '1') -> str:
     positions_prompt = (
         "Idx | Latitude  | Longitude   | SOG (kt) | COG (deg) | Time\n"
         "----+-----------+-------------+----------+-----------+----------\n"
-    )
 
     for i, position in enumerate(indexed_positions, start=start_index + 1):
         time_str = position["basedatetime"].strftime("%H:%M:%S")
@@ -115,8 +114,6 @@ def identify_maritime_region_helper(lat: float, lon: float) -> Optional[str]:
         
         # Handle regions crossing the date line
         if bounds["lon_min"] > bounds["lon_max"]:
-            # Region crosses date line (e.g., Bering Sea)
-            in_lon = lon >= bounds["lon_min"] or lon <= bounds["lon_max"]
         else:
             in_lon = bounds["lon_min"] <= lon <= bounds["lon_max"]
         
