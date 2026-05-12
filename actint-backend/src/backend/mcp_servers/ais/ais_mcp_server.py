@@ -313,7 +313,7 @@ def get_database_info() -> str:                                                 
         if not sqlite_path.exists():
             return json.dumps({"error": f"SQLite database not found at {sqlite_path}"})
 
-        conn = sqlite3.connect(str(sqlite_path))
+        conn = get_conn()
         cursor = conn.cursor()
 
         cursor.execute(
