@@ -24,12 +24,12 @@ if is_port_in_use(4317):
     SmolagentsInstrumentor().instrument()
 else:
     print(
-        "Phoenix telemetry server is not running on localhost:4317. Skipping instrumentation.",
+        "\x1b[33mPhoenix telemetry server is not running on localhost:4317. Skipping instrumentation.\033[0m",
         file=sys.stderr
     )
 
 model_id = config.MODEL_ID
-print("Model ID: " + model_id)
+print("\033[0;34mModel ID: \033[1;34m" + model_id + "\033[0m")
 
 if config.CONDA_PREFIX:
     python_path = str(Path(config.CONDA_PREFIX) / "bin" / "python")
