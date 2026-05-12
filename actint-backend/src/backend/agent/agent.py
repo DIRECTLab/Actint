@@ -1,43 +1,41 @@
+# backend/agent/agent.py
 import os
-from smolagents import ToolCallingAgent, TransformersModel, MCPClient, ActionStep, TaskStep
-
-
+import asyncio
+from smolagents import ToolCallingAgent, TransformersModel, MCPClient, AgentMaxStepsError, ActionStep, TaskStep
 from mcp import StdioServerParameters
 import sys
 from pathlib import Path
 
 from backend.config import config
 from backend.mcp_servers.ais import ais_mcp_server
+from backend.event_loop_registry import set_event_loop
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
-import sys
 import socket
 
-# Set the Hugging Face cache directory before importing Transformers
-# os.environ["HF_HOME"] = os.path.expandvars("/scratch/$USER/huggingface_cache")
 
-# Register Phoenix instrumentation
 def is_port_in_use(port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex(('localhost', port)) == 0
 
-# Register Phoenix instrumentation if server is running
+
 if is_port_in_use(4317):
     register(project_name="Map_Actint")
     SmolagentsInstrumentor().instrument()
 else:
-    print("Phoenix telemetry server is not running on localhost:4317. Skipping instrumentation.", file=sys.stderr)
+    print(
+        "Phoenix telemetry server is not running on localhost:4317. Skipping instrumentation.",
+        file=sys.stderr
+    )
 
-
-model_id = "Qwen/Qwen3.5-9B"
-#model_id = "Qwen/Qwen2-7B-Instruct"
+model_id = config.MODEL_ID
+print("Model ID: " + model_id)
 
 if config.CONDA_PREFIX:
     python_path = str(Path(config.CONDA_PREFIX) / "bin" / "python")
 else:
     python_path = sys.executable
 
-# Initialize MCP server
 server_params = StdioServerParameters(
     command=python_path,
     args=[ais_mcp_server.__file__],
@@ -48,78 +46,56 @@ server_params = StdioServerParameters(
 mcp_client = MCPClient(server_params, structured_output=False)
 ais_mcp_tools = mcp_client.get_tools()
 
-
 model = TransformersModel(
     model_id=model_id,
-    max_new_tokens=4096,
+    max_new_tokens=config.MAX_NEW_TOKENS,
 )
 
+def create_agent(
+    additional_tools: list = []
+) -> ToolCallingAgent:
+    """Creates an agent, injecting relevant tools."""
+    tools = ais_mcp_tools.copy()
+    managed_agents = []
+    if additional_tools:
+        tools.extend(additional_tools)
+        # map_agent = ToolCallingAgent(
+        #     tools=additional_tools,
+        #     model=model,
+        #     max_steps=10,
+        #     name="map_ui_agent",
+        #     description="Can show things to the user on a map. Can move, zoom, and draw basic shapes on the map."
+        # )
+        # managed_agents.append(map_agent)
+    return ToolCallingAgent(tools=tools, model=model, managed_agents=managed_agents)
 
-_agent_sessions = {}
+async def query_agent_instance(
+    agent: ToolCallingAgent,
+    query: str,
+) -> str:
+    """Entry point for both web and terminal to query an agent instance."""
 
-def get_or_create_agent(session_id: str, additional_tools: list = []) -> ToolCallingAgent:
-    """Creates or retrieves an agent for a given session, injecting relevant tools."""
-    if session_id not in _agent_sessions:
-        # Base tools that all agents get (e.g., MCP server tools)
-        tools = ais_mcp_tools.copy()
-        
-        # Inject context-specific tools (like UI tools or terminal tools)
-        if additional_tools:
-            tools.extend(additional_tools)
-            
-        _agent_sessions[session_id] = ToolCallingAgent(tools=tools, model=model)
-        
-    return _agent_sessions[session_id]
+    loop = asyncio.get_running_loop()
+    set_event_loop(loop)  # Register before entering the thread so tools can reach it
 
-async def query_agent(query: str, session_id: str, additional_tools: list = None):
-    """Entry point for both web and terminal to query their respective agent."""
-    agent = get_or_create_agent(session_id, additional_tools)
-    response = agent.run(query, reset=False)
-    
-    # print(agent.memory.get_full_steps())
-    instructions = "You are a summarization agent. Keep a relevant but consise summarization of the agent's memory while retaining the most important information."
-    summarization = summarize_last_turn(instructions, session_id)
-    print("\n\n\n\n\nSummary of agent's memory: \n\n\n\n\n", summarization, file=sys.stderr)
-    
-    return response
-
-def remove_agent_session(session_id: str):
-    if session_id in _agent_sessions:
-        del _agent_sessions[session_id]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    try:
+        result = await loop.run_in_executor(
+            None, lambda: agent.run(query, reset=False)
+        )
+        return result
+    except AgentMaxStepsError:
+        print(f"Agent hit max steps.", file=sys.stderr)
+        return "Agent failed to respond: maximum steps exceeded."
+    except Exception as e:
+        print(f"Agent error: {e}", file=sys.stderr)
+        return f"Agent encountered an error: {str(e)}"
 
 #======================================Summarization Agent==================================#
 
-def summarize_last_turn(instructions: str, session_id: str):
+def summarize_last_turn(instructions: str, agent: ToolCallingAgent):
     summarization_tools = []  # Define any tools specific to summarization if needed
 
-    agent_memory = _agent_sessions.get(session_id).memory if session_id in _agent_sessions else None
+    agent_memory = agent.memory
     first_step = None
     if not agent_memory: 
         return "Invalid session ID. No existing agent with that ID."
@@ -176,15 +152,3 @@ def create_prompt(instructions, steps_to_summarize):
             prompt += f"Final Response:\n{step.final_response}"
 
     return prompt
-
-
-
-def get_last_turn_index(agent_memory):
-    # agent.memory.messages contains the full conversation history
-    messages = agent_memory.messages
-    
-    # Iterate backwards to find the last 'user' role
-    for i in range(len(messages) - 1, -1, -1):
-        if messages[i]['role'] == 'user':
-            return i
-    return None

@@ -1,10 +1,20 @@
 import sys
+import asyncio
 from datetime import datetime
 
-from backend.agent.agent import remove_agent_session, query_agent
+from backend.agent.agent import create_agent, query_agent_instance
 from backend.ui_tools.map_edit_tools import ZoomTool, DrawCircleTool, DrawLineTool, DrawRectangleTool
 from backend.transport.connection import sio, app
 from backend.config import config
+from backend.event_loop_registry import set_event_loop
+
+user_agents = {}
+
+@sio.event
+async def connect(sid, environ):
+    set_event_loop(asyncio.get_event_loop())
+    print(f"User {sid} connected! New user.", file=sys.stderr)
+
 
 # ==================================================
 # Chat Manager
@@ -13,32 +23,37 @@ from backend.config import config
 @sio.on("recieve_message")
 async def handle_agent_query(sid, data):
     user_text = data.get("message", "")
-    
-    # Define transport-specific tools tied to this UI session
-    ui_tools = [
-        ZoomTool(sid, sio), 
-        DrawRectangleTool(sid, sio), 
-        DrawCircleTool(sid, sio), 
-        DrawLineTool(sid, sio)
-    ]
-    
-    # Pass them into the generic query function
-    agent_response_text = await query_agent(user_text, session_id=sid, additional_tools=ui_tools)
-    
+
+    if sid not in user_agents:
+        print(f"Creating new agent for new user {sid}.", file=sys.stderr)
+        ui_tools = [
+            ZoomTool(sid, sio),
+            DrawRectangleTool(sid, sio),
+            DrawCircleTool(sid, sio),
+            DrawLineTool(sid, sio),
+        ]
+        user_agents[sid] = create_agent(additional_tools=ui_tools)
+    else:
+        print(f"Using existing agent for returning user {sid}.", file=sys.stderr)
+
+    agent_response_text = await query_agent_instance(
+        user_agents[sid], user_text
+    )
+
     new_msg = {
-        "message": agent_response_text,
-        "sentTime": datetime.now().strftime("%H:%M:%S"), # Dynamic time
-        "sender": 'ChatBot',
-        "direction": 'incoming',
-        "position": 'single',
+        "message": agent_response_text or "Agent failed to respond.",
+        "sentTime": datetime.now().strftime("%H:%M:%S"),
+        "sender": "ChatBot",
+        "direction": "incoming",
+        "position": "single",
     }
 
-    # Send the response back to the specific client
     await sio.emit("send_response", new_msg, to=sid)
 
 
 @sio.event
 async def disconnect(sid):
     print(f"User {sid} left.", file=sys.stderr)
-    remove_agent_session(sid)
+    if sid in user_agents:
+        del user_agents[sid]
 
