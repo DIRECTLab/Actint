@@ -237,3 +237,5 @@ results/
 actint-backend/.env
 actint-backend/.env.example
 actint-backend/src/backend/mcp_servers/ais/test.py
+
+*.png
