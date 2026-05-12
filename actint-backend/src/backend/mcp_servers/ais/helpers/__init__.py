@@ -1,6 +1,6 @@
 """Tools module for ACTINT LLM."""
 
-from backend.mcp_servers.ais.helpers.get_general_ship_context import (
+from backend.mcp_servers.ais.helpers.ship_context import (
     get_vessel_general_information_helper,
     identify_maritime_region_helper,
     identify_nearest_port_helper,

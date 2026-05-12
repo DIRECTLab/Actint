@@ -22,7 +22,7 @@ import sys
 
 # Import tool functions from parent package
 from backend.mcp_servers.ais.helpers.previous_locations import ship_following
-from backend.mcp_servers.ais.helpers.get_general_ship_context import (
+from backend.mcp_servers.ais.helpers.ship_context import (
     get_vessel_general_information_helper,
     # get_location_context_helper as get_geolocation_context_helper,
     # get_distance_between as calc_distance_between,
@@ -67,7 +67,7 @@ mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 
 
 @mcp.tool()
-def get_vessel_mmsi(vessel_name: str) -> int:
+def get_vessel_mmsi(vessel_name: str) -> str:
     """Get the MMSI for a given vessel.
 
     Args:
@@ -89,7 +89,7 @@ def get_vessel_mmsi(vessel_name: str) -> int:
         return f"""
 Could not find the mmsi for vessel {vessel_name}.
 
-Here are a list of all the vessels' names:
+Vessels with the most similar names are:
 {similar_names_str}
 
 If this was a very minor typo, please proceed with the most accurate option, otherwise alert the user that their input was invalid and give them examples of valid vessel names.
@@ -127,6 +127,38 @@ If this was a very minor typo, please proceed with the most accurate option, oth
         return "Error:\n" + e
 
     return general_information
+
+
+# @mcp.tool() # I need to make this so that it doesn't give me a buttload of locations that caused autistic siezures with the AI
+# def get_vessel_locations(mmsi: int | str) -> str:
+#     """Get all recorded positions for a specific vessel identified by MMSI.
+    
+#     Args:
+#         mmsi (int): Maritime Mobile Service Identity number of the vessel
+    
+#     Returns:
+#         str: JSON list of vessel positions with coordinates, timestamps, and speed data
+#     """
+#     print("started")
+#     try:
+#         mmsi = int(mmsi)
+#         locations = get_vessel_position_history(mmsi)
+#         data = [
+#             {
+#                 "timestamp": loc.timestamp,
+#                 "latitude": loc.lat,
+#                 "longitude": loc.lon,
+#                 "speed_over_ground": loc.sog,
+#                 "course_over_ground": loc.cog,
+#                 "heading": loc.heading,
+#             }
+#             for loc in locations
+#         ]
+#         result_data = { "mmsi": mmsi, "positions": data}
+#         # return json.dumps(result_data, indent=2)
+#         return result_data
+#     except Exception as e:
+#         return json.dumps({"error": str(e)})
 
 
 
@@ -542,37 +574,6 @@ def query_database(sql_query: str, max_rows: int | str = 200) -> str:
 #     except Exception as e:
 #         return json.dumps({"error": str(e)})
 
-
-# @mcp.tool() # I need to make this so that it doesn't give me a buttload of locations that caused autistic siezures with the AI
-# def get_vessel_locations(mmsi: int | str) -> str:
-#     """Get all recorded positions for a specific vessel identified by MMSI.
-    
-#     Args:
-#         mmsi (int): Maritime Mobile Service Identity number of the vessel
-    
-#     Returns:
-#         str: JSON list of vessel positions with coordinates, timestamps, and speed data
-#     """
-#     print("started")
-#     try:
-#         mmsi = int(mmsi)
-#         locations = get_vessel_position_history(mmsi)
-#         data = [
-#             {
-#                 "timestamp": loc.timestamp,
-#                 "latitude": loc.lat,
-#                 "longitude": loc.lon,
-#                 "speed_over_ground": loc.sog,
-#                 "course_over_ground": loc.cog,
-#                 "heading": loc.heading,
-#             }
-#             for loc in locations
-#         ]
-#         result_data = { "mmsi": mmsi, "positions": data}
-#         # return json.dumps(result_data, indent=2)
-#         return result_data
-#     except Exception as e:
-#         return json.dumps({"error": str(e)})
 
 
 #@mcp.tool()

@@ -32,7 +32,8 @@ except ImportError:
 from backend.mcp_servers.ais.helpers.vessel_query import query_static_data_helper, get_vessel_latest_location_helper
 
 
-def get_vessel_general_information_helper(mmsi: int):
+def get_vessel_general_information_helper(mmsi: str):
+    mmsi = int(mmsi)
     vessel_info = query_static_data_helper({"mmsi": mmsi})
     if vessel_info:
         vessel_info = vessel_info[0]

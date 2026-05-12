@@ -1,7 +1,7 @@
 from backend.mcp_servers.utils.important_locations import *
 from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_position_history_helper, get_vessel_latest_location_helper
 from backend.mcp_servers.utils.distance_calculation import calculate_bearing, haversine_distance_nm
-from backend.mcp_servers.ais.helpers.get_general_ship_context import identify_maritime_region_helper, identify_maritime_region_helper
+from backend.mcp_servers.ais.helpers.ship_context import identify_maritime_region_helper, identify_maritime_region_helper
 from datetime import datetime, timedelta
 import math
 
