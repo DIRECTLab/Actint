@@ -38,7 +38,7 @@ def fetch_counts() -> np.ndarray:
         with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
             cur.execute("""
                 SELECT traversal_count
-                FROM heatmap_h3_res7_routes
+                FROM heatmap_h3_res6_routes
             """)
             rows = cur.fetchall()
 
@@ -58,7 +58,7 @@ def plot_traversal_histogram(count):
 
     plt.hist(
         log_counts,
-        bins=100,
+        bins=500,
         log=True
     )
 
@@ -69,7 +69,7 @@ def plot_traversal_histogram(count):
     plt.grid(True)
 
     plt.savefig(
-        "traversal_histogram_loglog.png",
+        "traversal_histogram_log.png",
         dpi=300,
         bbox_inches="tight"
     )
@@ -86,7 +86,7 @@ def plot_traversal_histogram_raw(count):
 
     plt.hist(
         counts,
-        bins=100,
+        bins=500,
         log=True
     )
 
@@ -97,7 +97,7 @@ def plot_traversal_histogram_raw(count):
     plt.grid(True)
 
     plt.savefig(
-        "traversal_histogram_raw_logy.png",
+        "traversal_histogram_raw.png",
         dpi=300,
         bbox_inches="tight"
     )
