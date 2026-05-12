@@ -8,7 +8,7 @@ import { vehicles_current_positions, vehicles_previous_positions } from "@/types
 
 
 // ********************************************** Components *********************************************//
-import SimSettings from '../components/sim_settings(deprecated)';
+//import SimSettings from '../components/sim_settings(deprecated)';
 import { Chat } from '../components/chat';
 import dynamic from "next/dynamic";
 
