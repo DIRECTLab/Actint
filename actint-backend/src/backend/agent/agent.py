@@ -21,7 +21,7 @@ def is_port_in_use(port: int) -> bool:
 
 
 if is_port_in_use(4317):
-    register(project_name="Map_Actint")
+    register(project_name="Multiagent")
     SmolagentsInstrumentor().instrument()
 else:
     print(
