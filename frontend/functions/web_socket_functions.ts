@@ -1,82 +1,72 @@
-import { SimulationSettingsTyp } from '@/types/simulationSettings'
-import { initializeVehicleData, update_position } from "./vehicle_position_functions";
-import { vehicles_current_positions, vehicles_previous_positions } from "@/types/vehicleSettings";
 import { socket } from "@/defaults/web_socket";
 
+export type ConnectionStatus =
+  | "connected"
+  | "disconnected_by_server"
+  | "disconnected_by_client"
+  | "connection_lost"
+  | "connection_error";
 
+type ConnectionProps = {
+  setConnectionStatus: React.Dispatch<React.SetStateAction<ConnectionStatus>>;
+};
+
+const DISCONNECT_REASON_MAP: Record<string, ConnectionStatus> = {
+  "io server disconnect": "disconnected_by_server",
+  "io client disconnect": "disconnected_by_client",
+  "ping timeout": "connection_lost",
+  "transport close": "connection_lost",
+  "transport error": "connection_error",
+};
+
+export const CONNECTION_STATUS_MESSAGES: Record<ConnectionStatus, string> = {
+  connected: "Connected to server.",
+  disconnected_by_server: "Disconnected: the server closed the connection.",
+  disconnected_by_client: "Disconnected: client initiated disconnect.",
+  connection_lost: "Connection lost. The server may be unreachable.",
+  connection_error: "A transport error occurred. Check your network.",
+};
+
+export const create_connection_listeners = ({
+  setConnectionStatus,
+}: ConnectionProps) => {
+  socket.on("connect", () => {
+    setConnectionStatus("connected");
+  });
+
+  socket.on("disconnect", (reason) => {
+    const status =
+      DISCONNECT_REASON_MAP[reason] ?? "connection_lost";
+    setConnectionStatus(status);
+  });
+};
 
 type Props1 = {
   handleManualMove: (lat: number, lng: number, zoom: number) => void;
-  setAI_objects: React.Dispatch<React.SetStateAction<any[]>>,
-}
+  setAI_objects: React.Dispatch<React.SetStateAction<any[]>>;
+};
 
-export const create_map_functions = ({handleManualMove, setAI_objects}: Props1) =>{
+export const create_map_functions = ({
+  handleManualMove,
+  setAI_objects,
+}: Props1) => {
   socket.on("set_map_position", (data) => {
-      console.log("set map position", data);
-      handleManualMove(data.lat, data.lon, data.zoom)
+    console.log("set map position", data);
+    handleManualMove(data.lat, data.lon, data.zoom);
   });
 
   socket.on("draw_rectangle", (data) => {
-    setAI_objects(prev => [...prev, { type: "rectangle", data }]);
+    setAI_objects((prev) => [...prev, { type: "rectangle", data }]);
     console.log("set AI objects", data);
-  })
-  
+  });
+
   socket.on("draw_circle", (data) => {
-      console.log("set AI objects", data);
-      setAI_objects(prev => [...prev, { type: "circle", data }]);
-  })
+    console.log("set AI objects", data);
+    setAI_objects((prev) => [...prev, { type: "circle", data }]);
+  });
 
   socket.on("draw_line", (data) => {
-      console.log("set AI objects", data);
-      setAI_objects(prev => [...prev, { type: "line", data }]);
-  })
-}
-
-
-
-
-
-// ***********************************Simulation web socket handling (deprecated) ********************************//
-
-// type Props2 = {
-//   simulation_settings: SimulationSettingsTyp,
-// //   VehicleCurrentPositions: vehicle_current_positions
-//   setVehicleCurrentPositions: React.Dispatch<React.SetStateAction<vehicles_current_positions>>,
-// //   VehiclePreviousPositions: vehicles_previous_positions
-//   setVehiclePreviousPositions: React.Dispatch<React.SetStateAction<vehicles_previous_positions>>,
-// };
-
-
-// export const start_simulation = ({simulation_settings, setVehicleCurrentPositions, setVehiclePreviousPositions}: Props2) => {
-//     console.log("send web crap");
-
-//     const starting_data = {
-//         "simulation_file": simulation_settings.simulation_file,
-//         "simulation_speed": simulation_settings.simulation_speed,
-//         "start_time": simulation_settings.start_time,
-//         "time_format": simulation_settings.time_format,
-//         "is_3D": simulation_settings.is_3D,
-//     }
-
-//     // Sending data
-//     socket.emit("simulation_init", starting_data);
-    
-//     // Receiving specific data
-//     socket.on("previous_data", (data) => {
-//       console.log(data);
-//       initializeVehicleData({ setVehicleCurrentPositions, setVehiclePreviousPositions, data });
-//       //go through all the data and put everything into the current and previous positons data.
-//     });
-
-//     socket.on("private_response", (data) => {
-//       console.log(data.msg);
-      
-//     });
-
-//     socket.on("new_detection", (data) => {
-//       console.log(data);
-//       update_position({ setVehicleCurrentPositions, setVehiclePreviousPositions, data });
-//       // When a new detection is recieved, replace the current destination with the new one, put the new destination at the top of the previous destinations, and get rid of the latest previous destination
-//     });
-  
-// }
+    console.log("set AI objects", data);
+    setAI_objects((prev) => [...prev, { type: "line", data }]);
+  });
+};
