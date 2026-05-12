@@ -1,12 +1,12 @@
 # backend/agent/agent.py
 import os
 import asyncio
-from smolagents import ToolCallingAgent, CodeAgent, TransformersModel, MCPClient, AgentMaxStepsError, ActionStep, TaskStep
-from mcp import StdioServerParameters
 import sys
+from backend.config import config
 from pathlib import Path
 
-from backend.config import config
+from smolagents import ToolCallingAgent, CodeAgent, TransformersModel, MCPClient, AgentMaxStepsError, ActionStep, TaskStep
+from mcp import StdioServerParameters
 from backend.mcp_servers.ais import ais_mcp_server
 from backend.mcp_servers.adsb import adsb_mcp_server
 from backend.event_loop_registry import set_event_loop
@@ -36,6 +36,7 @@ if config.CONDA_PREFIX:
     python_path = str(Path(config.CONDA_PREFIX) / "bin" / "python")
 else:
     python_path = sys.executable
+
 
 ais_server_params = StdioServerParameters(
     command=python_path,
@@ -68,37 +69,38 @@ def create_agent(
 ) -> CodeAgent:
     """Creates an agent, injecting relevant tools."""
     tools = []
-    # tools += ais_mcp_tools
-    # tools += adsb_mcp_tools
+    tools += ais_mcp_tools
+    tools += adsb_mcp_tools
     
-    ais_agent = ToolCallingAgent(
-        tools=ais_mcp_tools,
-        model=model,
-        max_steps=20,
-        name="martime_data_agent",
-        description="Can query a database of AIS information (including position, heading, speed, etc.) and do calculations with that data."
-    )
+    # ais_agent = CodeAgent(
+    #     tools=ais_mcp_tools,
+    #     model=model,
+    #     max_steps=20,
+    #     name="martime_data_agent",
+    #     description="Can query a database of AIS information (including position, heading, speed, etc.) and do calculations with that data."
+    # )
 
-    adsb_agent = ToolCallingAgent(
-        tools=adsb_mcp_tools,
-        model=model,
-        max_steps=20,
-        name="aviation_data_agent",
-        description="Can query a database of ADS-B information and do calculations with that data."
-    )
+    # adsb_agent = CodeAgent(
+    #     tools=adsb_mcp_tools,
+    #     model=model,
+    #     max_steps=20,
+    #     name="aviation_data_agent",
+    #     description="Can query a database of ADS-B information and do calculations with that data."
+    # )
 
-    managed_agents = [ais_agent, adsb_agent]
+    # managed_agents = [ais_agent, adsb_agent]
+    managed_agents = []
     
     if additional_tools:
         tools.extend(additional_tools)
-        map_agent = ToolCallingAgent(
-            tools=additional_tools,
-            model=model,
-            max_steps=10,
-            name="map_ui_agent",
-            description="Can show things to the user on a map. Can move, zoom, and draw basic shapes on the map."
-        )
-        managed_agents.append(map_agent)
+        # map_agent = ToolCallingAgent(
+        #     tools=additional_tools,
+        #     model=model,
+        #     max_steps=10,
+        #     name="map_ui_agent",
+        #     description="Can show things to the user on a map. Can move, zoom, and draw basic shapes on the map."
+        # )
+        # managed_agents.append(map_agent)
 
     
     return CodeAgent(tools=tools, model=model, managed_agents=managed_agents)

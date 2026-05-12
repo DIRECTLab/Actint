@@ -309,9 +309,9 @@ def get_database_info() -> str:                                                 
         str: JSON object containing database path and a list of tables with columns.
     """
     try:
-        sqlite_path = _resolve_sqlite_path()
-        if not sqlite_path.exists():
-            return json.dumps({"error": f"SQLite database not found at {sqlite_path}"})
+        # sqlite_path = _resolve_sqlite_path()
+        # if not sqlite_path.exists():
+        #     return json.dumps({"error": f"SQLite database not found at {sqlite_path}"})
 
         conn = get_conn()
         cursor = conn.cursor()
