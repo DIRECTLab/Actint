@@ -38,3 +38,5 @@ huggingface_hub[mcp]
 
 #sockets for LLM streaming and data transfer
 python-socketio>=5.15
+
+rapidfuzz>=3.14

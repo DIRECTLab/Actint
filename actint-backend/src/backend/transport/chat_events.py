@@ -1,4 +1,3 @@
-import uvicorn
 import sys
 import asyncio
 from datetime import datetime
@@ -58,5 +57,3 @@ async def disconnect(sid):
     if sid in user_agents:
         del user_agents[sid]
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=config.WEB_SOCKET_PORT)

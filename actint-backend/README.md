@@ -31,12 +31,36 @@ conda create -n actint python=3.12 -y
 conda activate actint
 pip install -e ./actint-backend
 ```
+## Phoenix
 
-## Usage
+This agent reports everything it does to a phoenix server. 
 
-Run backend modules through the package namespace:
+To run the phoenix server: 
+1. Be sure to run this through a Visual Studio Code terminal becuase it does all of the port forwarding for this server
+2. Make sure that you are running this in the actint conda environment
+
+Once those requirements are satisfied, run the phoenix server with
+```
+python -m phoenix.server.main serve
+```
+
+You can then ctrl click on the ip address and port in the vs code terminal to visit the web page.
+
+## Running the agent
+
+Before running the agent, run a phoenix server in a Visual Studio code terminal
+In VS Code:
+```
+conda activate actint 
+python -m phoenix.server.main serve
+```
+
+Then in a seperate terminal with the actint conda environment active,
+run backend modules through the package namespace:
 
 ```bash
+source ~/.bashrc
+conda activate actint
 python -m backend.benchmarking.benchmark_agents --run-all-benchmarks
 python -m backend.agent.agent
 ```

@@ -1,7 +1,7 @@
 # backend/agent/agent.py
 import os
 import asyncio
-from smolagents import ToolCallingAgent, TransformersModel, MCPClient, AgentMaxStepsError
+from smolagents import ToolCallingAgent, TransformersModel, MCPClient, AgentMaxStepsError, ActionStep, TaskStep
 from mcp import StdioServerParameters
 import sys
 from pathlib import Path
@@ -89,3 +89,66 @@ async def query_agent_instance(
     except Exception as e:
         print(f"Agent error: {e}", file=sys.stderr)
         return f"Agent encountered an error: {str(e)}"
+
+#======================================Summarization Agent==================================#
+
+def summarize_last_turn(instructions: str, agent: ToolCallingAgent):
+    summarization_tools = []  # Define any tools specific to summarization if needed
+
+    agent_memory = agent.memory
+    first_step = None
+    if not agent_memory: 
+        return "Invalid session ID. No existing agent with that ID."
+    first_step = None
+    if agent_memory.steps:
+        for num, step in enumerate(reversed(agent_memory.steps[-config.MAX_AGENT_STEPS:])):
+            print(type(step))
+            if isinstance(step, TaskStep):
+                first_step = len(agent_memory.steps) - num - 1
+                break
+    else: 
+        first_step = 0
+
+    if first_step == None:
+        return "Unable to summarize the last turn."
+
+    steps_to_summarize = agent_memory.steps[first_step:]
+    prompt = create_prompt(instructions, steps_to_summarize)
+
+    summarizer_agent = ToolCallingAgent(tools=summarization_tools, model=model)
+    import time
+    start_time = time.time()
+    summary = summarizer_agent.run(prompt, reset=True)
+    end_time = time.time()
+    time_taken = end_time - start_time
+    summarized_step = ActionStep(
+        model_output=f"Summary of previous operations: {summary}",
+        observations="Multi-step execution condensed for memory efficiency.",
+        is_final_answer=True,
+        timing=time_taken,
+        step_number=1,
+    )
+    del agent_memory.steps[first_step + 1:] #Keep the user's original query, just summarize the AI slop
+    agent_memory.steps.append(summarized_step)
+    print(summary)
+    return "Success"
+    
+
+def create_prompt(instructions, steps_to_summarize):
+    prompt = instructions
+    for num, step in enumerate(steps_to_summarize): 
+        prompt += f"\n\n==Step {num + 1}==\n"
+        if getattr(step, 'task', None):
+            prompt += f"Task:\n{step.task}\n\n"
+        if getattr(step, 'model_output', None):
+            prompt += f"Model Thought:\n{step.model_output}\n\n"
+        if getattr(step, 'tool_calls', None):
+            prompt += f"Tool Calls:\n{step.tool_calls}\n\n"
+        if getattr(step, 'model_action', None):
+            prompt += f"Model Action:\n{step.model_action}\n\n"
+        if getattr(step, 'action_output', None):
+            prompt += f"Action Output:{step.action_output}\n\n"
+        if getattr(step, 'final_response', None):
+            prompt += f"Final Response:\n{step.final_response}"
+
+    return prompt
