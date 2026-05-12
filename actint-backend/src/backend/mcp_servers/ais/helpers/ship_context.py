@@ -13,7 +13,7 @@ from typing import Optional, Tuple
 from functools import lru_cache
 from backend.mcp_servers.utils.distance_calculation import haversine_distance_nm, calculate_bearing, bearing_to_cardinal
 from backend.mcp_servers.utils.important_locations import MARITIME_REGIONS, MAJOR_PORTS, STRATEGIC_WATERWAYS, CONTINENTS
-from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_latest_location_helper
+from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_latest_location_helper, get_all_mmsis
 from datetime import datetime
 
 try:
@@ -29,7 +29,7 @@ try:
 except ImportError:
     HAS_REVERSE_GEOCODER = False
 
-from backend.mcp_servers.ais.helpers.vessel_query import query_static_data_helper, get_vessel_latest_location_helper
+from backend.mcp_servers.ais.helpers.vessel_query import query_static_data_helper, get_vessel_latest_location_helper, get_vessel_position_history_helper
 
 
 def get_vessel_general_information_helper(mmsi: str):
@@ -46,19 +46,59 @@ def get_vessel_general_information_helper(mmsi: str):
 
 
     return_string = f"""
-    Ship Information for MMSI {mmsi}:
-    Name: {vessel_info['vesselname']}
-    Home Base: {vessel_info['homebase']}
-    Parent Command: {vessel_info['parentcommand']}
-    Fleet: {vessel_info['fleet']}
-    Last Detction:
-        Timestamp: {latest_location_info['basedatetime']}
-        Lat: {latest_location_info['lat']}, Lon: {latest_location_info['lon']}
-        Speed Over Ground: {latest_location_info['sog']} knots
-        Course Over Ground: {latest_location_info['cog']} degrees
-        Heading: {latest_location_info['heading']} degrees
-    """
+Ship Information for MMSI {mmsi}:
+Name: {vessel_info['vesselname']}
+Home Base: {vessel_info['homebase']}
+Parent Command: {vessel_info['parentcommand']}
+Fleet: {vessel_info['fleet']}
+Last Detction:
+    Timestamp: {latest_location_info['basedatetime']}
+    Lat: {latest_location_info['lat']}, Lon: {latest_location_info['lon']}
+    Speed Over Ground: {latest_location_info['sog']} knots
+    Course Over Ground: {latest_location_info['cog']} degrees
+    Heading: {latest_location_info['heading']} degrees
+"""
     return return_string
+
+
+
+def get_vessel_locations_helper(mmsi: str, page: str = '1') -> str:
+    PAGE_SIZE = 8
+    mmsi = int(mmsi)
+    page = int(page)
+    if mmsi not in get_all_mmsis():
+        raise ValueError("No valid mmsis")
+    positions = get_vessel_position_history_helper(mmsi)
+    start_index = (page - 1) * PAGE_SIZE
+    end_index = ((page) * PAGE_SIZE) - 1
+    indexed_positions = positions[start_index:end_index]
+
+    positions_prompt = (
+        "Idx | Latitude  | Longitude   | SOG (kt) | COG (deg) | Time\n"
+        "----+-----------+-------------+----------+-----------+----------\n"
+    )
+
+    for i, position in enumerate(indexed_positions, start=start_index + 1):
+        time_str = position["basedatetime"].strftime("%H:%M:%S")
+
+        positions_prompt += (
+            f"{i:>3} | "
+            f"{position['lat']:>9.5f} | "
+            f"{position['lon']:>11.5f} | "
+            f"{position['sog']:>8.1f} | "
+            f"{position['cog']:>9.1f} | "
+            f"{time_str}\n"
+        )
+
+        prompt = (
+        f"Vessel positions ({start_index + 1}-{end_index + 1})\n\n"
+        f"{positions_prompt}\n"
+        f"To retrieve the next 8 positions:\n"
+        f"  get_vessel_locations({mmsi}, {page + 1})"
+        )
+
+    return prompt
+
 
 
 

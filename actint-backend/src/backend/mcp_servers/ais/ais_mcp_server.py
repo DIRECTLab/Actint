@@ -24,6 +24,7 @@ import sys
 from backend.mcp_servers.ais.helpers.previous_locations import ship_following
 from backend.mcp_servers.ais.helpers.ship_context import (
     get_vessel_general_information_helper,
+    get_vessel_locations_helper,
     # get_location_context_helper as get_geolocation_context_helper,
     # get_distance_between as calc_distance_between,
     identify_maritime_region_helper,
@@ -113,8 +114,8 @@ def get_vessel_general_information(mmsi: str) -> str:
     except ValueError as e:
         similar_mmsis = get_similar_mmsis(str(mmsi), 4)
         similar_mmsis_str = ""
-        for mmsi in similar_mmsis:
-            similar_mmsis_str += f"- {mmsi}\n"
+        for similar_mmsi in similar_mmsis:
+            similar_mmsis_str += f"- {similar_mmsi}\n"
         return f"""
 Could not find vessel information for MMSI {mmsi}.
 
@@ -129,38 +130,37 @@ If this was a very minor typo, please proceed with the most accurate option, oth
     return general_information
 
 
-# @mcp.tool() # I need to make this so that it doesn't give me a buttload of locations that caused autistic siezures with the AI
-# def get_vessel_locations(mmsi: int | str) -> str:
-#     """Get all recorded positions for a specific vessel identified by MMSI.
+@mcp.tool() # I need to make this so that it doesn't give me a buttload of locations that caused autistic siezures with the AI
+def get_vessel_locations(mmsi: str, page: str) -> str:
+    """Get all recorded positions for a specific vessel identified by MMSI.
     
-#     Args:
-#         mmsi (int): Maritime Mobile Service Identity number of the vessel
+    Args:
+        mmsi (str): Maritime Mobile Service Identity number of the vessel
+        page (str): Page number of detections. Start with '1'.
     
-#     Returns:
-#         str: JSON list of vessel positions with coordinates, timestamps, and speed data
-#     """
-#     print("started")
-#     try:
-#         mmsi = int(mmsi)
-#         locations = get_vessel_position_history(mmsi)
-#         data = [
-#             {
-#                 "timestamp": loc.timestamp,
-#                 "latitude": loc.lat,
-#                 "longitude": loc.lon,
-#                 "speed_over_ground": loc.sog,
-#                 "course_over_ground": loc.cog,
-#                 "heading": loc.heading,
-#             }
-#             for loc in locations
-#         ]
-#         result_data = { "mmsi": mmsi, "positions": data}
-#         # return json.dumps(result_data, indent=2)
-#         return result_data
-#     except Exception as e:
-#         return json.dumps({"error": str(e)})
+    Returns:
+        A list of detections
+    """
+    print("started")
+    try:
+        result = get_vessel_locations_helper(mmsi, page)
 
+        return result
+    except ValueError as e:
+        similar_mmsis = get_similar_mmsis(str(mmsi), 4)
+        similar_mmsis_str = ""
+        for similar_mmsi in similar_mmsis:
+            similar_mmsis_str += f"- {similar_mmsi}\n"
+        return f"""
+Could not find vessel information for MMSI {mmsi}.
 
+Similar MMSIs are: 
+{similar_mmsis_str}
+
+If this was a very minor typo, please proceed with the most accurate option, otherwise alert the user that their input was invalid and give them examples of valid mmsis.
+"""
+    except Exception as e:
+        return "Error: " + str(e)
 
 
 
@@ -179,10 +179,10 @@ def identify_maritime_region(latitude: float | str, longitude: float | str) -> s
         latitude = float(latitude)
         longitude = float(longitude)
         region = identify_maritime_region_helper(latitude, longitude)
-        result = {"region": region if region else "Unknown"}
-        return json.dumps(result, indent=2)
+        result = "Region" + str(region) if region else "Region unknown"
+        return result
     except Exception as e:
-        return json.dumps({"error": str(e)})
+        return "Error" + str(e)
 
 
 @mcp.tool()
@@ -200,10 +200,10 @@ def identify_nearest_port(latitude: float | str, longitude: float | str) -> str:
         latitude = float(latitude)
         longitude = float(longitude)
         port_name, distance = identify_nearest_port_helper(latitude, longitude)
-        result = {"port_name": port_name, "distance_nm": distance}
+        result = "Port name:" + str(port_name) + "\tDistance:" + str(distance)
         return json.dumps(result, indent=2)
     except Exception as e:
-        return json.dumps({"error": str(e)})
+        return "Error" + str(e)
 
 
 @mcp.tool()
@@ -221,10 +221,10 @@ def identify_nearest_waterway(latitude: float | str, longitude: float | str) -> 
         latitude = float(latitude)
         longitude = float(longitude)
         waterway_name, distance = identify_nearest_waterway_helper(latitude, longitude)
-        result = {"waterway_name": waterway_name, "distance_nm": distance}
-        return json.dumps(result, indent=2)
+        result = "Waterwau Name:" + str(waterway_name) + "Distance:" + str(distance)
+        return result
     except Exception as e:
-        return json.dumps({"error": str(e)})
+        return "Error" + str(e)
 
 
 # ============================================================================
@@ -258,7 +258,7 @@ Similar fleets are:
 If this was a very minor typo, please proceed with the most accurate option, otherwise alert the user that their input was invalid and give them examples of valid fleets.
 """
     except Exception as e:
-        return str(e)
+        return "Error" + str(e)
 
 
 
@@ -267,176 +267,176 @@ If this was a very minor typo, please proceed with the most accurate option, oth
 # Tools: Destination Prediction
 # ============================================================================
 
-@mcp.tool()
-def get_vessel_destination(mmsi: int | str, number_detections: int | str = 300) -> str:         # This might need to be modified to use the ship's heading and course over ground instead of this. 
-    """Predict where a vessel is heading based on recent trajectory.
+# @mcp.tool()
+# def get_vessel_destination(mmsi: int | str, number_detections: int | str = 300) -> str:         # This might need to be modified to use the ship's heading and course over ground instead of this. 
+#     """Predict where a vessel is heading based on recent trajectory.
     
-    Args:
-        mmsi (int): MMSI of the vessel
-        number_detections (int): Number of recent position detections to consider (default: 300)
+#     Args:
+#         mmsi (int): MMSI of the vessel
+#         number_detections (int): Number of recent position detections to consider (default: 300)
     
-    Returns:
-        str: JSON with analysis result and note about trajectory analysis
-    """
-    try:
-        mmsi = int(mmsi)
-        number_detections = int(number_detections)
-        calculate_vector_and_distance_sum(mmsi, number_detections)
-        result = {
-            "mmsi": mmsi,
-            "note": "Destination analysis completed. See server logs for trajectory analysis."
-        }
-        return json.dumps(result, indent=2)
-    except Exception as e:
-        return json.dumps({"error": str(e)})
+#     Returns:
+#         str: JSON with analysis result and note about trajectory analysis
+#     """
+#     try:
+#         mmsi = int(mmsi)
+#         number_detections = int(number_detections)
+#         calculate_vector_and_distance_sum(mmsi, number_detections)
+#         result = {
+#             "mmsi": mmsi,
+#             "note": "Destination analysis completed. See server logs for trajectory analysis."
+#         }
+#         return json.dumps(result, indent=2)
+#     except Exception as e:
+#         return json.dumps({"error": str(e)})
 
 
-# ============================================================================
-# Tools: Database Introspection
-# ============================================================================
+# # ============================================================================
+# # Tools: Database Introspection
+# # ============================================================================
 
-def _quote_sqlite_identifier(identifier: str) -> str:
-    """Safely quote a SQLite identifier (table/column name) using double quotes."""
-    return '"' + (identifier or "").replace('"', '""') + '"'
+# def _quote_sqlite_identifier(identifier: str) -> str:
+#     """Safely quote a SQLite identifier (table/column name) using double quotes."""
+#     return '"' + (identifier or "").replace('"', '""') + '"'
 
 
-@mcp.tool()
-def get_database_info() -> str:                                                     # This should maybe be in a helper function or in the system prompt
-    """Get basic SQLite database schema info (tables and column definitions).
+# @mcp.tool()
+# def get_database_info() -> str:                                                     # This should maybe be in a helper function or in the system prompt
+#     """Get basic SQLite database schema info (tables and column definitions).
 
-    Returns:
-        str: JSON object containing database path and a list of tables with columns.
-    """
-    try:
-        sqlite_path = _resolve_sqlite_path()
-        if not sqlite_path.exists():
-            return json.dumps({"error": f"SQLite database not found at {sqlite_path}"})
+#     Returns:
+#         str: JSON object containing database path and a list of tables with columns.
+#     """
+#     try:
+#         sqlite_path = _resolve_sqlite_path()
+#         if not sqlite_path.exists():
+#             return json.dumps({"error": f"SQLite database not found at {sqlite_path}"})
 
-        conn = sqlite3.connect(str(sqlite_path))
-        cursor = conn.cursor()
+#         conn = sqlite3.connect(str(sqlite_path))
+#         cursor = conn.cursor()
 
-        cursor.execute(
-            "SELECT name FROM sqlite_master "
-            "WHERE type='table' AND name NOT LIKE 'sqlite_%' "
-            "ORDER BY name;"
-        )
-        table_names = [r[0] for r in cursor.fetchall()]
+#         cursor.execute(
+#             "SELECT name FROM sqlite_master "
+#             "WHERE type='table' AND name NOT LIKE 'sqlite_%' "
+#             "ORDER BY name;"
+#         )
+#         table_names = [r[0] for r in cursor.fetchall()]
 
-        tables: list[dict] = []
-        for table_name in table_names:
-            quoted = _quote_sqlite_identifier(table_name)
-            cursor.execute(f"PRAGMA table_info({quoted});")
-            # PRAGMA table_info returns: cid, name, type, notnull, dflt_value, pk
-            columns = []
-            for cid, name, col_type, notnull, dflt_value, pk in cursor.fetchall():
-                columns.append(
-                    {
-                        "cid": cid,
-                        "name": name,
-                        "type": col_type,
-                        "notnull": bool(notnull),
-                        "default": dflt_value,
-                        "pk": bool(pk),
-                    }
-                )
+#         tables: list[dict] = []
+#         for table_name in table_names:
+#             quoted = _quote_sqlite_identifier(table_name)
+#             cursor.execute(f"PRAGMA table_info({quoted});")
+#             # PRAGMA table_info returns: cid, name, type, notnull, dflt_value, pk
+#             columns = []
+#             for cid, name, col_type, notnull, dflt_value, pk in cursor.fetchall():
+#                 columns.append(
+#                     {
+#                         "cid": cid,
+#                         "name": name,
+#                         "type": col_type,
+#                         "notnull": bool(notnull),
+#                         "default": dflt_value,
+#                         "pk": bool(pk),
+#                     }
+#                 )
 
-            tables.append({"name": table_name, "columns": columns})
+#             tables.append({"name": table_name, "columns": columns})
 
-        conn.close()
+#         conn.close()
 
-        return json.dumps(
-            {
-                "db_path": str(sqlite_path),
-                "table_count": len(tables),
-                "tables": tables,
-            },
-            indent=2,
-        )
-    except sqlite3.Error as e:
-        return json.dumps({"error": f"Database error: {str(e)}"})
-    except Exception as e:
-        return json.dumps({"error": f"Introspection error: {str(e)}"})
+#         return json.dumps(
+#             {
+#                 "db_path": str(sqlite_path),
+#                 "table_count": len(tables),
+#                 "tables": tables,
+#             },
+#             indent=2,
+#         )
+#     except sqlite3.Error as e:
+#         return json.dumps({"error": f"Database error: {str(e)}"})
+#     except Exception as e:
+#         return json.dumps({"error": f"Introspection error: {str(e)}"})
 
 
 # ============================================================================
 # Tools: Database Query
 # ============================================================================
 
-@mcp.tool()
-def query_database(sql_query: str, max_rows: int | str = 200) -> str:               
-    """Execute a read-only SQL query against the AIS database and return results.
+# @mcp.tool()
+# def query_database(sql_query: str, max_rows: int | str = 200) -> str:               
+#     """Execute a read-only SQL query against the AIS database and return results.
     
-    Args:
-        sql_query (str): Read-only SQL query to execute (SELECT / WITH ... SELECT)
-        max_rows (int): Maximum number of rows to return (default: 200)
+#     Args:
+#         sql_query (str): Read-only SQL query to execute (SELECT / WITH ... SELECT)
+#         max_rows (int): Maximum number of rows to return (default: 200)
     
-    Returns:
-        str: JSON with query results and column names, or error message
-    """
-    try:
-        max_rows = int(max_rows)
-        query = (sql_query or "").strip()
-        if not query:
-            return json.dumps({"error": "sql_query is required"})
+#     Returns:
+#         str: JSON with query results and column names, or error message
+#     """
+#     try:
+#         max_rows = int(max_rows)
+#         query = (sql_query or "").strip()
+#         if not query:
+#             return json.dumps({"error": "sql_query is required"})
 
-        # Guardrails: read-only, single-statement queries only
-        ql = query.lower().lstrip()
-        if not (ql.startswith("select") or ql.startswith("with")):
-            return json.dumps({"error": "Only read-only SELECT queries are allowed"})
+#         # Guardrails: read-only, single-statement queries only
+#         ql = query.lower().lstrip()
+#         if not (ql.startswith("select") or ql.startswith("with")):
+#             return json.dumps({"error": "Only read-only SELECT queries are allowed"})
 
-        forbidden = [
-            "insert ", "update ", "delete ", "drop ", "alter ", "create ",
-            "attach ", "detach ", "vacuum", "pragma", "reindex", "replace ",
-            "truncate ",
-        ]
-        if any(tok in ql for tok in forbidden):
-            return json.dumps({"error": "Query contains forbidden keywords"})
+#         forbidden = [
+#             "insert ", "update ", "delete ", "drop ", "alter ", "create ",
+#             "attach ", "detach ", "vacuum", "pragma", "reindex", "replace ",
+#             "truncate ",
+#         ]
+#         if any(tok in ql for tok in forbidden):
+#             return json.dumps({"error": "Query contains forbidden keywords"})
 
-        # Disallow multi-statement execution; allow a single trailing semicolon
-        if ";" in query.rstrip(";"):
-            return json.dumps({"error": "Multiple SQL statements are not allowed"})
+#         # Disallow multi-statement execution; allow a single trailing semicolon
+#         if ";" in query.rstrip(";"):
+#             return json.dumps({"error": "Multiple SQL statements are not allowed"})
 
-        if max_rows <= 0:
-            max_rows = 200
-        if max_rows > 5000:
-            max_rows = 5000
+#         if max_rows <= 0:
+#             max_rows = 200
+#         if max_rows > 5000:
+#             max_rows = 5000
 
-        conn = sqlite3.connect(str(_resolve_sqlite_path()))
-        cursor = conn.cursor()
+#         conn = sqlite3.connect(str(_resolve_sqlite_path()))
+#         cursor = conn.cursor()
 
-        cursor.execute(query)
+#         cursor.execute(query)
         
-        # Get column names
-        columns = [description[0] for description in cursor.description] if cursor.description else []
+#         # Get column names
+#         columns = [description[0] for description in cursor.description] if cursor.description else []
         
-        # Fetch bounded results
-        rows = cursor.fetchmany(max_rows + 1)
+#         # Fetch bounded results
+#         rows = cursor.fetchmany(max_rows + 1)
         
-        # Convert rows to list of dicts
-        result_list = []
-        truncated = False
-        if len(rows) > max_rows:
-            truncated = True
-            rows = rows[:max_rows]
+#         # Convert rows to list of dicts
+#         result_list = []
+#         truncated = False
+#         if len(rows) > max_rows:
+#             truncated = True
+#             rows = rows[:max_rows]
 
-        for row in rows:
-            row_dict = {col: val for col, val in zip(columns, row)}
-            result_list.append(row_dict)
+#         for row in rows:
+#             row_dict = {col: val for col, val in zip(columns, row)}
+#             result_list.append(row_dict)
         
-        conn.close()
+#         conn.close()
         
-        result = {
-            "columns": columns,
-            "row_count": len(result_list),
-            "truncated": truncated,
-            "max_rows": max_rows,
-            "rows": result_list
-        }
-        return json.dumps(result, indent=2)
-    except sqlite3.Error as e:
-        return json.dumps({"error": f"Database error: {str(e)}"})
-    except Exception as e:
-        return json.dumps({"error": f"Query error: {str(e)}"})
+#         result = {
+#             "columns": columns,
+#             "row_count": len(result_list),
+#             "truncated": truncated,
+#             "max_rows": max_rows,
+#             "rows": result_list
+#         }
+#         return json.dumps(result, indent=2)
+#     except sqlite3.Error as e:
+#         return json.dumps({"error": f"Database error: {str(e)}"})
+#     except Exception as e:
+#         return json.dumps({"error": f"Query error: {str(e)}"})
     
 
 
@@ -468,26 +468,6 @@ def query_database(sql_query: str, max_rows: int | str = 200) -> str:
 
 
 
-# @mcp.tool()                                                                   #It is probably better to do a get_ship_general_information tool and have the name included
-# def get_vessel_name(mmsi: int | str) -> str:
-#     """Get the name of a vessel given its MMSI.
-    
-#     Args:
-#         mmsi (int): Maritime Mobile Service Identity number of the vessel
-    
-#     Returns:
-#         str: The name of the vessel or an error message
-#     """
-#     try:
-#         mmsi = int(mmsi)
-#         info = get_vessel_name_helper(mmsi)
-#         if isinstance(info, dict):
-#             return info.get("vessel_name", "Unknown")
-#         else:
-#             return "No Vessel with that MMSI."
-#     except Exception as e:
-#         print(e, file=sys.stderr)
-#         return f"Error retrieving vessel name. That function does not seem to be working right now. You can try a different function or alert the user."
 
 # @mcp.tool()
 # def ship_following_analysis(mmsi1: int | str, mmsi2: int | str) -> str:
