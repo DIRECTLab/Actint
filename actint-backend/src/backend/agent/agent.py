@@ -1,7 +1,7 @@
 # backend/agent/agent.py
 import os
 import asyncio
-from smolagents import ToolCallingAgent, TransformersModel, MCPClient, AgentMaxStepsError, ActionStep, TaskStep
+from smolagents import ToolCallingAgent, CodeAgent, TransformersModel, MCPClient, AgentMaxStepsError, ActionStep, TaskStep
 from mcp import StdioServerParameters
 import sys
 from pathlib import Path
@@ -65,26 +65,46 @@ model = TransformersModel(
 
 def create_agent(
     additional_tools: list = []
-) -> ToolCallingAgent:
+) -> CodeAgent:
     """Creates an agent, injecting relevant tools."""
     tools = []
-    tools += ais_mcp_tools
-    tools += adsb_mcp_tools
-    managed_agents = []
+    # tools += ais_mcp_tools
+    # tools += adsb_mcp_tools
+    
+    ais_agent = ToolCallingAgent(
+        tools=ais_mcp_tools,
+        model=model,
+        max_steps=20,
+        name="martime_data_agent",
+        description="Can query a database of AIS information (including position, heading, speed, etc.) and do calculations with that data."
+    )
+
+    adsb_agent = ToolCallingAgent(
+        tools=adsb_mcp_tools,
+        model=model,
+        max_steps=20,
+        name="aviation_data_agent",
+        description="Can query a database of ADS-B information and do calculations with that data."
+    )
+
+    managed_agents = [ais_agent, adsb_agent]
+    
     if additional_tools:
         tools.extend(additional_tools)
-        # map_agent = ToolCallingAgent(
-        #     tools=additional_tools,
-        #     model=model,
-        #     max_steps=10,
-        #     name="map_ui_agent",
-        #     description="Can show things to the user on a map. Can move, zoom, and draw basic shapes on the map."
-        # )
-        # managed_agents.append(map_agent)
-    return ToolCallingAgent(tools=tools, model=model, managed_agents=managed_agents)
+        map_agent = ToolCallingAgent(
+            tools=additional_tools,
+            model=model,
+            max_steps=10,
+            name="map_ui_agent",
+            description="Can show things to the user on a map. Can move, zoom, and draw basic shapes on the map."
+        )
+        managed_agents.append(map_agent)
+
+    
+    return CodeAgent(tools=tools, model=model, managed_agents=managed_agents)
 
 async def query_agent_instance(
-    agent: ToolCallingAgent,
+    agent: CodeAgent,
     query: str,
 ) -> str:
     """Entry point for both web and terminal to query an agent instance."""
@@ -106,7 +126,7 @@ async def query_agent_instance(
 
 #======================================Summarization Agent==================================#
 
-def summarize_last_turn(instructions: str, agent: ToolCallingAgent):
+def summarize_last_turn(instructions: str, agent: CodeAgent):
     summarization_tools = []  # Define any tools specific to summarization if needed
 
     agent_memory = agent.memory
@@ -129,7 +149,7 @@ def summarize_last_turn(instructions: str, agent: ToolCallingAgent):
     steps_to_summarize = agent_memory.steps[first_step:]
     prompt = create_prompt(instructions, steps_to_summarize)
 
-    summarizer_agent = ToolCallingAgent(tools=summarization_tools, model=model)
+    summarizer_agent = CodeAgent(tools=summarization_tools, model=model)
     import time
     start_time = time.time()
     summary = summarizer_agent.run(prompt, reset=True)
