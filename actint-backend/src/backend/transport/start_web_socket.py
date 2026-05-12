@@ -50,17 +50,16 @@ async def handle_agent_query(sid, data):
     await sio.emit("send_response", new_msg, to=sid)
 
 @sio.on("get_heatmap")
-async def handle_get_heatmap(sid, data):
+async def handle_get_heatmap(sid):
     from backend.data_processing.heatmap import fetch_heatmap
 
     try:
-        points, max_val = fetch_heatmap()
+        points = fetch_heatmap()
 
         await sio.emit(
             "set_heatmap",
             {
                 "points": points,
-                "max": max_val,
             },
             to=sid
         )
