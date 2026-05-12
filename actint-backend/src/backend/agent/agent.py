@@ -67,6 +67,7 @@ def create_agent(
 ) -> ToolCallingAgent:
     """Creates an agent, injecting relevant tools."""
     tools = ais_mcp_tools.copy()
+    tools += adsb_mcp_tools.copy()
     managed_agents = []
     if additional_tools:
         tools.extend(additional_tools)
