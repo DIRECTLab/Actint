@@ -79,7 +79,14 @@ export default function Map({ vehiclesPreviousPositions, vehicleCurrentPositions
     }
   };
   useEffect(() => {
-    create_map_functions({handleManualMove, setAI_objects});
+    create_map_functions({
+    handleManualMove,
+    setAI_objects,
+    setHeatmapData: (data: any) => {
+      setHeatMapPoints(data.points);
+      setHeatMapMax(data.max);
+    }
+    });
   }, [])
   
   return (

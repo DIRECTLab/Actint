@@ -1,5 +1,10 @@
 import { socket } from "@/defaults/web_socket";
 
+export type HeatmapPayload = {
+  points: number[][];
+  max: number;
+};
+
 export type ConnectionStatus =
   | "connected"
   | "disconnected_by_server"
@@ -44,6 +49,10 @@ export const create_connection_listeners = ({
 type Props1 = {
   handleManualMove: (lat: number, lng: number, zoom: number) => void;
   setAI_objects: React.Dispatch<React.SetStateAction<any[]>>;
+  setHeatmapData: (data: {
+    points: number[][];
+    max: number;
+  }) => void;
 };
 
 export const create_map_functions = ({
@@ -68,5 +77,9 @@ export const create_map_functions = ({
   socket.on("draw_line", (data) => {
     console.log("set AI objects", data);
     setAI_objects((prev) => [...prev, { type: "line", data }]);
+  });
+  socket.on("set_heatmap", (data: HeatmapPayload) => {
+    console.log("set heatmap", data);
+    setAI_objects((prev) => [...prev, { type: "heatmap", data }]);
   });
 };
