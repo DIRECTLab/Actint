@@ -8,6 +8,7 @@ from pathlib import Path
 
 from backend.config import config
 from backend.mcp_servers.ais import ais_mcp_server
+from backend.mcp_servers.adsb import adsb_mcp_server
 from backend.event_loop_registry import set_event_loop
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
@@ -36,15 +37,26 @@ if config.CONDA_PREFIX:
 else:
     python_path = sys.executable
 
-server_params = StdioServerParameters(
+ais_server_params = StdioServerParameters(
     command=python_path,
     args=[ais_mcp_server.__file__],
     env=os.environ.copy(),
     cwd=os.getcwd()
 )
 
-mcp_client = MCPClient(server_params, structured_output=False)
-ais_mcp_tools = mcp_client.get_tools()
+ais_mcp_client = MCPClient(ais_server_params, structured_output=False)
+ais_mcp_tools = ais_mcp_client.get_tools()
+
+
+adsb_server_params = StdioServerParameters(
+    command=python_path,
+    args=[adsb_mcp_server.__file__],
+    env=os.environ.copy(),
+    cwd=os.getcwd()
+)
+
+adsb_mcp_client = MCPClient(adsb_server_params, structured_output=False)
+adsb_mcp_tools = adsb_mcp_client.get_tools()
 
 model = TransformersModel(
     model_id=model_id,
@@ -55,7 +67,9 @@ def create_agent(
     additional_tools: list = []
 ) -> ToolCallingAgent:
     """Creates an agent, injecting relevant tools."""
-    tools = ais_mcp_tools.copy()
+    tools = []
+    tools += ais_mcp_tools
+    tools += adsb_mcp_tools
     managed_agents = []
     if additional_tools:
         tools.extend(additional_tools)

@@ -11,7 +11,8 @@ class Config:
     WEB_SOCKET_PORT: int = int(getenv("WEB_SOCKET_PORT", "3050"))
     # DB Config
     DB_HOST: str | None = getenv("DB_HOST", None)
-    DB_NAME: str | None = getenv("DB_NAME", None)
+    ADSB_DB_NAME: str | None = getenv("ADSB_DB_NAME", None)
+    AIS_DB_NAME: str | None = getenv("AIS_DB_NAME", None)
     DB_USER: str | None = getenv("DB_USER", None)
     DB_PASS: str | None = getenv("DB_PASS", None)
     DB_PORT: int | None = int(getenv("DB_PORT", None)) if getenv("DB_PORT") else None

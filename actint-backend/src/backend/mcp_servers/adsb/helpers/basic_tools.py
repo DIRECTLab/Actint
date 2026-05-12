@@ -52,14 +52,14 @@ def bbox_from_radius_nm(lat: float, lon: float, radius_nm: float) -> tuple[float
 def get_conn():
     """Create a Postgres connection for ADS-B tooling.
 
-    Requires env vars: DB_HOST, DB_NAME, DB_USER, DB_PASS, DB_PORT.
+    Requires env vars: DB_HOST, ADSB_DB_NAME, DB_USER, DB_PASS, DB_PORT.
 
     Raises:
         ValueError: if any required env var is missing/invalid.
         psycopg.Error: if connection fails.
     """
     db_host = config.DB_HOST
-    db_name = config.DB_NAME
+    db_name = config.ADSB_DB_NAME
     db_user = config.DB_USER
     db_pass = config.DB_PASS
     db_port_raw = config.DB_PORT
@@ -68,7 +68,7 @@ def get_conn():
         name
         for name, val in [
             ("DB_HOST", db_host),
-            ("DB_NAME", db_name),
+            ("ADSB_DB_NAME", db_name),
             ("DB_USER", db_user),
             ("DB_PASS", db_pass),
             ("DB_PORT", db_port_raw),
