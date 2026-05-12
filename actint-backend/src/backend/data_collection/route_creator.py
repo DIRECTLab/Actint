@@ -73,20 +73,52 @@ def query(result):
         return rows
     
 
-def mean(points):
+def mean(points, wrapped):
+
+    if not points:
+        print("No points found within bbox!")
+        return
 
     count = 0
     lat_sum = lon_sum = 0
 
-    for coord in points:
-        count += 1
-        lat_sum += coord[0]
-        lon_sum += coord[1]
+    if wrapped:
 
-    mean_lat = lat_sum/count
-    mean_lon = lon_sum/count
+        ref = points[0][1]
 
-    print(f"\nMean Lat,Long: {mean_lat:.6f},{mean_lon:.6f}")
+        for coord in points:
+            diff = coord[1] - ref
+            # Adjust for wrap-around
+            if diff > 180:
+                lon_sum += (coord[1] - 360)
+            elif diff < -180:
+                lon_sum += (coord[1] + 360)
+            else:
+                lon_sum += coord[1]
+
+            count += 1
+            lat_sum += coord[0]
+
+        mean_lat = lat_sum/count
+        mean_lon = lon_sum/count
+        
+        # Normalize back to [-180, 180]
+        if mean_lon > 180: mean_lon -= 360
+        if mean_lon < -180: mean_lon += 360
+
+
+    else: 
+
+        for coord in points:
+            count += 1
+            lat_sum += coord[0]
+            lon_sum += coord[1]
+
+        mean_lat = lat_sum/count
+        mean_lon = lon_sum/count
+
+        print(f"\nMean Lat,Long: {mean_lat:.6f},{mean_lon:.6f}")
+
 
     return mean_lat, mean_lon
 
@@ -95,6 +127,7 @@ def mean(points):
 if __name__ == "__main__":
     
     result = cell_to_bbox("832695fffffffff", 10)
+   # result = cell_to_bbox("810dbffffffffff", 10)
     list_points = query(result)
-    mean = mean(list_points)
+    mean = mean(list_points, result[4])
     print(mean) 
