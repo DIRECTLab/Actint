@@ -124,6 +124,16 @@ async def query_agent_loop(
 ) -> None:
     sid = SESSION_ID
 
+    agent = None
+
+    if agent is None and not remote_client:
+        from backend.agent.agent import (
+            create_agent,
+            query_agent_instance,
+        )
+
+        agent = create_agent()
+
     if debug:
         print_message("System", f"Debug mode enabled. Session ID: {sid}")
     if remote_client:
@@ -136,18 +146,19 @@ async def query_agent_loop(
     try:
         while True:
             user_text = (await ainput("Message: ")).strip()
+            command_mode = user_text.startswith("/")
 
             if not user_text:
                 continue
 
-            if user_text.lower() in {"/quit", "/exit", "/q"}:
+            if user_text.lower() in {"/quit", "/exit", "/q"} and command_mode:
                 if not remote_client:
                     from backend.agent.agent import remove_agent_session
 
                     remove_agent_session(sid)
                 break
 
-            if user_text.lower() in {"/help", "/h"}:
+            if user_text.lower() in {"/help", "/h"} and command_mode:
                 print_message(
                     "System",
                     "Available commands: /help, /quit, /exit,"
@@ -156,7 +167,7 @@ async def query_agent_loop(
                 continue
 
             parts = user_text.lower().split()
-            if parts[0] in {"/save", "/s"}:
+            if parts[0] in {"/save", "/s"} and command_mode:
                 fmt = (
                     parts[1]
                     if len(parts) > 1 and parts[1] in {"txt", "md", "json"}
@@ -171,14 +182,8 @@ async def query_agent_loop(
             if remote_client:
                 response = await remote_client.query(user_text)
             else:
-                from backend.agent.agent import query_agent
-
                 print(f"Message from {sid}: {user_text}", file=sys.stderr)
-                response = await query_agent(
-                    user_text,
-                    session_id=sid,
-                    additional_tools=[],
-                )
+                response = await query_agent_instance(agent, user_text)
                 if response is None:
                     response = "Agent failed to respond."
 
@@ -192,6 +197,7 @@ async def query_agent_loop(
         if remote_client:
             await remote_client.disconnect()
         print_message("System", "Session closed.")
+        sys.exit(0)
 
 
 async def main() -> None:
