@@ -1,6 +1,5 @@
-from backend.mcp_servers.ais.helpers.vessel_data import VesselPosition
 from backend.mcp_servers.utils.distance_calculation import haversine_distance_nm
-from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_name_helper, get_vessel_position_history_helper
+from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_name, get_vessel_position_history_helper
 
 
 from datetime import timedelta
@@ -10,8 +9,8 @@ from datetime import timedelta
 def ship_following(mmsi1, mmsi2):
     """Determine if two vessels have been following each other."""
     
-    mmsi1_name = get_vessel_name_helper(mmsi1)
-    mmsi2_name = get_vessel_name_helper(mmsi2)
+    mmsi1_name = get_vessel_name(mmsi1)
+    mmsi2_name = get_vessel_name(mmsi2)
     THRESHOLD_TIME = timedelta(hours=1)
     THRESHOLD_DISTANCE = 5.0  # Latitude/longitude degrees for now
 
