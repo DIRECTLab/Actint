@@ -55,6 +55,15 @@ export const create_map_functions = ({
     handleManualMove(data.lat, data.lon, data.zoom);
   });
 
+  socket.on("add_marker", (data) => {
+    console.log(data)
+    setAI_objects((prev) => [...prev, { type: "marker", data}])
+  });
+
+  socket.on("draw_vessel_trajectory", (data) => {
+    setAI_objects((prev) => [...prev, { type: "trajectory", data}])
+  });
+
   socket.on("draw_rectangle", (data) => {
     setAI_objects((prev) => [...prev, { type: "rectangle", data }]);
     console.log("set AI objects", data);
