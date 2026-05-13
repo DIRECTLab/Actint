@@ -5,6 +5,8 @@ from smolagents import Tool
 from backend.event_loop_registry import get_event_loop
 from backend.transport.server_sent_events.map_events import (
     set_map_position,
+    add_marker,
+    draw_vessel_trajectory,
     draw_rectangle,
     draw_circle,
     draw_line,
@@ -49,17 +51,44 @@ class AddMarkerTool(Tool):
         self.sid = sid
         self.sio = sio_instance
 
-    def forward(self, lat, lon) -> str:
+    def forward(self, lat, lon, popup_description) -> str:
         lat = float(lat)
         lon = float(lon)
         future = asyncio.run_coroutine_threadsafe(
-            draw_rectangle(self.sid, lat=lat, lon=lon),
+            add_marker(self.sid, lat=lat, lon=lon, popup_description=popup_description),
             get_event_loop(),
         )
         future.result()
         return (f"Marker added with latitude {lat} and longitude {lon}")
 
 
+class DrawVesselTrajectoryTool(Tool):
+    name = "draw_vessel_trajectory"
+    description = "Draws the trajectory of a vessel given its position and direction. Draws a specified number of nautical miles out."
+    inputs = {
+        "lat": {"type": "string", "description": "Latitude of marker"},
+        "lon": {"type": "string", "description": "Longitude of marker"},
+        "degree": {"type": "string", "description": "Degree of vessel course"},
+        "distance": {"type": "string", "description": "How far to draw the vessel trajectory in nautical miles"},
+    }
+    output_type = "string"
+
+    def __init__(self, sid, sio_instance, **kwargs):
+        super().__init__(**kwargs)
+        self.sid = sid
+        self.sio = sio_instance
+
+    def forward(self, lat, lon, degree, distance_nm) -> str:
+        lat1, lon1 = float(lat1), float(lon1)
+        lat2, lon2 = float(lat2), float(lon2)
+        future = asyncio.run_coroutine_threadsafe(
+            draw_rectangle(
+                self.sid, lat=lat, lon=lon, lat=lat, lon=lon,
+            ),
+            get_event_loop(),
+        )
+        future.result()
+        return (f"Trajectory added to map with position Lat: {lat}, Lon: {lon}, with course {degree} and distance {distance_nm}")
 
 class DrawRectangleTool(Tool):
     name = "draw_rectangle"
