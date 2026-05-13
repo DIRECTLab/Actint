@@ -3,6 +3,7 @@ from datetime import datetime
 from backend.agent.agent import create_agent, query_agent_instance
 import uvicorn
 from backend.config import config
+from backend.ui_tools.map_edit_tools import ZoomTool, AddMarkerTool, DrawVesselTrajectoryTool, DrawRectangleTool, DrawCircleTool, DrawLineTool
 from backend.transport.connection import sio, app
 import sys
 
@@ -16,8 +17,17 @@ async def connect(sid, environ):
     new_user = connections[sid]
 
     if new_user["agent"] is None:
-        print(f"Creating new agent for new user {sid}.", file=sys.stderr)
-        new_user["agent"] = create_agent()
+        print(f"\033[1;33mCreating new agent for new user {sid}.\033[0m", file=sys.stderr)
+        ui_tools = [
+            ZoomTool(sid, sio),
+            AddMarkerTool(sid, sio),
+            DrawVesselTrajectoryTool(sid, sio),
+            DrawRectangleTool(sid, sio),
+            DrawCircleTool(sid, sio),
+            DrawLineTool(sid, sio),
+        ]
+        new_user["agent"] = create_agent(additional_tools=ui_tools)
+
 
 
 @sio.event
