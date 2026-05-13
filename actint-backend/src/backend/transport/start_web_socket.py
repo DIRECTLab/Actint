@@ -3,7 +3,7 @@ from datetime import datetime
 from backend.agent.agent import create_agent, query_agent_instance
 import uvicorn
 from backend.config import config
-from backend.ui_tools.map_edit_tools import ZoomTool, DrawRectangleTool, DrawCircleTool, DrawLineTool
+from backend.ui_tools.map_edit_tools import ZoomTool, DrawRectangleTool, DrawCircleTool, DrawLineTool, AddMarkerTool
 from backend.transport.connection import sio, app
 import sys
 
@@ -23,6 +23,7 @@ async def connect(sid, environ):
             DrawRectangleTool(sid, sio),
             DrawCircleTool(sid, sio),
             DrawLineTool(sid, sio),
+            AddMarkerTool(sid, sio)
         ]
         new_user["agent"] = create_agent(additional_tools=ui_tools)
 

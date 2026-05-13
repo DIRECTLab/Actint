@@ -84,7 +84,11 @@ export function HandleMarkers({ vehiclesPreviousPositions, vehicleCurrentPositio
                         positions={obj.data.points}
                         color={obj.data.color}
                     ></Polyline>;
-
+                case "marker":
+                    return <Marker
+                        key={index}
+                        position={[obj.data.lat, obj.data.lon]}
+                    ></Marker>;
                 default:
                     return null;
             }

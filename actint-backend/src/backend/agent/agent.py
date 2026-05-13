@@ -69,27 +69,27 @@ def create_agent(
 ) -> CodeAgent:
     """Creates an agent, injecting relevant tools."""
     tools = []
-    tools += ais_mcp_tools
-    tools += adsb_mcp_tools
+    # tools += ais_mcp_tools
+    # tools += adsb_mcp_tools
     
-    # ais_agent = CodeAgent(
-    #     tools=ais_mcp_tools,
-    #     model=model,
-    #     max_steps=20,
-    #     name="martime_data_agent",
-    #     description="Can query a database of AIS information (including position, heading, speed, etc.) and do calculations with that data."
-    # )
+    ais_agent = CodeAgent(
+        tools=ais_mcp_tools,
+        model=model,
+        max_steps=20,
+        name="martime_data_agent",
+        description="Can query a database of AIS information (including position, heading, speed, etc.) and do calculations with that data."
+    )
 
-    # adsb_agent = CodeAgent(
-    #     tools=adsb_mcp_tools,
-    #     model=model,
-    #     max_steps=20,
-    #     name="aviation_data_agent",
-    #     description="Can query a database of ADS-B information and do calculations with that data."
-    # )
+    adsb_agent = CodeAgent(
+        tools=adsb_mcp_tools,
+        model=model,
+        max_steps=20,
+        name="aviation_data_agent",
+        description="Can query a database of ADS-B information and do calculations with that data."
+    )
 
-    # managed_agents = [ais_agent, adsb_agent]
-    managed_agents = []
+    managed_agents = [ais_agent, adsb_agent]
+    # managed_agents = []
     
     if additional_tools:
         tools.extend(additional_tools)

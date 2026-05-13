@@ -8,6 +8,7 @@ from backend.transport.server_sent_events.map_events import (
     draw_rectangle,
     draw_circle,
     draw_line,
+    add_marker
 )
 
 
@@ -53,7 +54,7 @@ class AddMarkerTool(Tool):
         lat = float(lat)
         lon = float(lon)
         future = asyncio.run_coroutine_threadsafe(
-            draw_rectangle(self.sid, lat=lat, lon=lon),
+            add_marker(self.sid, lat=lat, lon=lon),
             get_event_loop(),
         )
         future.result()

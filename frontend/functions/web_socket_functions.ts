@@ -69,4 +69,8 @@ export const create_map_functions = ({
     console.log("set AI objects", data);
     setAI_objects((prev) => [...prev, { type: "line", data }]);
   });
+
+  socket.on("add_marker", (data) => {
+    setAI_objects((prev) => [...prev, { type: "marker", data }]);
+  });
 };
