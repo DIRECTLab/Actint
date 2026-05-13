@@ -1,26 +1,5 @@
 from backend.data_processing.query_database import get_conn
-from rapidfuzz import process, utils
-import sys
-
-
-# def get_vessel_information_helper(mmsi: int) -> dict:
-#     """Get detailed information about a vessel given its MMSI."""
-#     conn = get_conn()
-#     cursor = conn.cursor()
-#     cursor.execute("SELECT * FROM ais_static_data WHERE mmsi = %s;", (mmsi,))
-#     result = cursor.fetchone()
-#     conn.close()
-#     if result:
-#         return {
-#             "mmsi": result[0],
-#             "vesselname": result[1],
-#             "origincountry": result[3] if result[3] else "Unknown",
-#             "homebase": result[11] if result[11] else "Unknown",
-#             "parentcommand": result[12] if result[12] else "Unknown",
-#             "fleet": result[13] if result[13] else "Unknown",
-#         }
-#     return "No Vessel with that MMSI."
-
+from backend.mcp_servers.utils.distance_calculation import haversine_distance_nm
 
 def get_all_vessel_names() -> list[str]:
     conn = get_conn()
@@ -49,15 +28,12 @@ def get_all_fleet_names() -> list[str]:
     clean_names = [row[0] for row in results if row[0] is not None]
     return clean_names
 
-
-
-def get_vessel_name_helper(mmsi: int) -> str:
+def get_vessel_name(mmsi: int) -> str:
     """Get the name of a vessel given its MMSI."""
     name = get_static_data_helper(mmsi)['vesselname']
     if name:
         return name
     return "No Vessel with that MMSI."
-
 
 def get_vessel_mmsi_helper(vessel_name: str) -> int:
     """Get the MMSI of a vessel given its name."""
@@ -70,42 +46,6 @@ def get_vessel_mmsi_helper(vessel_name: str) -> int:
         return result[0]
     raise ValueError("No Vessel with that name.")
 
-
-def get_similar_vessel_names(query: str, number_results: int) -> list[str]:
-    names = get_all_vessel_names()
-    matches = process.extract(
-        query,
-        names, 
-        limit=number_results,
-        processor=utils.default_process # Handles case and whitespace automatically
-    )
-    names = [match[0] for match in matches]
-    return names
-
-def get_similar_mmsis(query: str | int, number_results: int) -> list[int]:
-    mmsis_int = get_all_mmsis()
-    mmsis_str = [str(mmsi) for mmsi in mmsis_int]
-    matches = process.extract(
-        str(query),
-        mmsis_str, 
-        limit=number_results,
-        processor=utils.default_process # Handles case and whitespace automatically
-    )
-    mmsis = [match[0] for match in matches]
-    return mmsis
-    
-def get_similar_fleet_names(query: str, number_results: int) -> list[str]:
-    names = get_all_fleet_names()
-    matches = process.extract(
-        query,
-        names, 
-        limit=number_results,
-        processor=utils.default_process # Handles case and whitespace automatically
-    )
-    names = [match[0] for match in matches]
-    return names
-
-
 def get_vessel_position_history_helper(mmsi: int) -> list[dict]:
     """Get the position history of a vessel given its MMSI."""
     conn = get_conn()
@@ -117,22 +57,26 @@ def get_vessel_position_history_helper(mmsi: int) -> list[dict]:
     return [dict(zip([key[0] for key in cursor.description], row)) for row in results]
 
 
-def get_vessel_latest_location_helper(mmsi: int) -> dict:
-    return get_vessel_position_history_helper(mmsi)[0]
-
-def get_all_fleets() -> list[str]:
-    """Get a list of all fleets."""
+def get_vessel_latest_location_helper(mmsi: int) -> dict | None:
+    """Get the latest known location of a vessel given its MMSI."""
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("SELECT DISTINCT fleet FROM ais_static_data WHERE fleet IS NOT NULL AND fleet != '';")
-    results = cursor.fetchall()
+    cursor.execute("SELECT * FROM ais_dynamic_data WHERE mmsi = %s ORDER BY basedatetime DESC LIMIT 1;", (mmsi,))
+    result = cursor.fetchone()
     conn.close()
-    fleets = []
-    for result in results:
-        fleet = result[13]
-        if fleet not in fleets:
-            fleets.append(fleet)
-    return fleets
+    
+    return dict(zip([key[0] for key in cursor.description], result))
+
+
+def get_all_latest_detections_helper() -> list[dict]:
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY mmsi ORDER BY basedatetime DESC) AS rn FROM ais_dynamic_data) sub WHERE rn = 1;")
+    columns = [desc[0] for desc in cursor.description]
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [dict(zip(columns, row)) for row in rows]
 
 def get_static_data_helper():
     conn = get_conn()
@@ -178,4 +122,3 @@ def query_dynamic_data_helper(searchQuery: dict, sort=False):
         return sorted_vessels
 
     return results
-

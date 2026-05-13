@@ -7,30 +7,12 @@ Provides geographic context for coordinates including:
 - Distance to notable locations (ports, coastlines)
 - Bearing and direction calculations
 """
-
-from dataclasses import dataclass
 from typing import Optional, Tuple
-from functools import lru_cache
-from backend.mcp_servers.utils.distance_calculation import haversine_distance_nm, calculate_bearing, bearing_to_cardinal
+from backend.mcp_servers.utils.distance_calculation import haversine_distance_nm
 from backend.mcp_servers.utils.important_locations import MARITIME_REGIONS, MAJOR_PORTS, STRATEGIC_WATERWAYS, CONTINENTS
-from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_latest_location_helper, get_all_mmsis
-from datetime import datetime
-
-try:
-    from geopy.geocoders import Nominatim
-    from geopy.exc import GeocoderTimedOut, GeocoderServiceError
-    HAS_GEOPY = True
-except ImportError:
-    HAS_GEOPY = False
-
-try:
-    import reverse_geocoder as rg
-except ImportError:
+from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_latest_location_helper, get_all_mmsis, get_all_latest_detections_helper, get_vessel_latest_location_helper
 from backend.mcp_servers.ais.helpers.vessel_query import query_static_data_helper, get_vessel_latest_location_helper, get_vessel_position_history_helper
-=======
-from backend.mcp_servers.ais.helpers.vessel_query import query_static_data_helper, get_vessel_latest_location_helper
->>>>>>> master
-
+# We may want to have a reverse georder eventually
 
 def get_vessel_general_information_helper(mmsi: str):
     mmsi = int(mmsi)
@@ -40,10 +22,6 @@ def get_vessel_general_information_helper(mmsi: str):
     else:
         raise ValueError(f"No vessel found with MMSI {mmsi}")
     latest_location_info = get_vessel_latest_location_helper(mmsi)
-    print("vessel info:", str(vessel_info) + "\n\n\n\n")
-    print("latest location info:", str(latest_location_info))
-
-
 
     return_string = f"""
 Ship Information for MMSI {mmsi}:
@@ -61,7 +39,6 @@ Last Detction:
     return return_string
 
 
-
 def get_vessel_locations_helper(mmsi: str, page: str = '1') -> str:
     PAGE_SIZE = 8
     mmsi = int(mmsi)
@@ -76,6 +53,7 @@ def get_vessel_locations_helper(mmsi: str, page: str = '1') -> str:
     positions_prompt = (
         "Idx | Latitude  | Longitude   | SOG (kt) | COG (deg) | Time\n"
         "----+-----------+-------------+----------+-----------+----------\n"
+    )
 
     for i, position in enumerate(indexed_positions, start=start_index + 1):
         time_str = position["basedatetime"].strftime("%H:%M:%S")
@@ -99,6 +77,156 @@ def get_vessel_locations_helper(mmsi: str, page: str = '1') -> str:
     return prompt
 
 
+def get_vessels_last_seen_helper():
+    detections = get_all_latest_detections_helper()
+    prompt = (
+        "MMSI       | Latitude | Longitude | SOG | COG  | Time \n"
+        "-----------+----------+-----------+-----+------+----------\n"
+    )
+
+    for detection in detections:
+        time_str = detection['basedatetime'].strftime("%H:%M:%S") \
+            if hasattr(detection["basedatetime"], "strftime") \
+            else str(detection["basedatetime"])
+        
+        lat_str = f"{detection['lat']:7.2f}" if detection['lat'] is not None else " None  "
+        lon_str = f"{detection['lon']:7.2f}" if detection['lon'] is not None else " None  "
+        sog_str = f"{detection['sog']:4.1f}" if detection['sog'] is not None else "None"
+        cog_str = f"{detection['cog']:5.1f}" if detection['cog'] is not None else "None "
+        prompt += (
+            f"{detection['mmsi']:<10} | "
+            f"{lat_str} | "
+            f"{lon_str} | "
+            f"{sog_str} | "
+            f"{cog_str} | "
+            f"{time_str}\n"
+        )
+
+    prompt += ("\nTo get even more information on any of these ships, run get_vessel_general_information() with the correct mmsi")
+
+    return prompt
+
+
+
+
+
+
+
+def get_nearest_ships_helper(mmsi: str, number_ships: str) -> str:
+    mmsi = int(mmsi)
+    number_ships = int(number_ships)
+    detections = get_all_latest_detections_helper()
+    mmsis = get_all_mmsis()
+    if mmsi not in mmsis:
+        raise ValueError("MMSI not in vessels")
+    primary_ship_location = get_vessel_latest_location_helper(mmsi)
+    primary_lat = primary_ship_location['lat']
+    primary_lon = primary_ship_location['lon']
+    distances = []
+
+    for detection in detections:
+        if detection['mmsi'] == mmsi:
+            continue
+        lat = detection['lat']
+        lon = detection['lon']
+        if lat is None or lon is None:
+            continue
+        distance = haversine_distance_nm(primary_lat, primary_lon, lat, lon)
+        distances.append({
+            "distance": distance,
+            "data": detection
+        })
+
+    distances.sort(key=lambda x: x['distance'])
+    nearest_ships = distances[:number_ships]
+    output = (
+        f"The {number_ships} closest ships to {mmsi} are:\n\n"
+        "MMSI       | Distance (nm) | Latitude   | Longitude   | SOG   | COG   | Time\n"
+        "-----------+---------------+------------+-------------+-------+-------+----------\n"
+    )
+
+    for ship in nearest_ships:
+        data = ship["data"]
+        time_str = data["basedatetime"].strftime("%H:%M:%S") \
+            if hasattr(data["basedatetime"], "strftime") \
+            else str(data["basedatetime"])
+        output += (
+            f"{data['mmsi']:<10} | "
+            f"{ship['distance']:<13.3f} | "
+            f"{data['lat']:<10.5f} | "
+            f"{data['lon']:<11.5f} | "
+            f"{data['sog']:<5.1f} | "
+            f"{data['cog']:<5.1f} | "
+            f"{time_str}\n"
+        )
+    return output
+
+def get_vessels_in_area_helper(lat: str, lon: str, distance_nm: str):
+    lat = float(lat); lon = float(lon); distance_nm = float(distance_nm)
+    detections = get_all_latest_detections_helper()
+    sussy_bakas = []
+    vessels_in_area = []
+    for detection in detections:
+        if not detection['lat'] or not detection['lon']:
+            sussy_bakas.append(detection)
+            continue
+        distance = haversine_distance_nm(lat, lon, detection['lat'], detection['lon'])
+        if distance < distance_nm:
+            vessels_in_area.append(detection)
+    if len(vessels_in_area) > 55:
+        raise ValueError("Too many detections")
+
+    prompt = (
+        f"Results for vesstles within {distance_nm} of {lat}, {lon}\n\n"
+        "MMSI       | Latitude | Longitude | SOG | COG  | Time \n"
+        "-----------+----------+-----------+-----+------+----------\n"
+    )
+
+    for detection in vessels_in_area:
+        time_str = detection['basedatetime'].strftime("%H:%M:%S") \
+            if hasattr(detection["basedatetime"], "strftime") \
+            else str(detection["basedatetime"])
+        lat_str = f"{detection['lat']:7.2f}" if detection['lat'] is not None else " None  "
+        lon_str = f"{detection['lon']:7.2f}" if detection['lon'] is not None else " None  "
+        sog_str = f"{detection['sog']:4.1f}" if detection['sog'] is not None else "None"
+        cog_str = f"{detection['cog']:5.1f}" if detection['cog'] is not None else "None "
+        prompt += (
+            f"{detection['mmsi']:<10} | "
+            f"{lat_str} | "
+            f"{lon_str} | "
+            f"{sog_str} | "
+            f"{cog_str} | "
+            f"{time_str}\n"
+        )
+    prompt += ("\nList of MMSIs with latitude or longitude as None:\n")
+    for baka in sussy_bakas:
+        prompt += str(baka['mmsi'])
+    prompt += ("\n\nTo get even more information on any of these ships, run get_vessel_general_information() with the correct mmsi")
+
+    prompt += str(len(vessels_in_area))
+    return prompt
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"""These might die"""
 
 
 def identify_maritime_region_helper(lat: float, lon: float) -> Optional[str]:
@@ -114,6 +242,8 @@ def identify_maritime_region_helper(lat: float, lon: float) -> Optional[str]:
         
         # Handle regions crossing the date line
         if bounds["lon_min"] > bounds["lon_max"]:
+            # Region crosses date line (e.g., Bering Sea)
+            in_lon = lon >= bounds["lon_min"] or lon <= bounds["lon_max"]
         else:
             in_lon = bounds["lon_min"] <= lon <= bounds["lon_max"]
         
@@ -160,37 +290,6 @@ def identify_nearest_waterway_helper(lat: float, lon: float) -> Tuple[str, float
             nearest = waterway_name
     
     return nearest, min_distance
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # @dataclass

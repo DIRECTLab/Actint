@@ -33,6 +33,32 @@ class ZoomTool(Tool):
         )
         future.result()
         return f"Map positioned to lat: {lat}, lon: {lon}, zoom: {zoom}"
+    
+
+class AddMarkerTool(Tool):
+    name="add_marker"
+    description = "Adds a marker a specific latitude and longitue"
+    inputs = {
+        "lat": {"type": "string", "description": "Latitude of marker"},
+        "lon": {"type": "string", "description": "Longitude of marker"},
+    }
+    output_type = "string"
+
+    def __init__(self, sid, sio_instance, **kwargs):
+        super().__init__(**kwargs)
+        self.sid = sid
+        self.sio = sio_instance
+
+    def forward(self, lat, lon) -> str:
+        lat = float(lat)
+        lon = float(lon)
+        future = asyncio.run_coroutine_threadsafe(
+            draw_rectangle(self.sid, lat=lat, lon=lon),
+            get_event_loop(),
+        )
+        future.result()
+        return (f"Marker added with latitude {lat} and longitude {lon}")
+
 
 
 class DrawRectangleTool(Tool):
