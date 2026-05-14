@@ -127,12 +127,11 @@ async def query_agent_loop(
     agent = None
 
     if agent is None and not remote_client:
-        from backend.agent.agent import (
-            create_agent,
-            query_agent_instance,
+        from backend.langgraph.orchestrator.router import (
+            run_orchestrator_sync,
+            run_orchestrator
         )
-
-        agent = create_agent()
+        agent = True
 
     if debug:
         print_message("System", f"Debug mode enabled. Session ID: {sid}")
@@ -183,16 +182,18 @@ async def query_agent_loop(
                 response = await remote_client.query(user_text)
             else:
                 print(f"Message from {sid}: {user_text}", file=sys.stderr)
-                response = await query_agent_instance(agent, user_text)
+                response = await run_orchestrator(user_text)
                 if response is None:
                     response = "Agent failed to respond."
 
-            print_message("ChatBot", response)
-            record_message("ChatBot", response)
+            print_message("ChatBot", response["final_answer"])
+            record_message("ChatBot", response["final_answer"])
 
     except KeyboardInterrupt:
         print()
         print_message("System", "Interrupted by user.")
+    except Exception as e:
+        print_message("System", f"Error: {e}")
     finally:
         if remote_client:
             await remote_client.disconnect()

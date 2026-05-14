@@ -27,7 +27,20 @@ from typing import Any
 from fastmcp import FastMCP
 
 
+INSTRUCTIONS = """
+MCP Server for ADS-B Aircraft Intelligence Tools.
 
+Standalone MCP server that exposes ADS-B (aircraft) data tools from 
+Postgres and other sources.
+
+Tools provided (initial, simple set):
+- Aircraft position history and current position
+- "Following" analysis between two aircraft
+- Track summary aggregates
+- Nearest airport / candidate destinations
+- Basic aviation reference lookups (navaids)
+- Postgres introspection and read-only SQL query tool
+"""
 
 
 # Import tool functions from parent package
@@ -56,7 +69,7 @@ from backend.mcp_servers.adsb.helpers.basic_tools import (
 from backend.mcp_servers.adsb.helpers.icao_to_reg_country import icao_to_country
 
 
-mcp = FastMCP("ADSB Aircraft Intelligence", "0.1.0")
+mcp = FastMCP("ADSB Aircraft Intelligence", instructions=INSTRUCTIONS, version="0.1.0")
 
 
 def _json_default(obj: Any):

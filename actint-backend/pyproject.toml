@@ -28,7 +28,8 @@ dependencies = [
     "smolagents[mcp,transformers,telemetry,toolkit] @ git+https://github.com/DIRECTLab/smolagents",
     "huggingface_hub[mcp]>=1.9",
     "python-socketio>=5.15",
-    "rapidfuzz>=3.14"
+    "rapidfuzz>=3.14",
+    "langgraph>=1.2.0",
 ]
 
 [build-system]
