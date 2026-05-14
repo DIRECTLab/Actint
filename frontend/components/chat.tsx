@@ -35,7 +35,7 @@ export function Chat() {
       position: "single",
     };
 
-    socket.emit("recieve_message", newMessage);
+    socket.emit("chat_message", newMessage);
     setMessages((prev) => [...prev, newMessage]);
     setIsTyping(true);
   };

@@ -1,11 +1,13 @@
 from datetime import datetime
+import asyncio
 
 from backend.agent.agent import create_agent, query_agent_instance
 import uvicorn
 from backend.config import config
-from backend.ui_tools.map_edit_tools import ZoomTool, AddMarkerTool, DrawVesselTrajectoryTool, DrawRectangleTool, DrawCircleTool, DrawLineTool
+from backend.ui_tools.map_edit_tools import ZoomTool, AddMarkerTool, DrawVesselTrajectoryTool, DrawRectangleTool, DrawCircleTool, DrawLineTool, DrawPolygonTool, DeleteObjctTool
 from backend.transport.connection import sio, app
 import sys
+from backend.transport.chat_events import make_get_map_info
 
 connections = {}
 
@@ -25,9 +27,17 @@ async def connect(sid, environ):
             DrawRectangleTool(sid, sio),
             DrawCircleTool(sid, sio),
             DrawLineTool(sid, sio),
+            DrawPolygonTool(sid, sio),
+            DeleteObjctTool(sid, sio),
         ]
         new_user["agent"] = create_agent(additional_tools=ui_tools)
-
+        # await asyncio.sleep(0.5)
+        # get_map_info = make_get_map_info(sio, sid)
+        # if get_map_info:
+        #     info = await get_map_info()
+        #     print("\n\n\n\n\n\n\n\n" + info + "\n\n\n\n\n\n\n\n", filee=sys.stderr)
+        # else: 
+        #     print("\n\n\n\n\n\n\n\nNothing\n\n\n\n\n\n\n\n", sys.stderr)
 
 
 @sio.event
@@ -36,16 +46,17 @@ async def disconnect(sid):
     if sid in connections:
         del connections[sid]
 
-@sio.on("recieve_message")
+@sio.on("chat_message")
 async def handle_agent_query(sid, data):
     user_text = data.get("message", "")
     user_agent = connections[sid]["agent"]
     agent_response_text = "Something went wrong and the agent did not respond."
-
+    
     if not user_text.strip() == "":
         agent_response_text = await query_agent_instance(
-            user_agent, user_text
+            user_agent, user_text, make_get_map_info(sio, sid)
         )
+        #might want get_map_info right here
     else:
         agent_response_text = "Received empty message, please send a valid query."
 
@@ -57,7 +68,14 @@ async def handle_agent_query(sid, data):
         "position": "single",
     }
 
-    await sio.emit("send_response", new_msg, to=sid)\
+    await sio.emit("send_response", new_msg, to=sid)
+
+
+
+    
+    
+
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=config.WEB_SOCKET_PORT)
