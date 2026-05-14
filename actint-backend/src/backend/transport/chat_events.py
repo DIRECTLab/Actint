@@ -20,7 +20,7 @@ async def connect(sid, environ):
 # Chat Manager
 # ==================================================
 
-@sio.on("recieve_message")
+@sio.on("chat_message")
 async def handle_agent_query(sid, data):
     user_text = data.get("message", "")
 
@@ -50,6 +50,17 @@ async def handle_agent_query(sid, data):
 
     await sio.emit("send_response", new_msg, to=sid)
 
+
+
+
+def make_get_map_info(sio, sid):
+    async def get_map_info():
+        map_info = await sio.call("get_map_information", {}, to=sid, timeout=8)
+        if map_info:
+            return map_info
+        else:
+            raise TimeoutError("Failed to fetch the map information in time")
+    return get_map_info
 
 @sio.event
 async def disconnect(sid):

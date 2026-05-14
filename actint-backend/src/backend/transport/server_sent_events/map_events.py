@@ -16,13 +16,14 @@ async def set_map_position(lat, lon, zoom, sid=None):
 
 
 
-async def add_marker(sid, lat, lon):
+async def add_marker(sid, lat, lon, popup_description):
     await sio.emit("add_marker", {
         "lat": lat,
         "lon": lon,
+        "popup": popup_description
     }, to=sid)
 
-async def draw_vessel_trajectory(sid, lat, lon, degree, distance_nm):
+async def draw_vessel_trajectory(sid, lat, lon, degree, distance_nm, color="blue"): #I need to add the ability for the AI to choose a color
     await sio.emit("draw_vessel_trajectory", {
         "lat": lat,
         "lon": lon,
@@ -52,4 +53,14 @@ async def draw_line(sid, points,  color="blue"):
         "points": points,
         "color": color,
     }, to=sid)
-    
+
+async def draw_polygon(sid, points, color="blue"):
+    await sio.emit("draw_polygon", {
+        "points": points,
+        "color": color
+    }, to=sid)
+
+async def delete_object(sid, object_number):
+    await sio.emit("delete_object", {
+        "object_number": object_number
+    }, to=sid)
