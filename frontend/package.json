@@ -11,6 +11,7 @@
   "dependencies": {
     "@chatscope/chat-ui-kit-react": "^2.1.1",
     "@chatscope/chat-ui-kit-styles": "^1.4.0",
+    "geographiclib": "^1.52.2",
     "leaflet": "^1.9.4",
     "next": "^16.2.3",
     "react": "^19.0.0-rc.1",

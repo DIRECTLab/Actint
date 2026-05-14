@@ -1,4 +1,4 @@
-import { Popup, Marker, Polyline, Rectangle, Circle } from 'react-leaflet'
+import { Popup, Marker, Polyline, Rectangle, Circle, Polygon } from 'react-leaflet'
 import { vehicles_current_positions, vehicles_previous_positions } from '@/types/vehicleSettings';
 import Trajectory from '@/components/Trajectory'
 
@@ -111,6 +111,13 @@ export function HandleMarkers({ vehiclesPreviousPositions, vehicleCurrentPositio
                         positions={obj.data.points}
                         color={obj.data.color}
                     ></Polyline>;
+
+                case "polygon":
+                    return <Polygon
+                        key={index}
+                        positions={obj.data.points}
+                        pathOptions={{ color: obj.data.color }}
+                    ></Polygon>;
 
                 default:
                     return null;

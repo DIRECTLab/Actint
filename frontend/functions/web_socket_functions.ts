@@ -1,4 +1,5 @@
 import { socket } from "@/defaults/web_socket";
+import { convertServerPatchToFullTree } from "next/dist/client/components/segment-cache/navigation";
 
 export type ConnectionStatus =
   | "connected"
@@ -43,11 +44,13 @@ export const create_connection_listeners = ({
 
 type Props1 = {
   handleManualMove: (lat: number, lng: number, zoom: number) => void;
+  aiObjectsRef: any;
   setAI_objects: React.Dispatch<React.SetStateAction<any[]>>;
 };
 
 export const create_map_functions = ({
   handleManualMove,
+  aiObjectsRef,
   setAI_objects,
 }: Props1) => {
   socket.on("set_map_position", (data) => {
@@ -78,4 +81,35 @@ export const create_map_functions = ({
     console.log("set AI objects", data);
     setAI_objects((prev) => [...prev, { type: "line", data }]);
   });
+
+  socket.on("draw_polygon", (data) => {
+    console.log(data);
+    setAI_objects((prev) => [...prev, { type: "polygon", data }]);
+  });
+
+  socket.on("delete_object", (data) => {
+    console.log("Deleting object", data)
+    setAI_objects((prev) => prev.filter(obj => obj.id !== data.object_number));
+  });
+
+  socket.on("get_map_information", (data, callback) => {
+    console.log("Map_objects retrieved")
+    let clean_objects = []
+    console.log(aiObjectsRef)
+
+    callback(aiObjectsRef)
+  });
 };
+
+export const remove_map_functions = () => {
+  socket.off("set_map_position")
+  socket.off("add_marker")
+  socket.off("draw_vessel_trajectory")
+  socket.off("draw_rectangle")
+  socket.off("draw_circle")
+  socket.off("draw_line")
+  socket.off("draw_polygon")
+  socket.off("delete_object")
+  socket.off("get_map_information")
+}
+
