@@ -6,6 +6,7 @@ from backend.config import config
 from backend.ui_tools.map_edit_tools import ZoomTool, DrawRectangleTool, DrawCircleTool, DrawLineTool, AddMarkerTool
 from backend.transport.connection import sio, app
 import sys
+import gc
 
 connections = {}
 
@@ -25,7 +26,7 @@ async def connect(sid, environ):
             DrawLineTool(sid, sio),
             AddMarkerTool(sid, sio)
         ]
-        new_user["agent"] = create_agent(additional_tools=ui_tools)
+        new_user["agent"] = create_agent(model=getattr(app, 'model', None), additional_tools=ui_tools)
 
 
 
@@ -33,7 +34,22 @@ async def connect(sid, environ):
 async def disconnect(sid):
     print(f"User {sid} left.", file=sys.stderr)
     if sid in connections:
+        agent = connections[sid].get("agent")
+        if agent and hasattr(agent, "memory"):
+            agent.memory.steps.clear()
+        
         del connections[sid]
+        
+        # Force garbage collection to free memory
+        gc.collect()
+        
+        # If using PyTorch, empty the CUDA cache to release GPU memory
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except ImportError:
+            pass
 
 @sio.on("recieve_message")
 async def handle_agent_query(sid, data):
@@ -56,7 +72,9 @@ async def handle_agent_query(sid, data):
         "position": "single",
     }
 
-    await sio.emit("send_response", new_msg, to=sid)\
+    await sio.emit("send_response", new_msg, to=sid)
 
 if __name__ == "__main__":
+    from backend.agent.agent import init_model
+    app.model = init_model()
     uvicorn.run(app, host="0.0.0.0", port=config.WEB_SOCKET_PORT)

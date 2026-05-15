@@ -129,10 +129,11 @@ async def query_agent_loop(
     if agent is None and not remote_client:
         from backend.agent.agent import (
             create_agent,
+            init_model,
             query_agent_instance,
         )
 
-        agent = create_agent()
+        agent = create_agent(model=init_model())
 
     if debug:
         print_message("System", f"Debug mode enabled. Session ID: {sid}")

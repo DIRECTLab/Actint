@@ -5,7 +5,7 @@ import sys
 from backend.config import config
 from pathlib import Path
 
-from smolagents import ToolCallingAgent, CodeAgent, TransformersModel, MCPClient, AgentMaxStepsError, ActionStep, TaskStep
+from smolagents import ToolCallingAgent, CodeAgent, VLLMModel, MCPClient, AgentMaxStepsError, ActionStep, TaskStep
 from mcp import StdioServerParameters
 from backend.mcp_servers.ais import ais_mcp_server
 from backend.mcp_servers.adsb import adsb_mcp_server
@@ -42,7 +42,7 @@ ais_server_params = StdioServerParameters(
     command=python_path,
     args=[ais_mcp_server.__file__],
     env=os.environ.copy(),
-    cwd=os.getcwd()
+    cwd=os.getcwd(),
 )
 
 ais_mcp_client = MCPClient(ais_server_params, structured_output=False)
@@ -53,18 +53,25 @@ adsb_server_params = StdioServerParameters(
     command=python_path,
     args=[adsb_mcp_server.__file__],
     env=os.environ.copy(),
-    cwd=os.getcwd()
+    cwd=os.getcwd(),
 )
 
 adsb_mcp_client = MCPClient(adsb_server_params, structured_output=False)
 adsb_mcp_tools = adsb_mcp_client.get_tools()
 
-model = TransformersModel(
-    model_id=model_id,
-    max_new_tokens=config.MAX_NEW_TOKENS,
-)
+def init_model() -> VLLMModel:
+    model_kwargs={}
+    # We have to limit the context length to fit gemma-4-31B on a blackwell
+    if config.MODEL_ID == 'google/gemma-4-31B-it':
+        model_kwargs={'max_model_len': 131392}
+
+    return VLLMModel(
+        model_id=config.MODEL_ID,
+        model_kwargs=model_kwargs
+    )
 
 def create_agent(
+    model,
     additional_tools: list = []
 ) -> CodeAgent:
     """Creates an agent, injecting relevant tools."""
@@ -88,6 +95,14 @@ def create_agent(
         description="Can query a database of ADS-B information and do calculations with that data."
     )
 
+    # search_agent = CodeAgent(
+    #     tools=[WebSearchTool()],
+    #     model=get_model(),
+    #     max_steps=10,
+    #     name="web_search_agent",
+    #     description="Can search the web for information and summarize results."
+    # )
+
     managed_agents = [ais_agent, adsb_agent]
     # managed_agents = []
     
@@ -95,7 +110,7 @@ def create_agent(
         tools.extend(additional_tools)
         # map_agent = ToolCallingAgent(
         #     tools=additional_tools,
-        #     model=model,
+        #     model=get_model(),
         #     max_steps=10,
         #     name="map_ui_agent",
         #     description="Can show things to the user on a map. Can move, zoom, and draw basic shapes on the map."
@@ -151,7 +166,7 @@ def summarize_last_turn(instructions: str, agent: CodeAgent):
     steps_to_summarize = agent_memory.steps[first_step:]
     prompt = create_prompt(instructions, steps_to_summarize)
 
-    summarizer_agent = CodeAgent(tools=summarization_tools, model=model)
+    summarizer_agent = CodeAgent(tools=summarization_tools, model=agent.model)
     import time
     start_time = time.time()
     summary = summarizer_agent.run(prompt, reset=True)
