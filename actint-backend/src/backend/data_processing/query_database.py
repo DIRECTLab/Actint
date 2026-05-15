@@ -1,39 +1,44 @@
-from datetime import datetime
-import os
 import psycopg
+from enum import Enum
+from backend.config import config
 
-from pathlib import Path
+class DatabaseConnectionTypes(Enum):
+    AIS = 0
+    ADSB = 1
 
-DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
-DB_DIR = DATA_DIR / "db"
-SQLITE_PATH_AIS = DB_DIR / "ais.db"
-SQLITE_PATH_ADSB = DB_DIR / "adsb.db"
-
-
-def get_conn():
-    from backend.config import config
-    try:
-        # Read environment variables
-        db_config = {
+def _database_configs(conn_type: DatabaseConnectionTypes) -> dict:
+    if conn_type == DatabaseConnectionTypes.AIS:
+        return {
             "host": config.DB_HOST,
             "dbname": config.AIS_DB_NAME,
             "user": config.DB_USER,
             "password": config.DB_PASS,
             "port": config.DB_PORT,
         }
+    elif conn_type == DatabaseConnectionTypes.ADSB:
+        return {
+            "host": config.DB_HOST,
+            "dbname": config.ADSB_DB_NAME,
+            "user": config.DB_USER,
+            "password": config.DB_PASS,
+            "port": config.DB_PORT,
+        }
+    else:
+        raise ValueError(f"Unsupported connection type: {conn_type}")
 
-        # Validate required vars
-        for key, value in db_config.items():
-            if value is None:
-                raise ValueError(f"Missing environment variable: {key}")
+def get_conn(conn_type: DatabaseConnectionTypes = DatabaseConnectionTypes.AIS):
+    db_config = _database_configs(conn_type)
 
-        # Connect
+    # Validate required vars
+    for key, value in db_config.items():
+        if value is None:
+            raise ValueError(f"Missing environment variable: {key}")
+
+    try:
         conn = psycopg.connect(**db_config)
         return conn
-        
-    except Exception as e:
-        print("Error:")
-        print(e)
+    except psycopg.Error as e:
+        raise ConnectionError(f"Failed to connect to database: {e}") from e
 
 
 
