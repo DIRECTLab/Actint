@@ -14,18 +14,12 @@ Tools provided:
 """
 
 import json
-import sqlite3
-import os
-from pathlib import Path
 from fastmcp import FastMCP
-import sys
 
-# Import tool functions from parent package
-from backend.mcp_servers.ais.helpers.previous_locations import ship_following
+from backend.data_processing.query_database import get_conn, DatabaseConnectionTypes
+
 from backend.mcp_servers.ais.helpers.ship_context import (
     get_vessel_general_information_helper,
-    # get_location_context_helper as get_geolocation_context_helper,
-    # get_distance_between as calc_distance_between,
     identify_maritime_region_helper,
     identify_nearest_port_helper,
     identify_nearest_waterway_helper,
@@ -37,28 +31,11 @@ from backend.mcp_servers.ais.helpers.vessel_query import (
     get_similar_mmsis,
     get_similar_vessel_names,
     get_similar_fleet_names,
-    get_vessel_position_history_helper,
-    get_vessel_latest_location_helper,
     get_vessel_mmsi_helper,
 )
 from backend.mcp_servers.ais.helpers.ship_going import (
     calculate_vector_and_distance_sum,
-    get_possible_destinations_helper,
 )
-# from backend.data_processing.query_database import query_vessels
-
-# Database path
-DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
-DB_DIR = DATA_DIR / "db"
-SQLITE_PATH = DB_DIR / "ais.db"
-
-
-def _resolve_sqlite_path() -> Path:
-    """Resolve SQLite path, allowing benchmark overrides via env var."""
-    override = os.getenv("ACTINT_SQLITE_PATH")
-    if override:
-        return Path(override).expanduser().resolve()
-    return SQLITE_PATH
 
 # ============================================================================
 # FastMCP Server Setup
@@ -87,7 +64,7 @@ def get_vessel_mmsi(vessel_name: str) -> str:
             similar_names_str += f"- {name}\n"
         
         return f"""
-Could not find the mmsi for vessel {vessel_name}.
+Could not find the mmsi for vessel {vessel_name}
 
 Vessels with the most similar names are:
 {similar_names_str}
@@ -301,59 +278,60 @@ def _quote_sqlite_identifier(identifier: str) -> str:
 
 
 @mcp.tool()
-def get_database_info() -> str:                                                     # This should maybe be in a helper function or in the system prompt
-    """Get basic SQLite database schema info (tables and column definitions).
+def get_database_info() -> str:
+    """Return a JSON summary of the database schema.
+
+    This tool provides basic schema discovery for the AIS database, including
+    table names and column definitions. Use it before writing queries when you
+    need to inspect available structures.
 
     Returns:
-        str: JSON object containing database path and a list of tables with columns.
+        A JSON string describing the database schema, typically including tables
+        and their columns.
     """
+
     try:
-        sqlite_path = _resolve_sqlite_path()
-        if not sqlite_path.exists():
-            return json.dumps({"error": f"SQLite database not found at {sqlite_path}"})
-
-        conn = sqlite3.connect(str(sqlite_path))
-        cursor = conn.cursor()
-
-        cursor.execute(
-            "SELECT name FROM sqlite_master "
-            "WHERE type='table' AND name NOT LIKE 'sqlite_%' "
-            "ORDER BY name;"
-        )
-        table_names = [r[0] for r in cursor.fetchall()]
-
-        tables: list[dict] = []
-        for table_name in table_names:
-            quoted = _quote_sqlite_identifier(table_name)
-            cursor.execute(f"PRAGMA table_info({quoted});")
-            # PRAGMA table_info returns: cid, name, type, notnull, dflt_value, pk
-            columns = []
-            for cid, name, col_type, notnull, dflt_value, pk in cursor.fetchall():
-                columns.append(
-                    {
-                        "cid": cid,
-                        "name": name,
-                        "type": col_type,
-                        "notnull": bool(notnull),
-                        "default": dflt_value,
-                        "pk": bool(pk),
-                    }
+        with get_conn(DatabaseConnectionTypes.AIS) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT
+                        table_name,
+                        column_name,
+                        data_type,
+                        is_nullable,
+                        column_default
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                    ORDER BY table_name, ordinal_position;
+                    """
                 )
 
-            tables.append({"name": table_name, "columns": columns})
+                rows = cursor.fetchall()
 
-        conn.close()
+        tables: dict[str, list[dict[str, object]]] = {}
+        for table_name, column_name, data_type, is_nullable, column_default in rows:
+            if table_name not in tables:
+                tables[table_name] = []
 
-        return json.dumps(
-            {
-                "db_path": str(sqlite_path),
-                "table_count": len(tables),
-                "tables": tables,
-            },
-            indent=2,
-        )
-    except sqlite3.Error as e:
-        return json.dumps({"error": f"Database error: {str(e)}"})
+            tables[table_name].append(
+                {
+                    "name": column_name,
+                    "type": data_type,
+                    "nullable": is_nullable == "YES",
+                    "default": column_default,
+                }
+            )
+
+        result = {
+            "table_count": len(tables),
+            "tables": [
+                {"name": table_name, "columns": columns}
+                for table_name, columns in tables.items()
+            ],
+        }
+        return json.dumps(result, indent=2)
+
     except Exception as e:
         return json.dumps({"error": f"Introspection error: {str(e)}"})
 
@@ -363,19 +341,34 @@ def get_database_info() -> str:                                                 
 # ============================================================================
 
 @mcp.tool()
-def query_database(sql_query: str, max_rows: int | str = 200) -> str:               
-    """Execute a read-only SQL query against the AIS database and return results.
-    
+def query_database(sql_query: str, max_rows: int | str = 200) -> str:
+    """Execute a read-only SELECT query against the AIS database.
+
+    This tool is intended for safe data retrieval only. It rejects any
+    non-SELECT statement, multiple SQL statements, and queries containing
+    forbidden schema-changing keywords.
+
     Args:
-        sql_query (str): Read-only SQL query to execute (SELECT / WITH ... SELECT)
-        max_rows (int): Maximum number of rows to return (default: 200)
-    
+        sql_query: A single read-only SELECT query to execute.
+        max_rows: Maximum number of rows to return. Values less than 1 default
+            to 200. Values above 5000 are capped at 5000.
+
     Returns:
-        str: JSON with query results and column names, or error message
+        A JSON string containing the query result with:
+        - columns: List of column names
+        - row_count: Number of rows returned
+        - truncated: Whether additional rows were available
+        - max_rows: Applied row limit
+        - rows: List of row objects
+
+        If the query is invalid or not allowed, returns a JSON object with an
+        error field.
     """
+
     try:
         max_rows = int(max_rows)
         query = (sql_query or "").strip()
+
         if not query:
             return json.dumps({"error": "sql_query is required"})
 
@@ -385,56 +378,59 @@ def query_database(sql_query: str, max_rows: int | str = 200) -> str:
             return json.dumps({"error": "Only read-only SELECT queries are allowed"})
 
         forbidden = [
-            "insert ", "update ", "delete ", "drop ", "alter ", "create ",
-            "attach ", "detach ", "vacuum", "pragma", "reindex", "replace ",
+            "insert ",
+            "update ",
+            "delete ",
+            "drop ",
+            "alter ",
+            "create ",
+            "attach ",
+            "detach ",
+            "vacuum",
+            "pragma",
+            "reindex",
+            "replace ",
             "truncate ",
         ]
         if any(tok in ql for tok in forbidden):
             return json.dumps({"error": "Query contains forbidden keywords"})
 
-        # Disallow multi-statement execution; allow a single trailing semicolon
         if ";" in query.rstrip(";"):
             return json.dumps({"error": "Multiple SQL statements are not allowed"})
 
         if max_rows <= 0:
             max_rows = 200
-        if max_rows > 5000:
+        elif max_rows > 5000:
             max_rows = 5000
 
-        conn = sqlite3.connect(str(_resolve_sqlite_path()))
-        cursor = conn.cursor()
+        with get_conn(DatabaseConnectionTypes.AIS) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(query)
 
-        cursor.execute(query)
-        
-        # Get column names
-        columns = [description[0] for description in cursor.description] if cursor.description else []
-        
-        # Fetch bounded results
-        rows = cursor.fetchmany(max_rows + 1)
-        
-        # Convert rows to list of dicts
-        result_list = []
-        truncated = False
-        if len(rows) > max_rows:
-            truncated = True
-            rows = rows[:max_rows]
+                columns = (
+                    [desc[0] for desc in cursor.description]
+                    if cursor.description
+                    else []
+                )
 
-        for row in rows:
-            row_dict = {col: val for col, val in zip(columns, row)}
-            result_list.append(row_dict)
-        
-        conn.close()
-        
+                rows = cursor.fetchmany(max_rows + 1)
+                truncated = len(rows) > max_rows
+                rows = rows[:max_rows]
+
+                result_rows = [
+                    {col: val for col, val in zip(columns, row)}
+                    for row in rows
+                ]
+
         result = {
             "columns": columns,
-            "row_count": len(result_list),
+            "row_count": len(result_rows),
             "truncated": truncated,
             "max_rows": max_rows,
-            "rows": result_list
+            "rows": result_rows,
         }
         return json.dumps(result, indent=2)
-    except sqlite3.Error as e:
-        return json.dumps({"error": f"Database error: {str(e)}"})
+
     except Exception as e:
         return json.dumps({"error": f"Query error: {str(e)}"})
     
