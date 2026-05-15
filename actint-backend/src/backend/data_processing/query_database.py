@@ -45,7 +45,7 @@ def get_conn(conn_type: DatabaseConnectionTypes = DatabaseConnectionTypes.AIS):
 ######################################### Functions for planes ##########################################
 
 def query_adsb_positions(searchQuery: dict, sort=False):
-    conn = get_conn()
+    conn = get_conn(DatabaseConnectionTypes.ADSB)
     cursor = conn.cursor()
 
     prompt = "SELECT * FROM adsb_positions WHERE "

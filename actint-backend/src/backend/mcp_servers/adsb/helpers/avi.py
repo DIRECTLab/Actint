@@ -15,8 +15,9 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from backend.mcp_servers.adsb.helpers.basic_tools import bbox_from_radius_nm, get_conn
+from backend.mcp_servers.adsb.helpers.basic_tools import bbox_from_radius_nm
 from backend.mcp_servers.utils.distance_calculation import haversine_distance_nm
+from backend.data_processing.query_database import DatabaseConnectionTypes, get_conn
 
 
 def get_country_info(code: str) -> Optional[dict[str, Any]]:
@@ -31,7 +32,7 @@ def get_country_info(code: str) -> Optional[dict[str, Any]]:
         LIMIT 1;
     """
 
-    with get_conn() as conn:
+    with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (code_n,))
             row = cur.fetchone()
@@ -59,7 +60,7 @@ def search_countries(name_contains: str, limit: int = 20) -> list[dict[str, Any]
         LIMIT %s;
     """
 
-    with get_conn() as conn:
+    with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (q, limit))
             cols = [d.name for d in cur.description]
@@ -78,7 +79,7 @@ def get_region_info(code: str) -> Optional[dict[str, Any]]:
         LIMIT 1;
     """
 
-    with get_conn() as conn:
+    with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (code_n,))
             row = cur.fetchone()
@@ -107,7 +108,7 @@ def search_regions(name_contains: str, iso_country: str | None = None, limit: in
         LIMIT %s;
     """
 
-    with get_conn() as conn:
+    with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (q, iso_country, iso_country, limit))
             cols = [d.name for d in cur.description]
@@ -137,7 +138,7 @@ def get_navaid_by_ident(ident: str, limit: int = 50) -> list[dict[str, Any]]:
         LIMIT %s;
     """
 
-    with get_conn() as conn:
+    with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (ident_n, limit))
             cols = [d.name for d in cur.description]
@@ -161,7 +162,7 @@ def get_navaids_for_airport(airport_ident: str, limit: int = 50) -> list[dict[st
         LIMIT %s;
     """
 
-    with get_conn() as conn:
+    with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (airport_n, limit))
             cols = [d.name for d in cur.description]
@@ -196,7 +197,7 @@ def find_nearest_navaids(
         LIMIT 20000;
     """
 
-    with get_conn() as conn:
+    with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (type_q, type_q, lat_min, lat_max, lon_min, lon_max))
             cols = [d.name for d in cur.description]
