@@ -151,11 +151,11 @@ async def query_agent_loop(
                 continue
 
             if user_text.lower() in {"/quit", "/exit", "/q"} and command_mode:
-                if not remote_client:
+                if remote_client:
                     from backend.agent.agent import remove_agent_session
-
                     remove_agent_session(sid)
-                break
+                
+                sys.exit(0)
 
             if user_text.lower() in {"/help", "/h"} and command_mode:
                 print_message(
