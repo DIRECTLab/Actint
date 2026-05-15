@@ -18,12 +18,8 @@ from fastmcp import FastMCP
 
 from backend.data_processing.query_database import get_conn, DatabaseConnectionTypes
 
-# Import tool functions from parent package
-# from backend.mcp_servers.ais.helpers.previous_locations import ship_following
 from backend.mcp_servers.ais.helpers.ship_context import (
     get_vessel_general_information_helper,
-    # get_location_context_helper as get_geolocation_context_helper,
-    # get_distance_between as calc_distance_between,
     identify_maritime_region_helper,
     identify_nearest_port_helper,
     identify_nearest_waterway_helper,
@@ -35,13 +31,10 @@ from backend.mcp_servers.ais.helpers.vessel_query import (
     get_similar_mmsis,
     get_similar_vessel_names,
     get_similar_fleet_names,
-    # get_vessel_position_history_helper,
-    # get_vessel_latest_location_helper,
     get_vessel_mmsi_helper,
 )
 from backend.mcp_servers.ais.helpers.ship_going import (
     calculate_vector_and_distance_sum,
-    # get_possible_destinations_helper,
 )
 
 # ============================================================================
@@ -71,7 +64,7 @@ def get_vessel_mmsi(vessel_name: str) -> str:
             similar_names_str += f"- {name}\n"
         
         return f"""
-Could not find the mmsi for vessel {vessel_name}.
+Could not find the mmsi for vessel {vessel_name}
 
 Vessels with the most similar names are:
 {similar_names_str}
@@ -286,7 +279,16 @@ def _quote_sqlite_identifier(identifier: str) -> str:
 
 @mcp.tool()
 def get_database_info() -> str:
-    """Get basic database schema info."""
+    """Return a JSON summary of the database schema.
+
+    This tool provides basic schema discovery for the AIS database, including
+    table names and column definitions. Use it before writing queries when you
+    need to inspect available structures.
+
+    Returns:
+        A JSON string describing the database schema, typically including tables
+        and their columns.
+    """
 
     try:
         with get_conn(DatabaseConnectionTypes.AIS) as conn:
@@ -340,7 +342,28 @@ def get_database_info() -> str:
 
 @mcp.tool()
 def query_database(sql_query: str, max_rows: int | str = 200) -> str:
-    """Execute a read-only SQL query against the AIS database and return results."""
+    """Execute a read-only SELECT query against the AIS database.
+
+    This tool is intended for safe data retrieval only. It rejects any
+    non-SELECT statement, multiple SQL statements, and queries containing
+    forbidden schema-changing keywords.
+
+    Args:
+        sql_query: A single read-only SELECT query to execute.
+        max_rows: Maximum number of rows to return. Values less than 1 default
+            to 200. Values above 5000 are capped at 5000.
+
+    Returns:
+        A JSON string containing the query result with:
+        - columns: List of column names
+        - row_count: Number of rows returned
+        - truncated: Whether additional rows were available
+        - max_rows: Applied row limit
+        - rows: List of row objects
+
+        If the query is invalid or not allowed, returns a JSON object with an
+        error field.
+    """
 
     try:
         max_rows = int(max_rows)
