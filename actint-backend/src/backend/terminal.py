@@ -152,8 +152,7 @@ async def query_agent_loop(
 
             if user_text.lower() in {"/quit", "/exit", "/q"} and command_mode:
                 if remote_client:
-                    from backend.agent.agent import remove_agent_session
-                    remove_agent_session(sid)
+                    await remote_client.disconnect()
                 
                 sys.exit(0)
 
