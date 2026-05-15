@@ -16,10 +16,11 @@ async def set_map_position(lat, lon, zoom, sid=None):
 
 
 
-async def add_marker(sid, lat, lon):
+async def add_marker(sid, lat, lon, popup_msg):
     await sio.emit("add_marker", {
         "lat": lat,
         "lon": lon,
+        "popup_msg": popup_msg,
     }, to=sid)
 
 async def draw_vessel_trajectory(sid, lat, lon, degree, distance_nm):

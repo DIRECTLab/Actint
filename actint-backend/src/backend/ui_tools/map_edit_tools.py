@@ -42,6 +42,7 @@ class AddMarkerTool(Tool):
     inputs = {
         "lat": {"type": "string", "description": "Latitude of marker"},
         "lon": {"type": "string", "description": "Longitude of marker"},
+        "popup_msg": {"type": "string", "description": "Optional message to show in a popup over the marker. Pass an empty string (\"\") to show no popup."},
     }
     output_type = "string"
 
@@ -50,11 +51,11 @@ class AddMarkerTool(Tool):
         self.sid = sid
         self.sio = sio_instance
 
-    def forward(self, lat, lon) -> str:
+    def forward(self, lat, lon, popup_msg) -> str:
         lat = float(lat)
         lon = float(lon)
         future = asyncio.run_coroutine_threadsafe(
-            add_marker(self.sid, lat=lat, lon=lon),
+            add_marker(self.sid, lat=lat, lon=lon, popup_msg=popup_msg),
             get_event_loop(),
         )
         future.result()

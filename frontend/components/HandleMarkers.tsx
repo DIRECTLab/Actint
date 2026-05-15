@@ -86,10 +86,12 @@ export function HandleMarkers({ vehiclesPreviousPositions, vehicleCurrentPositio
                         color={obj.data.color}
                     ></Polyline>;
                 case "marker":
-                    return <Marker
+                    return (<Marker
                         key={index}
                         position={[obj.data.lat, obj.data.lon]}
-                    ></Marker>;
+                    >
+                        {obj.data.popup_msg !== "" && <Popup>obj.data.popup_msg</Popup>}
+                    </Marker>);
                 default:
                     return null;
             }
