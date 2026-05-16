@@ -90,7 +90,7 @@ export function HandleMarkers({ vehiclesPreviousPositions, vehicleCurrentPositio
                         key={index}
                         position={[obj.data.lat, obj.data.lon]}
                     >
-                        {obj.data.popup_msg !== "" && <Popup>obj.data.popup_msg</Popup>}
+                        {obj.data.popup_msg !== "" && <Popup>{obj.data.popup_msg}</Popup>}
                     </Marker>);
                 default:
                     return null;
