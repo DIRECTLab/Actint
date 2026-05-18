@@ -1,10 +1,12 @@
 import uvicorn
 import sys
+import os
 from datetime import datetime
 
 from backend.agent.agent import remove_agent_session, query_agent
 from backend.ui_tools.map_edit_tools import ZoomTool, DrawCircleTool, DrawLineTool, DrawRectangleTool
 from backend.transport.defaults import sio, app
+from backend.config import config
 
 @sio.event
 async def connect(sid, environ):
