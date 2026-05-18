@@ -11,6 +11,10 @@ from backend.mcp_servers.ais import ais_mcp_server
 from backend.event_loop_registry import set_event_loop
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
+<<<<<<< HEAD
+=======
+import sys
+>>>>>>> 4837856 (Decoupling transport and agent logic)
 import socket
 import requests
 
@@ -54,6 +58,7 @@ model = TransformersModel(
 
 _agent_sessions = {}
 
+<<<<<<< HEAD
 
 def get_or_create_agent(
     session_id: str, additional_tools: list = []
@@ -92,6 +97,29 @@ async def query_agent(
         return f"Agent encountered an error: {str(e)}"
 
 
+=======
+_agent_sessions = {}
+
+def get_or_create_agent(session_id: str, additional_tools: list = []) -> ToolCallingAgent:
+    """Creates or retrieves an agent for a given session, injecting relevant tools."""
+    if session_id not in _agent_sessions:
+        # Base tools that all agents get (e.g., MCP server tools)
+        tools = ais_mcp_tools.copy()
+        
+        # Inject context-specific tools (like UI tools or terminal tools)
+        if additional_tools:
+            tools.extend(additional_tools)
+            
+        _agent_sessions[session_id] = ToolCallingAgent(tools=tools, model=model)
+        
+    return _agent_sessions[session_id]
+
+async def query_agent(query: str, session_id: str, additional_tools: list = None):
+    """Entry point for both web and terminal to query their respective agent."""
+    agent = get_or_create_agent(session_id, additional_tools)
+    return agent.run(query, reset=False)
+
+>>>>>>> 4837856 (Decoupling transport and agent logic)
 def remove_agent_session(session_id: str):
     if session_id in _agent_sessions:
         del _agent_sessions[session_id]
