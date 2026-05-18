@@ -33,6 +33,9 @@ else:
 model_id = config.MODEL_ID
 print("Model ID: " + model_id)
 
+model_id = config.MODEL_ID
+#model_id = "Qwen/Qwen2-7B-Instruct"
+
 if config.CONDA_PREFIX:
     python_path = str(Path(config.CONDA_PREFIX) / "bin" / "python")
 else:
