@@ -12,7 +12,6 @@ from backend.mcp_servers.adsb import adsb_mcp_server
 from backend.event_loop_registry import set_event_loop
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
-import sys
 import socket
 import requests
 
@@ -49,7 +48,7 @@ model_id = config.MODEL_ID or ""
 print("\033[0;34mModel ID: \033[1;34m" + model_id + "\033[0m")
 
 model_id = config.MODEL_ID
-#model_id = "Qwen/Qwen2-7B-Instruct"
+print("Model ID: " + model_id)
 
 if config.CONDA_PREFIX:
     python_path = str(Path(config.CONDA_PREFIX) / "bin" / "python")
@@ -73,64 +72,47 @@ adsb_server_params = StdioServerParameters(
     cwd=os.getcwd()
 )
 
-adsb_mcp_client = MCPClient(adsb_server_params, structured_output=False)
-adsb_mcp_tools = adsb_mcp_client.get_tools()
+_agent_sessions = {}
+
+_agent_sessions = {}
 
 
-print(f"""\033[1;33mChecking connection to llm inference server {config.INFERENCE_SERVER_URL}\033[0m""", file=sys.stderr)
-print(check_openai_health(), file=sys.stderr)
-
-model = OpenAIModel(
-    model_id="local",
-    api_base=config.INFERENCE_SERVER_URL,
-    api_key="dummy"
-)
-
-def create_agent(
-    additional_tools: list = [],
-    
+def get_or_create_agent(
+    session_id: str, additional_tools: list = []
 ) -> ToolCallingAgent:
-    """Creates an agent, injecting relevant tools."""
-    tools = []
-    tools += ais_mcp_tools
-    tools += adsb_mcp_tools
-    managed_agents = []
-    if additional_tools:
-        tools.extend(additional_tools)
-        # map_agent = ToolCallingAgent(
-        #     tools=additional_tools,
-        #     model=model,
-        #     max_steps=10,
-        #     name="map_ui_agent",
-        #     description="Can show things to the user on a map. Can move, zoom, and draw basic shapes on the map."
-        # )
-        # managed_agents.append(map_agent)
-    return ToolCallingAgent(tools=tools, model=model, managed_agents=managed_agents)
+    """Creates or retrieves an agent for a given session, injecting relevant tools."""
+    if session_id not in _agent_sessions:
+        tools = ais_mcp_tools.copy()
+        if additional_tools:
+            tools.extend(additional_tools)
+        _agent_sessions[session_id] = ToolCallingAgent(tools=tools, model=model)
+    return _agent_sessions[session_id]
 
-async def query_agent_instance(
-    agent: ToolCallingAgent,
+
+async def query_agent(
     query: str,
+    session_id: str,
+    additional_tools: list = None,
 ) -> str:
-    """Entry point for both web and terminal to query an agent instance."""
+    """Entry point for both web and terminal to query their respective agent."""
 
     loop = asyncio.get_running_loop()
     set_event_loop(loop)  # Register before entering the thread so tools can reach it
+
+    agent = get_or_create_agent(session_id, additional_tools or [])
 
     try:
         result = await loop.run_in_executor(
             None, lambda: agent.run(query, reset=False)
         )
-
         return result
     except AgentMaxStepsError:
-        print(f"Agent hit max steps.", file=sys.stderr)
+        print(f"[session={session_id}] Agent hit max steps.", file=sys.stderr)
         return "Agent failed to respond: maximum steps exceeded."
     except Exception as e:
-        print(f"Agent error: {e}", file=sys.stderr)
+        print(f"[session={session_id}] Agent error: {e}", file=sys.stderr)
         return f"Agent encountered an error: {str(e)}"
-    
 
-#======================================Summarization Agent==================================#
 
 def summarize_last_turn(instructions: str, agent: ToolCallingAgent):
     summarization_tools = []  # Define any tools specific to summarization if needed
