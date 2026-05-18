@@ -76,7 +76,74 @@ Scores are 1–5 (higher = better). Ratings are preliminary/vibes-based.
 | **Total** | **32/40** | **22/40** | **20/40** |
 
 
-## Data Model
+# Data Model
+
+## Start With these Tables
+
+### `heatmap_bins`
+Spatial trajectory segments, used for path reconstruction and analysis.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `h3_index` | PK | |
+| `lat_center` | float | |
+| `lon_center` | float | |
+| `contains_airport` | bool | |
+| `traversal_count` |int||
+
+### `route_segments`
+Spatial trajectory segments, used for path reconstruction and analysis.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | PK | |
+| `start_bin` | hex code | |
+| `end_bin` | hex code | |
+| `transition_count` |int||
+
+### `route_stats`
+per route per aircraft statistics 
+per aircraft we want (ave speed, ave altitude, ave vertical rate, ave ias (airspeed))
+these stats should be linked to edges (segments)
+new entry in the table for each aircraft and each altitude band
+
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `segment_id` | FK → route_segments | |
+| `aircraft_type` | string | |
+| `ave_gnd_speed` | float | |
+| `altitude_band` | float | Use FL avi designation |
+| `ave_vert_rate` | float | |
+| `ave_ias` | float | indicated air speed |
+| `heading_variance` | float | how consistent is the heading|
+
+
+### `segment_transitions`
+Learned transition probabilities between trajectory segments for next-segment prediction and behavior modeling.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | PK | |
+| `from_segment_id` | FK → route_segments | |
+| `to_segment_id` | FK → route_segments | |
+| `aircraft_type` | text | |
+| `db_flags` | int | |
+| `altitude_band` | text | |
+| `time_of_day` | text | |
+| `transition_count` | int | |
+| `probability` | float | |
+| `confidence` | float | |
+| `last_updated` | timestamp | |
+
+
+
+
+<br/>
+<br/>
+
+## OLD
+
 
 ### `flights`
 Individual flight instances reconstructed from ADS-B data — a single aircraft movement from departure to arrival.
@@ -175,3 +242,21 @@ Links fine-grained trajectory segments to higher-level routes with probabilistic
 | `segment_id` | FK → route_segments | |
 | `route_id` | FK → routes | |
 | `probability` | float | |
+
+---
+
+### `route_stats`
+per route per aircraft statistics 
+per aircraft we want (ave speed, ave altitude, ave vertical rate, ave ias (airspeed))
+these stats should be linked to edges (segments)
+new entry in the table for each aircraft and each altitude band
+
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `segment_id` | FK → route_segments | |
+| `aircraft_type` | string | |
+| `ave_gnd_speed` | float | |
+| `altitude_band` | float | Use FL avi designation |
+| `ave_vert_rate` | float | |
+| `ave_ias` | float | indicated air speed |
