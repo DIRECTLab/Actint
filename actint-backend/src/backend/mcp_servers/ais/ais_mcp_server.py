@@ -157,6 +157,15 @@ def ship_following_analysis(mmsi1: int | str, mmsi2: int | str) -> str:
 # ============================================================================
 @mcp.tool()
 def search_region_for_ships(region: str) -> dict:
+    """Get information about dark vessels in a given region
+    
+    Args:
+        region (str): Key of the region to search (e.g. "gulf_of_aden")
+
+    Returns:
+        str: String with information about concerning (dark?) vessels in the region
+
+    """
     if region not in REGIONS:
         return {
             "success": False,
