@@ -33,9 +33,6 @@ else:
 model_id = config.MODEL_ID
 print("Model ID: " + model_id)
 
-model_id = config.MODEL_ID
-print("Model ID: " + model_id)
-
 if config.CONDA_PREFIX:
     python_path = str(Path(config.CONDA_PREFIX) / "bin" / "python")
 else:
@@ -55,8 +52,6 @@ model = TransformersModel(
     model_id=model_id,
     max_new_tokens=config.MAX_NEW_TOKENS,
 )
-
-_agent_sessions = {}
 
 _agent_sessions = {}
 
