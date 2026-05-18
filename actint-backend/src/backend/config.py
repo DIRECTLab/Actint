@@ -20,29 +20,14 @@ def env_int(name: str, default: int | None = None) -> int | None:
 
 @dataclass(frozen=True)
 class Config:
-    CONDA_PREFIX: str | None = env_str("CONDA_PREFIX")
-
-    WEB_SOCKET_PORT: int = env_int("WEB_SOCKET_PORT", 3050)
-
-    DB_HOST: str | None = env_str("DB_HOST")
-    ADSB_DB_NAME: str | None = env_str("ADSB_DB_NAME")
-    AIS_DB_NAME: str | None = env_str("AIS_DB_NAME")
-    DB_USER: str | None = env_str("DB_USER")
-    DB_PASS: str | None = env_str("DB_PASS")
-    DB_PORT: int | None = env_int("DB_PORT")
-    MODEL_ID: str | None = env_str("MODEL_ID")
-
-    DB_USING_SQLITE: bool = bool(env_str("DB_USING_SQLITE", ""))
-    DB_PATH: str = env_str("DB_PATH", "")
-
-    MAX_AGENT_STEPS: int = env_int("MAX_AGENT_STEPS", 20)
-
-    INFERENCE_SERVER_PORT: int = env_int("INFERENCE_SERVER_PORT", 8000)
-    INFERENCE_SERVER_HOST: str = env_str("INFERENCE_SERVER_HOST", "127.0.0.1")
-    INFERENCE_SERVER_URL: str = f"http://{INFERENCE_SERVER_HOST}:{INFERENCE_SERVER_PORT}/v1"
-    MODEL_API_KEY: str | None = env_str("MODEL_API_KEY", "")
-
-    FISHY_VESSELS_DB_NAME: str | None = env_str("FISHY_VESSELS_DB_NAME")
-    FISHY_REPORTS_DB_NAME: str | None = env_str("FISHY_REPORTS_DB_NAME")
-
+    CONDA_PREFIX: str | None = getenv("CONDA_PREFIX")
+    WEB_SOCKET_PORT: int = int(getenv("WEB_SOCKET_PORT", "3050"))
+    DB_HOST: str | None = getenv("DB_HOST")
+    DB_NAME: str | None = getenv("DB_NAME")
+    DB_USER: str | None = getenv("DB_USER")
+    DB_PASS: str | None = getenv("DB_PASS")
+    # DB_PORT is set to None if undefined, and errors if set to something that
+    # can't be converted to an int
+    DB_PORT: int | None = int(getenv("DB_PORT")) if getenv("DB_PORT") else None
+    
 config = Config()
