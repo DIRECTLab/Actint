@@ -70,6 +70,8 @@ adsb_server_params = StdioServerParameters(
 
 _agent_sessions = {}
 
+_agent_sessions = {}
+
 def get_or_create_agent(session_id: str, additional_tools: list = []) -> ToolCallingAgent:
     """Creates or retrieves an agent for a given session, injecting relevant tools."""
     if session_id not in _agent_sessions:
