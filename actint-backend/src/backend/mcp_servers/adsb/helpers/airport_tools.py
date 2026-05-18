@@ -16,14 +16,15 @@ from typing import Any, Optional
 
 from backend.mcp_servers.adsb.helpers.basic_tools import (
     bbox_from_radius_nm,
-    bearing_diff_deg,
-    get_conn,
+    bearing_diff_deg
 )
 from backend.mcp_servers.adsb.helpers.adsb_locations import (
     get_direction_vector_for_aircraft,
     get_vehicle_current_position,
 )
 from backend.mcp_servers.utils.distance_calculation import calculate_bearing, haversine_distance_nm
+
+from backend.data_processing.query_database import DatabaseConnectionTypes, get_conn
 
 
 def get_airport_by_ident(ident: str) -> Optional[dict[str, Any]]:
@@ -45,7 +46,7 @@ def get_airport_by_ident(ident: str) -> Optional[dict[str, Any]]:
         LIMIT 1;
     """
 
-    with get_conn() as conn:
+    with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (ident_n,))
             row = cur.fetchone()
@@ -87,7 +88,7 @@ def search_airports(
         LIMIT %s;
     """
 
-    with get_conn() as conn:
+    with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 sql,
@@ -134,7 +135,7 @@ def get_airport_runways(
         LIMIT %s;
     """
 
-    with get_conn() as conn:
+    with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (ident_q, ident_q, airport_ref, airport_ref, limit))
             cols = [d.name for d in cur.description]
@@ -166,7 +167,7 @@ def get_airport_frequencies(
         LIMIT %s;
     """
 
-    with get_conn() as conn:
+    with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (ident_q, ident_q, airport_ref, airport_ref, type_q, type_q, limit))
             cols = [d.name for d in cur.description]
@@ -205,7 +206,7 @@ def find_nearest_airport(
         LIMIT 5000;
     """
 
-    with get_conn() as conn:
+    with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (lat_min, lat_max, lon_min, lon_max))
             cols = [d.name for d in cur.description]
@@ -272,7 +273,7 @@ def get_possible_airport_destinations(
         LIMIT 10000;
     """
 
-    with get_conn() as conn:
+    with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (lat_min, lat_max, lon_min, lon_max))
             cols = [d.name for d in cur.description]

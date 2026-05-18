@@ -216,7 +216,7 @@ class DrawPolygonTool(Tool):
         return f"Polygon drawn with points {points} in {color}"
 
 
-class DeleteObjctTool(Tool):
+class DeleteObjectTool(Tool):
     name = "delete_object"
     description = "Deletes objects drawn on the map"
     inputs = {

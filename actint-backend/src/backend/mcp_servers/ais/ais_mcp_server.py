@@ -34,10 +34,7 @@ from backend.mcp_servers.ais.helpers.similartiy import (
 from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_mmsi_helper
 # from backend.data_processing.query_database import query_vessels
 
-# Database path
-DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
-DB_DIR = DATA_DIR / "db"
-SQLITE_PATH = DB_DIR / "ais.db"
+
 
 # ============================================================================
 # FastMCP Server Setup
@@ -85,7 +82,7 @@ def get_vessel_mmsi(vessel_name: str) -> str:
             similar_names_str += f"- {name}\n"
         
         return f"""
-Could not find the mmsi for vessel {vessel_name}.
+Could not find the mmsi for vessel {vessel_name}
 
 Vessels with the most similar names are:
 {similar_names_str}
@@ -252,6 +249,7 @@ def get_vessels_in_fleet(fleet_name: str) -> str:
     Returns: 
         str: MMSIs of all ships in the fleet
     """
+
     try:
         return get_vessels_in_fleet_helper(fleet_name)
     except ValueError as e:

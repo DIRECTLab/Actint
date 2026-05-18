@@ -8,6 +8,7 @@ from pathlib import Path
 
 from backend.config import config
 from backend.mcp_servers.ais import ais_mcp_server
+from backend.mcp_servers.adsb import adsb_mcp_server
 from backend.event_loop_registry import set_event_loop
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
@@ -24,27 +25,38 @@ if is_port_in_use(4317):
     SmolagentsInstrumentor().instrument()
 else:
     print(
-        "Phoenix telemetry server is not running on localhost:4317. Skipping instrumentation.",
+        "\x1b[33mPhoenix telemetry server is not running on localhost:4317. Skipping instrumentation.\033[0m",
         file=sys.stderr
     )
 
 model_id = config.MODEL_ID
-print("Model ID: " + model_id)
+print("\033[0;34mModel ID: \033[1;34m" + model_id + "\033[0m")
 
 if config.CONDA_PREFIX:
     python_path = str(Path(config.CONDA_PREFIX) / "bin" / "python")
 else:
     python_path = sys.executable
 
-server_params = StdioServerParameters(
+ais_server_params = StdioServerParameters(
     command=python_path,
     args=[ais_mcp_server.__file__],
     env=os.environ.copy(),
     cwd=os.getcwd()
 )
 
-mcp_client = MCPClient(server_params, structured_output=False)
-ais_mcp_tools = mcp_client.get_tools()
+ais_mcp_client = MCPClient(ais_server_params, structured_output=False)
+ais_mcp_tools = ais_mcp_client.get_tools()
+
+
+adsb_server_params = StdioServerParameters(
+    command=python_path,
+    args=[adsb_mcp_server.__file__],
+    env=os.environ.copy(),
+    cwd=os.getcwd()
+)
+
+adsb_mcp_client = MCPClient(adsb_server_params, structured_output=False)
+adsb_mcp_tools = adsb_mcp_client.get_tools()
 
 model = TransformersModel(
     model_id=model_id,
@@ -56,7 +68,9 @@ def create_agent(
     
 ) -> ToolCallingAgent:
     """Creates an agent, injecting relevant tools."""
-    tools = ais_mcp_tools.copy()
+    tools = []
+    tools += ais_mcp_tools
+    tools += adsb_mcp_tools
     managed_agents = []
     if additional_tools:
         tools.extend(additional_tools)

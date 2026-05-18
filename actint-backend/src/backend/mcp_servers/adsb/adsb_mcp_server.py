@@ -7,7 +7,7 @@ This is intentionally parallel to `actint.mcp.mcp_server` (AIS) but uses the
 Postgres-backed ADS-B tools in `actint.tools.ADSB`.
 
 Environment variables required for DB access:
-- DB_HOST, DB_NAME, DB_USER, DB_PASS, DB_PORT
+- DB_HOST, ADSB_DB_NAME, DB_USER, DB_PASS, DB_PORT
 
 Tools provided (initial, simple set):
 - Aircraft position history and current position
