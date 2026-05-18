@@ -1,9 +1,9 @@
+import argparse
 import asyncio
 import json
 import sys
 from datetime import datetime
 from uuid import uuid4
-from sys import argv
 
 try:
     import readline  # noqa: F401 -- enables up-arrow input history automatically
@@ -11,7 +11,11 @@ except ImportError:
     # readline is Unix/macOS only. Install pyreadline3 on Windows.
     pass
 
-from backend.agent.agent import query_agent, remove_agent_session
+try:
+    import socketio
+    SOCKETIO_AVAILABLE = True
+except ImportError:
+    SOCKETIO_AVAILABLE = False
 
 
 SESSION_ID = uuid4().hex[:8]  # Generate a short random session ID for terminal users
@@ -66,7 +70,54 @@ async def query_agent_loop(debug: bool = False) -> None:
         print()
         print_message("System", "Interrupted by user.")
     finally:
+        if remote_client:
+            await remote_client.disconnect()
         print_message("System", "Session closed.")
+
+
+async def main() -> None:
+    parser = argparse.ArgumentParser(description="Terminal chat client")
+    parser.add_argument(
+        "--debug", "-d",
+        action="store_true",
+        help="Enable debug mode",
+    )
+    parser.add_argument(
+        "--remote", "-r",
+        action="store_true",
+        help="Connect to a remote backend via WebSocket instead of running locally",
+    )
+    parser.add_argument(
+        "--host",
+        default=DEFAULT_HOST,
+        help=f"Remote backend host (default: {DEFAULT_HOST})",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=DEFAULT_PORT,
+        help=f"Remote backend port (default: {DEFAULT_PORT})",
+    )
+    args = parser.parse_args()
+
+    remote_client = None
+
+    if args.remote:
+        if not SOCKETIO_AVAILABLE:
+            print(
+                "Error: python-socketio is required for remote mode.\n"
+                'Run: pip install "python-socketio[asyncio_client]"'
+            )
+            sys.exit(1)
+
+        remote_client = RemoteAgentClient(args.host, args.port)
+        try:
+            await remote_client.connect()
+        except Exception as e:
+            print(f"Failed to connect to {remote_client.url}: {e}")
+            sys.exit(1)
+
+    await query_agent_loop(debug=args.debug, remote_client=remote_client)
 
 
 if __name__ == "__main__":
