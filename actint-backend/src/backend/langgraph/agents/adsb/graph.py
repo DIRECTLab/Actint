@@ -1,6 +1,6 @@
 from langgraph.graph import StateGraph, START, END
 
-from .state import AISAgentState
+from .state import ADSBAgentState
 from .nodes.analyze import analyze
 from .nodes.fetch import fetch_information
 from .nodes.summarize import summarize_reasoning
@@ -8,18 +8,14 @@ from .nodes.router import route
 
 
 def build_graph():
-    builder = StateGraph(AISAgentState)
+    builder = StateGraph(ADSBAgentState)
 
-    # Nodes
     builder.add_node("analyze", analyze)
     builder.add_node("fetch", fetch_information)
     builder.add_node("summarize", summarize_reasoning)
 
-    # Entry
     builder.add_edge(START, "analyze")
 
-    # Loop
-    # Route directly from analyze using conditional edges
     builder.add_conditional_edges(
         "analyze",
         route,
@@ -31,12 +27,9 @@ def build_graph():
     )
 
     builder.add_edge("fetch", "analyze")
-
-    # Exit
     builder.add_edge("summarize", END)
 
     return builder.compile()
 
 
-# Compiled graph
 app = build_graph()

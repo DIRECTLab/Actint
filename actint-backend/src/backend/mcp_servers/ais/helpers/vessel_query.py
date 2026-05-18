@@ -61,13 +61,14 @@ def get_vessel_name_helper(mmsi: int) -> str:
 
 def get_vessel_mmsi_helper(vessel_name: str) -> int:
     """Get the MMSI of a vessel given its name."""
-    conn = get_conn()
-    cursor = conn.cursor()
-    cursor.execute("SELECT mmsi FROM ais_static_data WHERE UPPER(vesselname) = UPPER(%s);", (vessel_name,))
-    result = cursor.fetchone()
-    conn.close()
+    with get_conn() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT mmsi FROM ais_static_data WHERE UPPER(vesselname) = UPPER(%s);", (vessel_name,))
+        result = cursor.fetchone()
+
     if result:
         return result[0]
+    
     raise ValueError("No Vessel with that name.")
 
 

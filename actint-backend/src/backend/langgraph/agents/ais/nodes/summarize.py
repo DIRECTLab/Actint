@@ -26,6 +26,9 @@ I'm doing well, thank you!</final>
 User query:
 {state["user_query"]}
 
+Agent reasoning:
+{state.get("agent_thinking", [])}
+
 Provide your summary of the AIS Agent's reasoning and actions in response to the user's query:
 """
     final_answer = await generate(prompt, max_tokens=500)

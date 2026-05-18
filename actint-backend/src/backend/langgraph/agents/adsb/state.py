@@ -1,6 +1,7 @@
 from typing import TypedDict, Optional, List
 
-class AISAgentState(TypedDict, total=False):
+
+class ADSBAgentState(TypedDict, total=False):
     user_query: str
 
     agent_thinking: List[str]

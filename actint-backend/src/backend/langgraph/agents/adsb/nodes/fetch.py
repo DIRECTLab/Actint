@@ -4,14 +4,12 @@ from backend.mcp_servers.ais import ais_mcp_server
 
 _tool_str = None
 
-async def get_tool_definitions_str() -> str:
-    """Fetch all tool definitions from the AIS MCP server as a formatted string."""
-    global _tool_str
 
+async def get_tool_definitions_str() -> str:
+    global _tool_str
     if _tool_str is not None:
         return _tool_str
 
-    # Build and cache tool definitions once
     async with Client(ais_mcp_server.mcp) as client:
         tools = await client.list_tools()
 
@@ -34,7 +32,6 @@ async def get_tool_definitions_str() -> str:
 
 async def fetch_information(state):
     request = state.get("tool_request")
-
     if not request:
         return {}
 
@@ -46,25 +43,18 @@ async def fetch_information(state):
 
     result_str = str(result)
 
-    # attempt to parse structured output
-    structured = None
     try:
-        if isinstance(result, dict):
-            structured = result
-        else:
-            structured = json.loads(result_str)
+        structured = result if isinstance(result, dict) else json.loads(result_str)
     except Exception:
         structured = {"raw": result_str}
 
-    history = state.get("tool_history", [])
-    history = history + [{
+    history = state.get("tool_history", []) + [{
         "tool": name,
         "args": args,
         "result": structured,
     }]
 
-    thinking = state.get("agent_thinking", [])
-    thinking = thinking + [f"Tool {name} executed"]
+    thinking = state.get("agent_thinking", []) + [f"Tool {name} executed"]
 
     return {
         "tool_result": result_str,
