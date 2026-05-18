@@ -1,4 +1,3 @@
-# backend/agent/agent.py
 import os
 import asyncio
 import sys
