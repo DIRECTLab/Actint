@@ -61,51 +61,6 @@ async def query_agent_loop(debug: bool = False) -> None:
         print_message("System", "Session closed.")
 
 
-async def main() -> None:
-    parser = argparse.ArgumentParser(description="Terminal chat client")
-    parser.add_argument(
-        "--debug", "-d",
-        action="store_true",
-        help="Enable debug mode",
-    )
-    parser.add_argument(
-        "--remote", "-r",
-        action="store_true",
-        help="Connect to a remote backend via WebSocket instead of running locally",
-    )
-    parser.add_argument(
-        "--host",
-        default=DEFAULT_HOST,
-        help=f"Remote backend host (default: {DEFAULT_HOST})",
-    )
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=DEFAULT_PORT,
-        help=f"Remote backend port (default: {DEFAULT_PORT})",
-    )
-    args = parser.parse_args()
-
-    remote_client = None
-
-    if args.remote:
-        if not SOCKETIO_AVAILABLE:
-            print(
-                "Error: python-socketio is required for remote mode.\n"
-                'Run: pip install "python-socketio[asyncio_client]"'
-            )
-            sys.exit(1)
-
-        remote_client = RemoteAgentClient(args.host, args.port)
-        try:
-            await remote_client.connect()
-        except Exception as e:
-            print(f"Failed to connect to {remote_client.url}: {e}")
-            sys.exit(1)
-
-    await query_agent_loop(debug=args.debug, remote_client=remote_client)
-
-
 if __name__ == "__main__":
     if len(argv) > 1 and argv[1] in {"--debug", "-d"}:
         asyncio.run(query_agent_loop(debug=True))
