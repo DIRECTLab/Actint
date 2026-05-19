@@ -1,11 +1,11 @@
 # backend/agent/agent.py
 import os
 import asyncio
-from smolagents import ToolCallingAgent, TransformersModel, MCPClient, AgentMaxStepsError, ActionStep, TaskStep
+from smolagents import ToolCallingAgent, TransformersModel, MCPClient, AgentMaxStepsError, ActionStep, TaskStep, OpenAIModel
 from mcp import StdioServerParameters
 import sys
 from pathlib import Path
-
+from backend.agent.llamacpp_wrapper import LlamaCppModel
 from backend.config import config
 from backend.mcp_servers.ais import ais_mcp_server
 from backend.event_loop_registry import set_event_loop
@@ -46,10 +46,26 @@ server_params = StdioServerParameters(
 mcp_client = MCPClient(server_params, structured_output=False)
 ais_mcp_tools = mcp_client.get_tools()
 
-model = TransformersModel(
-    model_id=model_id,
-    max_new_tokens=config.MAX_NEW_TOKENS,
+# model = TransformersModel(
+#     model_id=model_id,
+#     max_new_tokens=config.MAX_NEW_TOKENS,
+# )
+
+
+
+
+# model = LlamaCppModel(
+
+#     model_path="/home/daxtonb/models/gemma-4-26B-A4B-it-MXFP4_MOE_BF16.gguf"
+# )
+
+
+model = OpenAIModel(
+    model_id="local",
+    api_base="http://127.0.0.1:8000/v1",
+    api_key="dummy"
 )
+
 
 def create_agent(
     additional_tools: list = [],
