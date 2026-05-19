@@ -5,7 +5,7 @@ import sys
 from backend.config import config
 from pathlib import Path
 
-from smolagents import ToolCallingAgent, CodeAgent, VLLMModel, MCPClient, AgentMaxStepsError, ActionStep, TaskStep
+from smolagents import ToolCallingAgent, CodeAgent, VLLMModel, TransformersModel, MCPClient, AgentMaxStepsError, ActionStep, TaskStep
 from mcp import StdioServerParameters
 from backend.mcp_servers.ais import ais_mcp_server
 from backend.mcp_servers.adsb import adsb_mcp_server
@@ -59,16 +59,18 @@ adsb_server_params = StdioServerParameters(
 adsb_mcp_client = MCPClient(adsb_server_params, structured_output=False)
 adsb_mcp_tools = adsb_mcp_client.get_tools()
 
-def init_model() -> VLLMModel:
+def init_model() -> TransformersModel:
     model_kwargs={}
     # We have to limit the context length to fit gemma-4-31B on a blackwell
     if config.MODEL_ID == 'google/gemma-4-31B-it':
         model_kwargs={'max_model_len': 131392}
 
-    return VLLMModel(
-        model_id=config.MODEL_ID,
-        model_kwargs=model_kwargs
-    )
+    # return VLLMModel(
+    #     model_id=config.MODEL_ID,
+    #     model_kwargs=model_kwargs
+    # )
+    return TransformersModel(model_id=config.MODEL_ID)
+
 
 def create_agent(
     model,
