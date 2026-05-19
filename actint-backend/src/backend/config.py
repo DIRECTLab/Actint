@@ -9,6 +9,7 @@ load_dotenv()
 class Config:
     CONDA_PREFIX: str | None = getenv("CONDA_PREFIX", None)
     WEB_SOCKET_PORT: int = int(getenv("WEB_SOCKET_PORT", "3050"))
+    INFERENCE_SERVER_PORT: int = int(getenv("INFERENCE_SERVER_PORT", "8000"))
     # DB Config
     DB_HOST: str | None = getenv("DB_HOST", None)
     ADSB_DB_NAME: str | None = getenv("ADSB_DB_NAME", None)
