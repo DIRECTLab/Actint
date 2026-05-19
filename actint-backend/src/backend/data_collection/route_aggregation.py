@@ -75,6 +75,7 @@ from pathlib import Path
 
 from h3 import cell_to_latlng, latlng_to_cell
 from backend.mcp_servers.adsb.helpers.adsb_locations import bbox_from_radius_nm, get_conn
+from backend.mcp_servers.adsb.helpers.airport_tools import find_nearest_airport
 from backend.mcp_servers.utils.distance_calculation import haversine_distance_nm
 
 from contextlib import nullcontext
@@ -89,7 +90,7 @@ RAW_DIR = DATA_DIR / "raw"
 
 BASE_URL = "https://github.com/adsblol/globe_history_{year}/releases/download"
 RES = 7
-MAX_SPEED = 800
+MAX_SPEED = 2000
 
 
 def build_date_range(day_delta, start_str, end_str=None):
@@ -104,45 +105,59 @@ def build_date_range(day_delta, start_str, end_str=None):
     return days
 
 
+def create_tables(conn):
 
-def get_aircrafts(tar_buffer):
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS heatmap_bins (
+        
+                h3_index BIGINT PRIMARY KEY,
+                lat_center DOUBLE PRECISION,
+                lon_center DOUBLE PRECISION,
+                traversal_count BIGINT NOT NULL,
+                contains_airport BOOLEAN
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS route_segments (
+        
+                id BIGINT PRIMARY KEY,
+                start_bin BIGINT,
+                end_bin BIGINT,
+                transition_count BIGINT NOT NULL
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS segment_stats (
+        
+                segment_id BIGINT PRIMARY KEY,
+                aircraft_type TEXT,
+                altitude_band TEXT,
+                ave_gnd_speed REAL,
+                ave_ias REAL,
+                ave_vert_rate REAL,
+                ave_heading REAL,
+                heading_variance REAL
+            )
+        """)
 
-    with tarfile.open(fileobj=tar_buffer, mode="r:*") as tar:
+    conn.commit()
+
+
+def get_aircraft_count(tar_buffer):
+
+    #with tarfile.open(fileobj=tar_buffer, mode="r:*") as tar:
+    with tarfile.open(tar_buffer, mode="r:*") as tar:
 
         total_matches = 0
-        tar_members = []
 
         for member in tar.getmembers():
             if re.match(r'^./traces/[0-9a-fA-F]{2}/.*\.json$', member.name):
                 
                 total_matches = total_matches + 1
-                tar_members.append(member)
 
+    return total_matches
 
-    return total_matches, tar_members
-
-
-
-def get_aircraft_data(tar_buffer, member): 
-    
-    with tarfile.open(fileobj=tar_buffer, mode="r:*") as tar:
-
-        f = tar.extractfile(member)
-        if f:
-            with gzip.open(f, 'rt', encoding='utf-8') as gz:
-                try:
-                    data = json.load(gz)
-                    
-                except (json.JSONDecodeError, gzip.BadGzipFile):
-                    print(f"error extracting aircraft {member}")
-
-    return data
-
-
-def save_Tar(tar_buffer):
-
-    with tarfile.open(fileobj=tar_buffer, mode="r:*") as tar:
-        tar.extractall(RAW_DIR, filter=lambda tarinfo, _: tarinfo)
 
 
 def download_Tar_File(day, year, iterations=0, show_bar=True):
@@ -208,6 +223,35 @@ def download_Tar_File(day, year, iterations=0, show_bar=True):
     # If all tag variants fail, recurse to next year
     print("No data found for this year, trying next year")
     return download_Tar_File(day, year + 1, iterations + 1, show_bar)
+
+
+
+def iter_aircrafts_from_tar(tar_path: Path):
+    """
+    Yields one aircraft JSON object at a time from a tar.gz archive.
+    Memory efficient: streams per member.
+    """
+
+    pattern = re.compile(r'^./traces/[0-9a-fA-F]{2}/.*\.json$')
+
+    #with tarfile.open(fileobj=tar_buffer, mode="r:*") as tar:
+    with tarfile.open(tar_path, mode="r:*") as tar:
+
+        for member in tar:
+
+            if not pattern.match(member.name):
+                continue
+
+            f = tar.extractfile(member)
+            if f is None:
+                continue
+
+            try:
+                with gzip.open(f, "rt", encoding="utf-8") as gz:
+                    yield member, json.load(gz)
+
+            except (json.JSONDecodeError, gzip.BadGzipFile):
+                continue
 
 
 
@@ -284,8 +328,11 @@ def normalize_data(json_data):
     return flattened
 
 
+def safe_div(numerator, denominator):
+    return numerator / denominator if denominator else 0.0
 
-def determine_routes(data):
+
+def determine_routes(conn, data, airport_cells):
 
     if not data:
         print(f"no flight data")
@@ -314,19 +361,20 @@ def determine_routes(data):
 
     for entry in data:
 
-    
-
         if entry.get("ALTITUDE") == None or entry.get("ALTITUDE") <= 1000:
+            #print(f'altitude below threshold: {entry.get("ALTITUDE")}')
             continue 
 
         cur_time = entry.get("TIMESTAMP")
+        #print(f"cur_time: {cur_time}")
 
         if(prev_time):
             dt = cur_time - prev_time
 
-        print(f'time delta: {dt}')
+        #print(f'time delta: {dt}')
 
         if dt <= 0:
+            print(f'negative time delta: {dt}')
             continue
 
         lat = entry.get("LAT")
@@ -341,12 +389,19 @@ def determine_routes(data):
         #     continue 
 
         if(prev_point):
-            implied_speed = haversine_distance_nm(cur_point, prev_point)/dt
+
+            lat1, lon1 = cur_point
+            lat2, lon2 = prev_point
+
+            dt_hours = dt/3600
+
+            implied_speed = haversine_distance_nm(lat1, lon1, lat2, lon2)/dt_hours
         
         if implied_speed > MAX_SPEED:
             prev_time = None
             prev_bin = None
             prev_point = None
+            print(f"Impossible speed: {implied_speed} for {entry.get("TYPE")}")
             continue
 
         if(prev_bin):
@@ -375,64 +430,163 @@ def determine_routes(data):
                 continue 
 
             else:
-                print()
+
+                gnd_speed_ave = safe_div(gnd_speed_sum, gnd_speed_count)  
+                alt_ave       = safe_div(alt_sum, alt_count)
+                vert_rate_ave = safe_div(vert_rate_sum, vert_rate_count)
+                ias_ave       = safe_div(ias_sum, ias_count)
+                heading_ave   = safe_div(heading_sum, heading_count)
+
+                # print(f"\ngnd_speed_ave: {gnd_speed_ave}")
+                # print(f"alt_ave: {alt_ave}")
+                # print(f"vert_rate_ave: {vert_rate_ave}")
+                # print(f"ias_ave: {ias_ave}")
+                # print(f"heading_ave: {heading_ave}\n")
+
+                #new bin traversal
+                bin_traversal_update(conn, cur_bin, airport_cells)
+
+                gnd_speed_sum = 0
+                alt_sum = 0
+                vert_rate_sum = 0
+                ias_sum = 0
+                heading_sum = 0
+
+                gnd_speed_count = 0
+                alt_count = 0
+                vert_rate_count = 0
+                ias_count = 0
+                heading_count = 0
+               
+
             
         # else
         #     new_bin_traversal += 1 
         #     record transition
         #     record_transition_stats(prev_bin, cur_bin)
-        #     prev_bin = cur_bin
 
         prev_time = cur_time
         prev_bin = cur_bin
         prev_point = cur_point
 
 
+def bin_traversal_update(conn, h3_cell, airport_cells):
 
+    h3_index = int(h3_cell, 16)
+
+    with conn.cursor() as cur:
+
+        # Fast path:
+        # If row already exists, only increment traversal count.
+        cur.execute("""
+            UPDATE heatmap_bins
+            SET traversal_count = traversal_count + 1
+            WHERE h3_index = %(h3_index)s
+            RETURNING h3_index;
+        """, {
+            "h3_index": h3_index,
+        })
+
+        existing = cur.fetchone()
+
+        # Existing row updated successfully
+        if existing:
+            conn.commit()
+            return
+
+        # NEW CELL ONLY BELOW THIS POINT
+
+        lat_center, lon_center = cell_to_latlng(h3_cell)
+
+        contains_airport = h3_index in airport_cells
+
+        cur.execute("""
+            INSERT INTO heatmap_bins (
+                h3_index,
+                lat_center,
+                lon_center,
+                contains_airport,
+                traversal_count
+            )
+            VALUES (
+                %(h3_index)s,
+                %(lat_center)s,
+                %(lon_center)s,
+                %(contains_airport)s,
+                1
+            );
+        """, {
+            "h3_index": h3_index,
+            "lat_center": lat_center,
+            "lon_center": lon_center,
+            "contains_airport": contains_airport,
+        })
+
+    conn.commit()
+
+
+def load_airport_cells(conn):
+
+    with conn.cursor() as cur:
+
+        cur.execute("""
+            SELECT DISTINCT h3_index
+            FROM airports
+            WHERE h3_index IS NOT NULL;
+        """)
+
+        return {
+            row[0]
+            for row in cur.fetchall()
+        }
 
 def main():
 
     RAW_DIR.mkdir(parents=True, exist_ok=True)
 
-    days = build_date_range(1, "1/10/24", "1/1/26")
+    #days = build_date_range(1, "1/10/24", "1/1/26")
 
-    for day in days:
+    with get_conn() as conn:
+       
+        create_tables(conn)
+        airport_cells = load_airport_cells(conn)
 
-        tar_buffer = download_Tar_File(day, day.year)
-        save_Tar(tar_buffer)
-        aircraft_count, aircrafts = get_aircrafts(tar_buffer)
+        #for day in days:
+
+        #tar_buffer = download_Tar_File(day, day.year)
+        tar_buffer = RAW_DIR/"2024.01.03.tar"
+
+        aircraft_count = get_aircraft_count(tar_buffer)
 
         print(f"count: {aircraft_count}")
-        print(f"member: {aircrafts[0]}")
 
         with alive_bar(aircraft_count) as bar:
 
             bar.title = 'Processing Aircrafts'
 
             count = 0
-            for aircraft in aircrafts:
+            #for aircraft in aircrafts:
+            for member, aircraft_data in iter_aircrafts_from_tar(tar_buffer):
                 count += 1
                 
                 if count > 100:
                     break
+            
+                bar.text(f"File: {member.name[-11:]}")
 
-                bar.text(f"File: {aircraft.name[-11:]}")
-
-                aircraft_data = get_aircraft_data(tar_buffer, aircraft)
                 normed_data = normalize_data([aircraft_data])
-                
-                determine_routes(normed_data)
+                determine_routes(conn, normed_data, airport_cells)
+
                 #print(f"data: {normed_data[0]}")
 
                 bar()
 
         del tar_buffer
-        del aircrafts 
         del aircraft_count
         gc.collect()
 
 
-    
+
 
 
 
