@@ -20,7 +20,7 @@ from backend.mcp_servers.ais.helpers.ship_context import (
     get_vessel_general_information_helper,
     get_vessel_locations_helper,
     get_nearest_ships_helper,
-    get_vessels_last_seen_helper,
+    # get_vessels_last_seen_helper,
     get_vessels_in_area_helper,
 )
 from backend.mcp_servers.ais.helpers.fleet_information import (
@@ -48,12 +48,12 @@ mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 
 """ This isn't very good, there is too much output, there are too many ships"""
 
-@mcp.tool()
-def get_vessels_last_seen():
-    try: 
-        return get_vessels_last_seen_helper()
-    except Exception as e:
-        return "Error:\n" + str(e)
+# @mcp.tool()
+# def get_vessels_last_seen():
+#     try: 
+#         return get_vessels_last_seen_helper()
+#     except Exception as e:
+#         return "Error:\n" + str(e)
 
 
 # ============================================================================
@@ -266,7 +266,17 @@ Could not find vessel information for fleet {fleet_name}.
 # Tools: Geographic Queries
 # ============================================================================
 
+@mcp.tool()
 def get_vessels_in_area(lat: str, lon: str, radius_nm: str):
+    """Retrieves the mmsis of all the vessels in the radius of a certain point.
+    
+    Args:
+        lat: Latitude of the point
+        lon: Longitude of the point
+    
+    Returns: 
+        str: List of MMSIs in within the radius of the point
+    """
     try:
         return get_vessels_in_area_helper(lat, lon, radius_nm)
     except Exception as e: 
