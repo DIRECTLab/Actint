@@ -1,7 +1,7 @@
 # backend/agent/agent.py
 import os
 import asyncio
-from smolagents import ToolCallingAgent, TransformersModel, MCPClient, AgentMaxStepsError, ActionStep, TaskStep
+from smolagents import ToolCallingAgent, TransformersModel, MCPClient, AgentMaxStepsError, ActionStep, TaskStep, OpenAIModel
 from mcp import StdioServerParameters
 import sys
 from pathlib import Path
@@ -58,9 +58,16 @@ adsb_server_params = StdioServerParameters(
 adsb_mcp_client = MCPClient(adsb_server_params, structured_output=False)
 adsb_mcp_tools = adsb_mcp_client.get_tools()
 
-model = TransformersModel(
-    model_id=model_id,
-    max_new_tokens=config.MAX_NEW_TOKENS,
+# model = TransformersModel(
+#     model_id=model_id,
+#     max_new_tokens=config.MAX_NEW_TOKENS,
+# )
+
+
+model = OpenAIModel(
+    model_id="local",
+    api_base="http://127.0.0.1:8000/v1",
+    api_key="dummy"
 )
 
 def create_agent(

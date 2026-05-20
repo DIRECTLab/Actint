@@ -242,14 +242,14 @@ class DeleteObjectTool(Tool):
         return f"Deleted object {object_number} from the map objects"
 
 
-class GetMapInfoToool(Tool):
+class GetMapInfoTool(Tool):
     name = "get_map_info"
     description = "Gets information about things on the map"
-    inputs = None
+    inputs = {}
     output_type = "string"
 
-    def __init__(self, sid, sio_instance, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, sid, sio_instance):
+        super().__init__()
         self.sid = sid
         self.sio = sio_instance
 

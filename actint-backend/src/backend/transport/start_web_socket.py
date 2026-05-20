@@ -4,7 +4,7 @@ import asyncio
 from backend.agent.agent import create_agent, query_agent_instance
 import uvicorn
 from backend.config import config
-from backend.ui_tools.map_edit_tools import ZoomTool, AddMarkerTool, DrawVesselTrajectoryTool, DrawRectangleTool, DrawCircleTool, DrawLineTool, DrawPolygonTool, DeleteObjectTool, GetMapInfoToool
+from backend.ui_tools.map_edit_tools import ZoomTool, AddMarkerTool, DrawVesselTrajectoryTool, DrawRectangleTool, DrawCircleTool, DrawLineTool, DrawPolygonTool, DeleteObjectTool, GetMapInfoTool
 from backend.transport.connection import sio, app
 import sys
 
@@ -28,7 +28,7 @@ async def connect(sid, environ):
             DrawLineTool(sid, sio),
             DrawPolygonTool(sid, sio),
             DeleteObjectTool(sid, sio),
-            GetMapInfoToool(sid, sio),
+            GetMapInfoTool(sid, sio),
         ]
         new_user["agent"] = create_agent(additional_tools=ui_tools)
 
