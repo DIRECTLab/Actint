@@ -64,3 +64,11 @@ async def delete_object(sid, object_number):
     await sio.emit("delete_object", {
         "object_number": object_number
     }, to=sid)
+
+
+async def get_map_info(sid):
+    map_info = await sio.call("get_map_information", {}, to=sid, timeout=8)
+    if map_info:
+        return map_info
+    else:
+        raise TimeoutError("Failed to fetch the map information in time")

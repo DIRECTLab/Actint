@@ -11,7 +11,8 @@ from backend.transport.server_sent_events.map_events import (
     draw_circle,
     draw_line,
     draw_polygon,
-    delete_object
+    delete_object,
+    get_map_info,
 )
 
 
@@ -239,3 +240,23 @@ class DeleteObjectTool(Tool):
         )
         future.result()
         return f"Deleted object {object_number} from the map objects"
+
+
+class GetMapInfoToool(Tool):
+    name = "get_map_info"
+    description = "Gets information about things on the map"
+    inputs = None
+    output_type = "string"
+
+    def __init__(self, sid, sio_instance, **kwargs):
+        super().__init__(**kwargs)
+        self.sid = sid
+        self.sio = sio_instance
+
+    def forward(self) -> str: 
+
+        future = asyncio.run_coroutine_threadsafe(
+            get_map_info(self.sid), get_event_loop()
+        )
+        result = future.result()
+        return result

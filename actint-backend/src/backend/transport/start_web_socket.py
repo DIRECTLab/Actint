@@ -4,7 +4,7 @@ import asyncio
 from backend.agent.agent import create_agent, query_agent_instance
 import uvicorn
 from backend.config import config
-from backend.ui_tools.map_edit_tools import ZoomTool, AddMarkerTool, DrawVesselTrajectoryTool, DrawRectangleTool, DrawCircleTool, DrawLineTool, DrawPolygonTool, DeleteObjectTool
+from backend.ui_tools.map_edit_tools import ZoomTool, AddMarkerTool, DrawVesselTrajectoryTool, DrawRectangleTool, DrawCircleTool, DrawLineTool, DrawPolygonTool, DeleteObjectTool, GetMapInfoToool
 from backend.transport.connection import sio, app
 import sys
 
@@ -28,6 +28,7 @@ async def connect(sid, environ):
             DrawLineTool(sid, sio),
             DrawPolygonTool(sid, sio),
             DeleteObjectTool(sid, sio),
+            GetMapInfoToool(sid, sio),
         ]
         new_user["agent"] = create_agent(additional_tools=ui_tools)
 
@@ -46,7 +47,7 @@ async def handle_agent_query(sid, data):
     
     if not user_text.strip() == "":
         agent_response_text = await query_agent_instance(
-            user_agent, user_text, make_get_map_info(sio, sid)
+            user_agent, user_text
         )
         #might want get_map_info right here
     else:
@@ -61,19 +62,6 @@ async def handle_agent_query(sid, data):
     }
 
     await sio.emit("send_response", new_msg, to=sid)
-
-
-def make_get_map_info(sio, sid):
-    async def get_map_info():
-        map_info = await sio.call("get_map_information", {}, to=sid, timeout=8)
-        if map_info:
-            return map_info
-        else:
-            raise TimeoutError("Failed to fetch the map information in time")
-    return get_map_info
-    
-    
-
 
 
 if __name__ == "__main__":

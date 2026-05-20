@@ -87,7 +87,6 @@ def create_agent(
 async def query_agent_instance(
     agent: ToolCallingAgent,
     query: str,
-    get_map_info=None,
 ) -> str:
     """Entry point for both web and terminal to query an agent instance."""
 
@@ -98,12 +97,7 @@ async def query_agent_instance(
         result = await loop.run_in_executor(
             None, lambda: agent.run(query, reset=False)
         )
-        # The following is a proof of concept that doesn't do anything to the program besides bring out the different 
-        if get_map_info:
-            map_information = await get_map_info()
-            print("\n\n\n\n\n\n\n\nMap information:\n\n\n\n\n\n\n\n", map_information['current'], "\n\n\n\n\n\n\n\n", file=sys.stderr)
-        else: 
-            print("\n\n\n\n\n\n\n\nNo memory updater\n\n\n\n\n\n\n\n", file=sys.stderr)
+
         return result
     except AgentMaxStepsError:
         print(f"Agent hit max steps.", file=sys.stderr)
