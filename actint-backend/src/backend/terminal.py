@@ -135,6 +135,20 @@ async def query_agent_loop(
 
     if debug:
         print_message("System", f"Debug mode enabled. Session ID: {sid}")
+        if not remote_client:
+            print_message(
+                "System",
+                "Running in local mode. Agent will be executed in-process.",
+            )
+            from backend.langgraph.common.llm.observability import setup_observability
+
+            print_message(
+                "System",
+                "Setting up observability with OpenTelemetry and"
+                " LangChain instrumentation.",
+            )
+            setup_observability(debug=True)
+
     if remote_client:
         print_message(
             "System", f"Connected to remote backend at {remote_client.url}"

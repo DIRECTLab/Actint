@@ -39,6 +39,7 @@ async def run_orchestrator(
     user_query: str,
     messages: Optional[list[dict[str, Any]]] = None,
     metadata: Optional[dict[str, Any]] = None,
+    debug: bool = False,
 ) -> OrchestratorResponse:
     state = build_orchestrator_state(
         user_query=user_query,
@@ -61,6 +62,7 @@ def run_orchestrator_sync(
     user_query: str,
     messages: Optional[list[dict[str, Any]]] = None,
     metadata: Optional[dict[str, Any]] = None,
+    debug: bool = False,
 ) -> OrchestratorResponse:
     state = build_orchestrator_state(
         user_query=user_query,
