@@ -83,7 +83,11 @@ import re
 import requests
 import io
 import gc
-import psycopg
+
+from dataclasses import dataclass
+from collections import defaultdict
+
+
 
 DATA_DIR = Path(__file__).parent / "data"
 RAW_DIR = DATA_DIR / "raw"
@@ -91,6 +95,108 @@ RAW_DIR = DATA_DIR / "raw"
 BASE_URL = "https://github.com/adsblol/globe_history_{year}/releases/download"
 RES = 7
 MAX_SPEED = 2000
+FLUSH_SIZE = 100_000
+
+
+@dataclass
+class RouteStatsAccumulator:
+
+    gnd_speed_sum: float = 0
+    alt_sum: float = 0
+    vert_rate_sum: float = 0
+    ias_sum: float = 0
+    heading_sum: float = 0
+
+    gnd_speed_count: int = 0
+    alt_count: int = 0
+    vert_rate_count: int = 0
+    ias_count: int = 0
+    heading_count: int = 0
+
+    def add(self, entry):
+
+        if entry.get("GROUND_SPEED"):
+            self.gnd_speed_sum += entry["GROUND_SPEED"]
+            self.gnd_speed_count += 1
+
+        if entry.get("ALTITUDE"):
+            self.alt_sum += entry["ALTITUDE"]
+            self.alt_count += 1
+
+        if entry.get("VERTICAL_RATE"):
+            self.vert_rate_sum += entry["VERTICAL_RATE"]
+            self.vert_rate_count += 1
+
+        if entry.get("IAS"):
+            self.ias_sum += entry["IAS"]
+            self.ias_count += 1
+
+        if entry.get("TRACK"):
+            self.heading_sum += entry["TRACK"]
+            self.heading_count += 1
+
+    def averages(self):
+
+        return {
+            "gnd_speed": safe_div(
+                self.gnd_speed_sum,
+                self.gnd_speed_count
+            ),
+
+            "altitude": safe_div(
+                self.alt_sum,
+                self.alt_count
+            ),
+
+            "vert_rate": safe_div(
+                self.vert_rate_sum,
+                self.vert_rate_count
+            ),
+
+            "ias": safe_div(
+                self.ias_sum,
+                self.ias_count
+            ),
+
+            "heading": safe_div(
+                self.heading_sum,
+                self.heading_count
+            )
+        }
+
+    def reset(self):
+
+        self.gnd_speed_sum = 0
+        self.alt_sum = 0
+        self.vert_rate_sum = 0
+        self.ias_sum = 0
+        self.heading_sum = 0
+
+        self.gnd_speed_count = 0
+        self.alt_count = 0
+        self.vert_rate_count = 0
+        self.ias_count = 0
+        self.heading_count = 0
+
+    def merge(self, other):
+
+        self.gnd_speed_sum += other.gnd_speed_sum
+        self.alt_sum += other.alt_sum
+        self.vert_rate_sum += other.vert_rate_sum
+        self.ias_sum += other.ias_sum
+        self.heading_sum += other.heading_sum
+
+        self.gnd_speed_count += other.gnd_speed_count
+        self.alt_count += other.alt_count
+        self.vert_rate_count += other.vert_rate_count
+        self.ias_count += other.ias_count
+        self.heading_count += other.heading_count
+
+
+
+def safe_div(numerator, denominator):
+    return numerator / denominator if denominator else 0.0
+
 
 
 def build_date_range(day_delta, start_str, end_str=None):
@@ -121,10 +227,13 @@ def create_tables(conn):
         cur.execute("""
             CREATE TABLE IF NOT EXISTS route_segments (
         
-                id BIGINT PRIMARY KEY,
+                id BIGSERIAL PRIMARY KEY,
                 start_bin BIGINT,
                 end_bin BIGINT,
-                transition_count BIGINT NOT NULL
+                transition_count BIGINT NOT NULL,
+                    
+                CONSTRAINT unique_route_segment
+                UNIQUE (start_bin, end_bin)
             )
         """)
         cur.execute("""
@@ -328,8 +437,6 @@ def normalize_data(json_data):
     return flattened
 
 
-def safe_div(numerator, denominator):
-    return numerator / denominator if denominator else 0.0
 
 
 def determine_routes(conn, data, airport_cells):
@@ -338,6 +445,18 @@ def determine_routes(conn, data, airport_cells):
         print(f"no flight data")
         return
     
+    def flush():
+        if heatmap_batch:
+            flush_heatmap_batch(conn, heatmap_batch, airport_cells)
+
+        if segment_batch:
+            flush_segment_batch(conn, segment_batch)
+
+        conn.commit()
+    
+    heatmap_batch = defaultdict(int)
+    segment_batch = defaultdict(int)
+
     prev_time = None
     cur_time = None
     prev_bin = None
@@ -347,17 +466,8 @@ def determine_routes(conn, data, airport_cells):
     dt = 10
     implied_speed = 0
 
-    gnd_speed_sum = 0
-    alt_sum = 0
-    vert_rate_sum = 0
-    ias_sum = 0
-    heading_sum = 0
-
-    gnd_speed_count = 0
-    alt_count = 0
-    vert_rate_count = 0
-    ias_count = 0
-    heading_count = 0
+    cur_stats = RouteStatsAccumulator()
+    prev_stats = RouteStatsAccumulator()
 
     for entry in data:
 
@@ -407,100 +517,74 @@ def determine_routes(conn, data, airport_cells):
         if(prev_bin):
             if(cur_bin == prev_bin):
                 
-                if entry.get("GROUND_SPEED"):
-                    gnd_speed_sum += entry.get("GROUND_SPEED")
-                    gnd_speed_count += 1
-
-                if entry.get("ALTITUDE"):
-                    alt_sum += entry.get("ALTITUDE")
-                    alt_count += 1
-
-                if entry.get("VERTICAL_RATE"):
-                    vert_rate_sum += entry.get("VERTICAL_RATE")
-                    vert_rate_count += 1
-
-                if entry.get("IAS"):
-                    ias_sum += entry.get("IAS")
-                    ias_count += 1
-
-                if entry.get("TRACK"):
-                    heading_sum += entry.get("TRACK")
-                    heading_count += 1
-
-                continue 
+                cur_stats.add(entry) 
 
             else:
 
-                gnd_speed_ave = safe_div(gnd_speed_sum, gnd_speed_count)  
-                alt_ave       = safe_div(alt_sum, alt_count)
-                vert_rate_ave = safe_div(vert_rate_sum, vert_rate_count)
-                ias_ave       = safe_div(ias_sum, ias_count)
-                heading_ave   = safe_div(heading_sum, heading_count)
+                heatmap_batch[cur_bin] += 1
+                segment_batch[(prev_bin, cur_bin)] += 1
 
-                # print(f"\ngnd_speed_ave: {gnd_speed_ave}")
-                # print(f"alt_ave: {alt_ave}")
-                # print(f"vert_rate_ave: {vert_rate_ave}")
-                # print(f"ias_ave: {ias_ave}")
-                # print(f"heading_ave: {heading_ave}\n")
+                prev_stats.merge(cur_stats)
 
-                #new bin traversal
-                bin_traversal_update(conn, cur_bin, airport_cells)
+                #record_transition_stats(conn, prev_stats)
 
-                gnd_speed_sum = 0
-                alt_sum = 0
-                vert_rate_sum = 0
-                ias_sum = 0
-                heading_sum = 0
+                prev_stats = cur_stats
+                cur_stats.reset()
 
-                gnd_speed_count = 0
-                alt_count = 0
-                vert_rate_count = 0
-                ias_count = 0
-                heading_count = 0
-               
-
-            
-        # else
-        #     new_bin_traversal += 1 
-        #     record transition
-        #     record_transition_stats(prev_bin, cur_bin)
+                if (len(segment_batch) >= FLUSH_SIZE or len(heatmap_batch) >= FLUSH_SIZE):
+                    
+                    flush()
 
         prev_time = cur_time
         prev_bin = cur_bin
         prev_point = cur_point
 
+    flush()
 
-def bin_traversal_update(conn, h3_cell, airport_cells):
 
-    h3_index = int(h3_cell, 16)
+
+def record_transition_stats(conn, stats):
+
+    averages = stats.averages()
+
+    gnd_speed = averages["gnd_speed"]
+    altitude = averages["altitude"]
+    vert_rate = averages["vert_rate"]
+    ias = averages["ias"]
+    heading = averages["heading"]
 
     with conn.cursor() as cur:
+        None
 
-        # Fast path:
-        # If row already exists, only increment traversal count.
-        cur.execute("""
-            UPDATE heatmap_bins
-            SET traversal_count = traversal_count + 1
-            WHERE h3_index = %(h3_index)s
-            RETURNING h3_index;
-        """, {
-            "h3_index": h3_index,
-        })
 
-        existing = cur.fetchone()
 
-        # Existing row updated successfully
-        if existing:
-            conn.commit()
-            return
 
-        # NEW CELL ONLY BELOW THIS POINT
+def flush_heatmap_batch(conn, heatmap_batch, airport_cells):
+
+    if not heatmap_batch:
+        return
+
+    rows = []
+
+    for h3_cell, traversal_count in heatmap_batch.items():
+
+        h3_index = int(h3_cell, 16)
 
         lat_center, lon_center = cell_to_latlng(h3_cell)
 
         contains_airport = h3_index in airport_cells
 
-        cur.execute("""
+        rows.append((
+            h3_index,
+            lat_center,
+            lon_center,
+            contains_airport,
+            traversal_count
+        ))
+
+    with conn.cursor() as cur:
+
+        cur.executemany("""
             INSERT INTO heatmap_bins (
                 h3_index,
                 lat_center,
@@ -508,21 +592,54 @@ def bin_traversal_update(conn, h3_cell, airport_cells):
                 contains_airport,
                 traversal_count
             )
-            VALUES (
-                %(h3_index)s,
-                %(lat_center)s,
-                %(lon_center)s,
-                %(contains_airport)s,
-                1
-            );
-        """, {
-            "h3_index": h3_index,
-            "lat_center": lat_center,
-            "lon_center": lon_center,
-            "contains_airport": contains_airport,
-        })
+            VALUES (%s, %s, %s, %s, %s)
 
-    conn.commit()
+            ON CONFLICT (h3_index)
+            DO UPDATE SET
+                traversal_count =
+                    heatmap_bins.traversal_count
+                    + EXCLUDED.traversal_count
+        """, rows)
+
+    heatmap_batch.clear()
+
+
+
+
+def flush_segment_batch(conn, segment_batch):
+
+    if not segment_batch:
+        return
+
+    rows = []
+
+    for (start_bin, end_bin), transition_count in segment_batch.items():
+
+        rows.append((
+            int(start_bin, 16),
+            int(end_bin, 16),
+            transition_count
+        ))
+
+    with conn.cursor() as cur:
+
+        cur.executemany("""
+            INSERT INTO route_segments (
+                start_bin,
+                end_bin,
+                transition_count
+            )
+            VALUES (%s, %s, %s)
+
+            ON CONFLICT (start_bin, end_bin)
+            DO UPDATE SET
+                transition_count =
+                    route_segments.transition_count
+                    + EXCLUDED.transition_count
+        """, rows)
+
+    segment_batch.clear()
+
 
 
 def load_airport_cells(conn):
@@ -539,6 +656,8 @@ def load_airport_cells(conn):
             row[0]
             for row in cur.fetchall()
         }
+
+
 
 def main():
 
@@ -569,7 +688,7 @@ def main():
             for member, aircraft_data in iter_aircrafts_from_tar(tar_buffer):
                 count += 1
                 
-                if count > 100:
+                if count > 10000:
                     break
             
                 bar.text(f"File: {member.name[-11:]}")
@@ -584,11 +703,6 @@ def main():
         del tar_buffer
         del aircraft_count
         gc.collect()
-
-
-
-
-
 
 
 
