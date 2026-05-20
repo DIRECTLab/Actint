@@ -86,6 +86,7 @@ import gc
 
 from dataclasses import dataclass
 from collections import defaultdict
+import math
 
 
 
@@ -95,7 +96,9 @@ RAW_DIR = DATA_DIR / "raw"
 BASE_URL = "https://github.com/adsblol/globe_history_{year}/releases/download"
 RES = 7
 MAX_SPEED = 2000
+OVERNIGHT_GAP = 3600 * 10 #if there is a 10 hour gap in data don't create an edge
 FLUSH_SIZE = 100_000
+
 
 
 @dataclass
@@ -105,91 +108,115 @@ class RouteStatsAccumulator:
     alt_sum: float = 0
     vert_rate_sum: float = 0
     ias_sum: float = 0
-    heading_sum: float = 0
 
     gnd_speed_count: int = 0
     alt_count: int = 0
     vert_rate_count: int = 0
     ias_count: int = 0
+
+    # circular heading accumulator 
+    heading_sin_sum: float = 0.0
+    heading_cos_sum: float = 0.0
     heading_count: int = 0
 
+  
+    # ADD SAMPLE
     def add(self, entry):
 
-        if entry.get("GROUND_SPEED"):
+        if entry.get("GROUND_SPEED") is not None:
             self.gnd_speed_sum += entry["GROUND_SPEED"]
             self.gnd_speed_count += 1
 
-        if entry.get("ALTITUDE"):
+        if entry.get("ALTITUDE") is not None:
             self.alt_sum += entry["ALTITUDE"]
             self.alt_count += 1
 
-        if entry.get("VERTICAL_RATE"):
+        if entry.get("VERTICAL_RATE") is not None:
             self.vert_rate_sum += entry["VERTICAL_RATE"]
             self.vert_rate_count += 1
 
-        if entry.get("IAS"):
+        if entry.get("IAS") is not None:
             self.ias_sum += entry["IAS"]
             self.ias_count += 1
 
-        if entry.get("TRACK"):
-            self.heading_sum += entry["TRACK"]
+
+        # CIRCULAR HEADING HANDLING
+        heading = entry.get("TRACK")
+        if heading is not None:
+
+            theta = math.radians(heading)
+
+            self.heading_sin_sum += math.sin(theta)
+            self.heading_cos_sum += math.cos(theta)
             self.heading_count += 1
 
+
+    # LINEAR AVERAGES
     def averages(self):
 
         return {
-            "gnd_speed": safe_div(
-                self.gnd_speed_sum,
-                self.gnd_speed_count
-            ),
+            "gnd_speed": safe_div(self.gnd_speed_sum, self.gnd_speed_count),
+            "altitude": safe_div(self.alt_sum, self.alt_count),
+            "vert_rate": safe_div(self.vert_rate_sum, self.vert_rate_count),
+            "ias": safe_div(self.ias_sum, self.ias_count),
 
-            "altitude": safe_div(
-                self.alt_sum,
-                self.alt_count
-            ),
-
-            "vert_rate": safe_div(
-                self.vert_rate_sum,
-                self.vert_rate_count
-            ),
-
-            "ias": safe_div(
-                self.ias_sum,
-                self.ias_count
-            ),
-
-            "heading": safe_div(
-                self.heading_sum,
-                self.heading_count
-            )
+            # circular mean
+            "heading": self.mean_heading()
         }
 
+  
+    # CIRCULAR MEAN HEADING
+    def mean_heading(self):
+
+        if self.heading_count == 0:
+            return 0.0
+
+        angle = math.atan2(self.heading_sin_sum, self.heading_cos_sum)
+        return math.degrees(angle) % 360
+
+    # RESULTANT LENGTH R
+    def heading_R(self):
+
+        if self.heading_count == 0:
+            return 0.0
+
+        return math.sqrt(
+            self.heading_sin_sum ** 2 +
+            self.heading_cos_sum ** 2
+        ) / self.heading_count
+
+    # RESET
     def reset(self):
 
         self.gnd_speed_sum = 0
         self.alt_sum = 0
         self.vert_rate_sum = 0
         self.ias_sum = 0
-        self.heading_sum = 0
 
         self.gnd_speed_count = 0
         self.alt_count = 0
         self.vert_rate_count = 0
         self.ias_count = 0
+
+        self.heading_sin_sum = 0.0
+        self.heading_cos_sum = 0.0
         self.heading_count = 0
 
+    # MERGE
     def merge(self, other):
 
         self.gnd_speed_sum += other.gnd_speed_sum
         self.alt_sum += other.alt_sum
         self.vert_rate_sum += other.vert_rate_sum
         self.ias_sum += other.ias_sum
-        self.heading_sum += other.heading_sum
 
         self.gnd_speed_count += other.gnd_speed_count
         self.alt_count += other.alt_count
         self.vert_rate_count += other.vert_rate_count
         self.ias_count += other.ias_count
+
+        self.heading_sin_sum += other.heading_sin_sum
+        self.heading_cos_sum += other.heading_cos_sum
         self.heading_count += other.heading_count
 
 
@@ -227,27 +254,37 @@ def create_tables(conn):
         cur.execute("""
             CREATE TABLE IF NOT EXISTS route_segments (
         
-                id BIGSERIAL PRIMARY KEY,
-                start_bin BIGINT,
-                end_bin BIGINT,
+                start_bin BIGINT NOT NULL,
+                end_bin BIGINT NOT NULL,
                 transition_count BIGINT NOT NULL,
                     
-                CONSTRAINT unique_route_segment
-                UNIQUE (start_bin, end_bin)
+                PRIMARY KEY (start_bin, end_bin)
             )
         """)
-        cur.execute("""
+        cur.execute("""               
             CREATE TABLE IF NOT EXISTS segment_stats (
-        
-                segment_id BIGINT PRIMARY KEY,
-                aircraft_type TEXT,
-                altitude_band TEXT,
-                ave_gnd_speed REAL,
-                ave_ias REAL,
-                ave_vert_rate REAL,
-                ave_heading REAL,
-                heading_variance REAL
-            )
+
+                start_bin BIGINT NOT NULL,
+                end_bin   BIGINT NOT NULL,
+
+                aircraft_type TEXT NOT NULL,
+                altitude_band TEXT NOT NULL,
+
+                gnd_speed_sum REAL DEFAULT 0,
+                gnd_speed_count BIGINT DEFAULT 0,
+
+                vert_rate_sum REAL DEFAULT 0,
+                vert_rate_count BIGINT DEFAULT 0,
+
+                ias_sum REAL DEFAULT 0,
+                ias_count BIGINT DEFAULT 0,
+
+                heading_sin_sum REAL DEFAULT 0,
+                heading_cos_sum REAL DEFAULT 0,
+                heading_count BIGINT DEFAULT 0,
+
+                PRIMARY KEY (start_bin, end_bin, aircraft_type, altitude_band)
+            );
         """)
 
     conn.commit()
@@ -255,8 +292,8 @@ def create_tables(conn):
 
 def get_aircraft_count(tar_buffer):
 
-    #with tarfile.open(fileobj=tar_buffer, mode="r:*") as tar:
-    with tarfile.open(tar_buffer, mode="r:*") as tar:
+    with tarfile.open(fileobj=tar_buffer, mode="r:*") as tar:
+    #with tarfile.open(tar_buffer, mode="r:*") as tar:
 
         total_matches = 0
 
@@ -335,7 +372,7 @@ def download_Tar_File(day, year, iterations=0, show_bar=True):
 
 
 
-def iter_aircrafts_from_tar(tar_path: Path):
+def iter_aircrafts_from_tar(tar_buffer):
     """
     Yields one aircraft JSON object at a time from a tar.gz archive.
     Memory efficient: streams per member.
@@ -343,8 +380,8 @@ def iter_aircrafts_from_tar(tar_path: Path):
 
     pattern = re.compile(r'^./traces/[0-9a-fA-F]{2}/.*\.json$')
 
-    #with tarfile.open(fileobj=tar_buffer, mode="r:*") as tar:
-    with tarfile.open(tar_path, mode="r:*") as tar:
+    with tarfile.open(fileobj=tar_buffer, mode="r:*") as tar:
+    #with tarfile.open(tar_path, mode="r:*") as tar:
 
         for member in tar:
 
@@ -438,124 +475,254 @@ def normalize_data(json_data):
 
 
 
+#Global Aircraft state array
+
+class AircraftState:
+    def __init__(self):
+        self.prev_time = None
+        self.prev_bin = None
+        self.prev_point = None
+        self.cell_stats = RouteStatsAccumulator()
+        self.last_cell_stats = RouteStatsAccumulator()
+
+aircraft_state = {}  # ICAO -> AircraftState
+
+
 
 def determine_routes(conn, data, airport_cells):
 
     if not data:
-        print(f"no flight data")
+        print("no flight data")
         return
-    
+
     def flush():
         if heatmap_batch:
             flush_heatmap_batch(conn, heatmap_batch, airport_cells)
+            heatmap_batch.clear()
 
         if segment_batch:
             flush_segment_batch(conn, segment_batch)
+            segment_batch.clear()
+
+        if stats_batch:
+            flush_segment_stats(conn, stats_batch)
+            stats_batch.clear()
 
         conn.commit()
-    
+
     heatmap_batch = defaultdict(int)
     segment_batch = defaultdict(int)
-
-    prev_time = None
-    cur_time = None
-    prev_bin = None
-    cur_bin = None
-    prev_point = None
-    cur_point = None
-    dt = 10
-    implied_speed = 0
-
-    cur_stats = RouteStatsAccumulator()
-    prev_stats = RouteStatsAccumulator()
+    stats_batch = {}
 
     for entry in data:
 
-        if entry.get("ALTITUDE") == None or entry.get("ALTITUDE") <= 1000:
-            #print(f'altitude below threshold: {entry.get("ALTITUDE")}')
-            continue 
-
-        cur_time = entry.get("TIMESTAMP")
-        #print(f"cur_time: {cur_time}")
-
-        if(prev_time):
-            dt = cur_time - prev_time
-
-        #print(f'time delta: {dt}')
-
-        if dt <= 0:
-            print(f'negative time delta: {dt}')
+        
+        # FILTER INVALID RECORDS
+        if entry.get("ALTITUDE") is None or entry.get("ALTITUDE") <= 1000:
             continue
 
+        icao = entry.get("ICAO")
+        if not icao or str(icao).startswith("~"):
+            continue
+
+        state = aircraft_state.setdefault(icao, AircraftState())
+
+        cur_time = entry.get("TIMESTAMP")
         lat = entry.get("LAT")
         lon = entry.get("LON")
 
         cur_point = lat, lon
 
-        cur_bin = latlng_to_cell(lat, lon, RES)
-        
-        # find debouncing solution if it is an issue naive fix below
-        # if (dt <= 5 sec) and (h3_distance(prev_bin, bin) == 1) (reduce bouncing between cells)
-        #     continue 
-
-        if(prev_point):
-
-            lat1, lon1 = cur_point
-            lat2, lon2 = prev_point
-
-            dt_hours = dt/3600
-
-            implied_speed = haversine_distance_nm(lat1, lon1, lat2, lon2)/dt_hours
-        
-        if implied_speed > MAX_SPEED:
-            prev_time = None
-            prev_bin = None
-            prev_point = None
-            print(f"Impossible speed: {implied_speed} for {entry.get("TYPE")}")
+        if lat is None or lon is None:
             continue
 
-        if(prev_bin):
-            if(cur_bin == prev_bin):
-                
-                cur_stats.add(entry) 
+        cur_bin = latlng_to_cell(lat, lon, RES)
 
-            else:
+        
+        # OVERNIGHT / GAP RESET
+        if state.prev_time is not None:
+            dt = cur_time - state.prev_time
 
-                heatmap_batch[cur_bin] += 1
-                segment_batch[(prev_bin, cur_bin)] += 1
+            if dt <= 0:
+                continue
 
-                prev_stats.merge(cur_stats)
+            if dt > OVERNIGHT_GAP:
+                state.prev_time = cur_time
+                state.prev_bin = None
+                state.prev_point = None
+                state.cell_stats = RouteStatsAccumulator()
+                state.last_cell_stats = RouteStatsAccumulator()
+                state.cell_stats.add(entry)
+                continue
 
-                #record_transition_stats(conn, prev_stats)
+        
+        # SPEED VALIDATION
+        if state.prev_point and state.prev_time:
+            dt = cur_time - state.prev_time
+            dt_hours = dt / 3600
 
-                prev_stats = cur_stats
-                cur_stats.reset()
+            speed = haversine_distance_nm(
+                lat, lon,
+                state.prev_point[0], state.prev_point[1]
+            ) / dt_hours
 
-                if (len(segment_batch) >= FLUSH_SIZE or len(heatmap_batch) >= FLUSH_SIZE):
-                    
-                    flush()
+            if speed > MAX_SPEED:
+                state.prev_time = cur_time
+                state.prev_bin = cur_bin
+                state.prev_point = cur_point
+                state.cell_stats = RouteStatsAccumulator()
+                state.last_cell_stats = RouteStatsAccumulator()
+                state.cell_stats.add(entry)
 
-        prev_time = cur_time
-        prev_bin = cur_bin
-        prev_point = cur_point
+        
+        # CELL INITIALIZATION
+        if state.prev_bin is None:
+            state.prev_bin = cur_bin
+            state.prev_time = cur_time
+            state.prev_point = cur_point
+            state.cell_stats = RouteStatsAccumulator()
+            state.cell_stats.add(entry)
+            continue
+
+        
+        # SAME CELL → ACCUMULATE
+        if cur_bin == state.prev_bin:
+            state.cell_stats.add(entry)
+
+        
+        # TRANSITION EVENT
+        else:
+
+            heatmap_batch[cur_bin] += 1
+            segment_batch[(state.prev_bin, cur_bin)] += 1
+
+            aircraft_type = entry.get("TYPE") or "unknown"
+            altitude_band = get_altitude_band(state.cell_stats)
+
+            key = (
+                state.prev_bin,
+                cur_bin,
+                aircraft_type,
+                altitude_band
+            )
+
+            if key not in stats_batch:
+                stats_batch[key] = RouteStatsAccumulator()
+
+            # FULL BIDIRECTIONAL CELL MERGE
+            stats_batch[key].merge(state.last_cell_stats)
+            stats_batch[key].merge(state.cell_stats)
+
+            # shift window forward
+            state.last_cell_stats = state.cell_stats
+            state.cell_stats = RouteStatsAccumulator()
+            
+            state.cell_stats.add(entry)
+            state.prev_bin = cur_bin
+
+        
+        # UPDATE STATE
+        state.prev_time = cur_time
+        state.prev_point = cur_point
+
+        
+        # FLUSH TRIGGER
+        if (
+            len(segment_batch) >= FLUSH_SIZE or
+            len(heatmap_batch) >= FLUSH_SIZE or
+            len(stats_batch) >= FLUSH_SIZE
+        ):
+            flush()
 
     flush()
 
 
 
-def record_transition_stats(conn, stats):
+def get_altitude_band(stats, step=10):
+    """
+    Buckets altitude into FL bands (default 10 FL = 1000 ft bins)
+    """
 
-    averages = stats.averages()
+    if stats.alt_count == 0:
+        return "FLNONE"
 
-    gnd_speed = averages["gnd_speed"]
-    altitude = averages["altitude"]
-    vert_rate = averages["vert_rate"]
-    ias = averages["ias"]
-    heading = averages["heading"]
+    avg_alt = stats.alt_sum / stats.alt_count
+
+    fl = int(round(avg_alt / 100))
+
+    # bucket it
+    fl_band = (fl // step) * step
+
+    return f"FL{fl_band:03d}"
+
+
+
+def flush_segment_stats(conn, batch):
+
+    rows = []
+
+    for (start_bin, end_bin, aircraft_type, altitude_band), stats in batch.items():
+
+        rows.append((
+            int(start_bin, 16),
+            int(end_bin, 16),
+            aircraft_type,
+            altitude_band,
+
+            stats.gnd_speed_sum,
+            stats.gnd_speed_count,
+
+            stats.vert_rate_sum,
+            stats.vert_rate_count,
+
+            stats.ias_sum,
+            stats.ias_count,
+
+            stats.heading_sin_sum,
+            stats.heading_cos_sum,
+            stats.heading_count
+        ))
 
     with conn.cursor() as cur:
-        None
 
+        cur.executemany("""
+            INSERT INTO segment_stats (
+                start_bin,
+                end_bin,
+                aircraft_type,
+                altitude_band,
+
+                gnd_speed_sum,
+                gnd_speed_count,
+
+                vert_rate_sum,
+                vert_rate_count,
+
+                ias_sum,
+                ias_count,
+
+                heading_sin_sum,
+                heading_cos_sum,
+                heading_count
+            )
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+
+            ON CONFLICT (start_bin, end_bin, aircraft_type, altitude_band)
+            DO UPDATE SET
+
+                gnd_speed_sum = segment_stats.gnd_speed_sum + EXCLUDED.gnd_speed_sum,
+                gnd_speed_count = segment_stats.gnd_speed_count + EXCLUDED.gnd_speed_count,
+
+                vert_rate_sum = segment_stats.vert_rate_sum + EXCLUDED.vert_rate_sum,
+                vert_rate_count = segment_stats.vert_rate_count + EXCLUDED.vert_rate_count,
+
+                ias_sum = segment_stats.ias_sum + EXCLUDED.ias_sum,
+                ias_count = segment_stats.ias_count + EXCLUDED.ias_count,
+
+                heading_sin_sum = segment_stats.heading_sin_sum + EXCLUDED.heading_sin_sum,
+                heading_cos_sum = segment_stats.heading_cos_sum + EXCLUDED.heading_cos_sum,
+                heading_count = segment_stats.heading_count + EXCLUDED.heading_count
+        """, rows)
 
 
 
@@ -601,8 +768,6 @@ def flush_heatmap_batch(conn, heatmap_batch, airport_cells):
                     + EXCLUDED.traversal_count
         """, rows)
 
-    heatmap_batch.clear()
-
 
 
 
@@ -638,7 +803,6 @@ def flush_segment_batch(conn, segment_batch):
                     + EXCLUDED.transition_count
         """, rows)
 
-    segment_batch.clear()
 
 
 
@@ -661,48 +825,45 @@ def load_airport_cells(conn):
 
 def main():
 
-    RAW_DIR.mkdir(parents=True, exist_ok=True)
-
-    #days = build_date_range(1, "1/10/24", "1/1/26")
+    days = build_date_range(1, "5/1/25", "5/1/26")
 
     with get_conn() as conn:
        
         create_tables(conn)
         airport_cells = load_airport_cells(conn)
 
-        #for day in days:
+        for day in days:
 
-        #tar_buffer = download_Tar_File(day, day.year)
-        tar_buffer = RAW_DIR/"2024.01.03.tar"
+            tar_buffer = download_Tar_File(day, day.year)
+            #tar_buffer = RAW_DIR/"2024.01.03.tar"
 
-        aircraft_count = get_aircraft_count(tar_buffer)
+            aircraft_count = get_aircraft_count(tar_buffer)
+            tar_buffer.seek(0) 
 
-        print(f"count: {aircraft_count}")
+            print(f"count: {aircraft_count}")
 
-        with alive_bar(aircraft_count) as bar:
+            with alive_bar(aircraft_count) as bar:
 
-            bar.title = 'Processing Aircrafts'
+                bar.title = 'Processing Aircrafts'
 
-            count = 0
-            #for aircraft in aircrafts:
-            for member, aircraft_data in iter_aircrafts_from_tar(tar_buffer):
-                count += 1
+                #count = 0
+
+                for member, aircraft_data in iter_aircrafts_from_tar(tar_buffer):
+                    #count += 1
+                    
+                    #if count > 10000:
+                    #    break
                 
-                if count > 10000:
-                    break
-            
-                bar.text(f"File: {member.name[-11:]}")
+                    bar.text(f"File: {member.name[-11:]}")
 
-                normed_data = normalize_data([aircraft_data])
-                determine_routes(conn, normed_data, airport_cells)
+                    normed_data = normalize_data([aircraft_data])
+                    determine_routes(conn, normed_data, airport_cells)
 
-                #print(f"data: {normed_data[0]}")
+                    bar()
 
-                bar()
-
-        del tar_buffer
-        del aircraft_count
-        gc.collect()
+            del tar_buffer
+            del aircraft_count
+            gc.collect()
 
 
 
