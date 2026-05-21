@@ -511,6 +511,65 @@ def get_vessels_in_area(lat: str, lon: str, radius_nm: str):
         return "Error:\n" + str(e)
 
 
+        forbidden = [
+            "insert ", "update ", "delete ", "drop ", "alter ", "create ",
+            "attach ", "detach ", "vacuum", "pragma", "reindex", "replace ",
+            "truncate ",
+        ]
+        if any(tok in ql for tok in forbidden):
+            return json.dumps({"error": "Query contains forbidden keywords"})
+
+        # Disallow multi-statement execution; allow a single trailing semicolon
+        if ";" in query.rstrip(";"):
+            return json.dumps({"error": "Multiple SQL statements are not allowed"})
+
+        if max_rows <= 0:
+            max_rows = 200
+        if max_rows > 5000:
+            max_rows = 5000
+
+        conn = sqlite3.connect(str(_resolve_sqlite_path()))
+        cursor = conn.cursor()
+
+        cursor.execute(query)
+        
+        # Get column names
+        columns = [description[0] for description in cursor.description] if cursor.description else []
+        
+        # Fetch bounded results
+        rows = cursor.fetchmany(max_rows + 1)
+        
+        # Convert rows to list of dicts
+        result_list = []
+        truncated = False
+        if len(rows) > max_rows:
+            truncated = True
+            rows = rows[:max_rows]
+
+        for row in rows:
+            row_dict = {col: val for col, val in zip(columns, row)}
+            result_list.append(row_dict)
+        
+        conn.close()
+        
+        result = {
+            "columns": columns,
+            "row_count": len(result_list),
+            "truncated": truncated,
+            "max_rows": max_rows,
+            "rows": result_list
+        }
+        return json.dumps(result, indent=2)
+    except sqlite3.Error as e:
+        return json.dumps({"error": f"Database error: {str(e)}"})
+    except Exception as e:
+        return json.dumps({"error": f"Query error: {str(e)}"})
+
+
+# ============================================================================
+# Server Entry Point
+# ============================================================================
+
 def run_dark_vessel_tests():
     # print("summarise_fishy_vessels_in_region: " + summarise_fishy_vessels_in_region("brazil_eez"))
     # print("evaluate_vessel_fishiness: ", evaluate_vessel_fishiness("jane"))
@@ -518,10 +577,7 @@ def run_dark_vessel_tests():
     # print("detect_fishy_clusters: ", detect_fishy_clusters("brazil_eez"))
     print("summarise_insecure_areas: ", summarise_insecure_areas())
     # print("re_evaluate_region: ", re_evaluate_region("brazil_eez"))
-
-# ============================================================================
-# Server Entry Point
-# ============================================================================
+    
 
 if __name__ == "__main__":
     # mcp.run() # TODO: Uncomment before pushing
