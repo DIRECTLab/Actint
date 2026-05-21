@@ -344,7 +344,8 @@ def compute_segment_features(
 
     groups = [(mmsi, grp.copy()) for mmsi, grp in df.groupby("mmsi")]
 
-    all_rows = Parallel(n_jobs=n_jobs, backend="loky", verbose=0)(
+    #n_jobs was set to n_jobs but there were thread management issues, so set to 1 for now
+    all_rows = Parallel(n_jobs=1, backend="loky", verbose=0)(
         delayed(_compute_segments_one_vessel)(
             mmsi, grp, region_key, window_size, step_size, ports, fishing_grounds
         )

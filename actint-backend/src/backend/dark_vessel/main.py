@@ -23,6 +23,19 @@ from src.simulator        import simulate_region
 from src.features         import compute_vessel_features, compute_segment_features
 from src.classifier       import ActivityIntelligenceClassifier
 from src.dark_vessel_detector import DarkVesselDetector
+from src.visualizer       import (
+    build_region_map,
+    plot_activity_distribution,
+    plot_confusion_matrix,
+    plot_feature_importance,
+    plot_speed_profiles,
+)
+from src.real_data_viz import (
+    build_real_fishing_map,
+    plot_real_fleet_composition,
+    plot_model_vs_reality,
+    print_region_intelligence_report,
+)
 from src.real_ais_validator import validate_real_ais
 from src.partial_track_classifier import (
     PartialTrackClassifier, build_training_data, PARTIAL_FEATURES,
@@ -38,46 +51,64 @@ from src.vessel_baseline import VesselBaselineProfiler
 OUTPUT_DIR = Path("outputs")
 
 
-#log errors so json output isn't compromised
-def log(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
+# ─────────────────────────────────────────────────────────────────────────────
+# Helper: pretty print table
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _print_table(df: pd.DataFrame, cols: list, title: str, n: int = 20):
+    print(f"\n{'─'*80}")
+    print(f"  {title}")
+    print(f"{'─'*80}")
+    sub = df[cols].head(n)
+    # Right-pad/truncate strings
+    col_widths = {}
+    for c in cols:
+        col_widths[c] = max(len(str(c)), sub[c].astype(str).str.len().max())
+        col_widths[c] = min(col_widths[c], 22)
+
+    header = "  ".join(str(c).ljust(col_widths[c]) for c in cols)
+    print(header)
+    print("  ".join("─" * col_widths[c] for c in cols))
+    for _, row in sub.iterrows():
+        print("  ".join(str(row[c])[:col_widths[c]].ljust(col_widths[c]) for c in cols))
+    print()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Core pipeline for one region
 # ─────────────────────────────────────────────────────────────────────────────
 
-def run_region(region_key: str, n_fishing: int = 20, n_cargo: int = 12) -> dict:
+def run_region(region_key: str, n_fishing: int = 20, n_cargo: int = 12, visualise: bool = False) -> dict:
     region_name = REGIONS[region_key]["name"]
-    log(f"\n{'═'*80}")
-    log(f"  ACTIVITY INTELLIGENCE ENGINE — {region_name.upper()}")
-    log(f"{'═'*80}")
+    print(f"\n{'═'*80}")
+    print(f"  ACTIVITY INTELLIGENCE ENGINE — {region_name.upper()}")
+    print(f"{'═'*80}")
 
     out_dir = OUTPUT_DIR / region_key
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # ── 1. Simulate AIS data ─────────────────────────────────────────────────
-    log("\n[1/6] Simulating AIS vessel tracks ...")
+    print("\n[1/6] Simulating AIS vessel tracks ...")
     raw_df = simulate_region(region_key)
     raw_df["timestamp"] = pd.to_datetime(raw_df["timestamp"])
     n_vessels  = raw_df["mmsi"].nunique()
     n_pings    = len(raw_df)
     dark_pings = int((~raw_df["ais_on"]).sum())
-    log(f"      {n_vessels} vessels  |  {n_pings:,} AIS pings  |  "
+    print(f"      {n_vessels} vessels  |  {n_pings:,} AIS pings  |  "
           f"{dark_pings:,} dark pings ({dark_pings/n_pings:.1%})")
 
     # ── 2. Feature engineering ───────────────────────────────────────────────
-    log("[2/6] Computing segment features (sliding window) ...")
+    print("[2/6] Computing segment features (sliding window) ...")
     # Segment-level (20-ping windows, step 10) for classifier training/eval
     seg_df  = compute_segment_features(raw_df, region_key=region_key,
                                         window_size=20, step_size=10)
     # Vessel-level for dark detection and summary
     feat_df = compute_vessel_features(raw_df, region_key=region_key)
-    log(f"      {len(seg_df):,} segments  |  {len(feat_df)} vessels  |  "
+    print(f"      {len(seg_df):,} segments  |  {len(feat_df)} vessels  |  "
           f"{len(seg_df.columns)} features")
 
     # ── 3. Train & evaluate classifier ──────────────────────────────────────
-    log("[3/6] Training activity classifier on segments ...")
+    print("[3/6] Training activity classifier on segments ...")
     # Train/test split: 70% train, 30% test (by vessel, not by ping, to avoid leakage)
     all_mmsis = seg_df["mmsi"].unique()
     RNG_eval  = np.random.default_rng(99)
@@ -96,21 +127,21 @@ def run_region(region_key: str, n_fishing: int = 20, n_cargo: int = 12) -> dict:
     report = eval_results["classification_report"]
     macro_f1 = report.get("macro avg", {}).get("f1-score", 0)
     weighted_f1 = report.get("weighted avg", {}).get("f1-score", 0)
-    log(f"      Train vessels: {len(train_mmsis)}  |  Test vessels: {len(test_mmsis)}")
-    log(f"      Train segs:    {len(train_seg):,}  |  Test segs:    {len(test_seg):,}")
-    log(f"      Macro F1:    {macro_f1:.3f}")
-    log(f"      Weighted F1: {weighted_f1:.3f}")
+    print(f"      Train vessels: {len(train_mmsis)}  |  Test vessels: {len(test_mmsis)}")
+    print(f"      Train segs:    {len(train_seg):,}  |  Test segs:    {len(test_seg):,}")
+    print(f"      Macro F1:    {macro_f1:.3f}")
+    print(f"      Weighted F1: {weighted_f1:.3f}")
 
     # Per-class accuracy
-    log("\n      Per-class metrics:")
+    print("\n      Per-class metrics:")
     for label in eval_results["labels"]:
         if label in report and isinstance(report[label], dict):
             r = report[label]
-            log(f"        {label:<12}  P={r['precision']:.2f}  R={r['recall']:.2f}  "
+            print(f"        {label:<12}  P={r['precision']:.2f}  R={r['recall']:.2f}  "
                   f"F1={r['f1-score']:.2f}  support={r['support']}")
 
     # ── 4. Predict on full dataset ───────────────────────────────────────────
-    log("\n[4/6] Running predictions on segments + vessel roll-up ...")
+    print("\n[4/6] Running predictions on segments + vessel roll-up ...")
     # Segment-level predictions
     seg_preds = clf.predict(seg_df)
     seg_preds["mmsi"] = seg_df["mmsi"].values
@@ -145,20 +176,20 @@ def run_region(region_key: str, n_fishing: int = 20, n_cargo: int = 12) -> dict:
     results_df = vessel_rollup
 
     high_risk = results_df[results_df["overall_anomaly_score"] > 0.5]
-    log(f"      High-risk vessels (score > 0.5): {len(high_risk)}")
+    print(f"      High-risk vessels (score > 0.5): {len(high_risk)}")
 
     # ── 5. Dark vessel analysis ──────────────────────────────────────────────
-    log("[5/6] Dark vessel detection ...")
+    print("[5/6] Dark vessel detection ...")
     detector = DarkVesselDetector()
     dark_df  = detector.analyze_fleet(raw_df)
     spoofed_mmsis = detector.detect_mmsi_clones(raw_df)
 
     n_dark_flagged = int((dark_df["dark_risk_score"] > 0.3).sum())
-    log(f"      Vessels with dark risk > 0.3: {n_dark_flagged}")
-    log(f"      Suspected MMSI clones:         {len(spoofed_mmsis)}")
+    print(f"      Vessels with dark risk > 0.3: {n_dark_flagged}")
+    print(f"      Suspected MMSI clones:         {len(spoofed_mmsis)}")
 
     # ── 6. Output ────────────────────────────────────────────────────────────
-    log("[6/6] Generating outputs ...")
+    print("[6/6] Generating outputs ...")
 
     # Save CSVs
     raw_df.to_csv(out_dir / "raw_tracks.csv", index=False)
@@ -168,6 +199,75 @@ def run_region(region_key: str, n_fishing: int = 20, n_cargo: int = 12) -> dict:
     results_df.to_csv(out_dir / "predictions.csv", index=False)
     dark_df.to_csv(out_dir / "dark_analysis.csv",  index=False)
 
+    # Charts
+
+    map_path = build_region_map(
+        raw_df, results_df, dark_df, region_key,
+        str(out_dir / "map.html")
+    )
+    print(f"      Interactive map: {map_path}")
+
+    if visualise:
+        plot_activity_distribution(
+            results_df, region_key,
+            str(out_dir / "activity_distribution.png")
+        )
+        plot_confusion_matrix(
+            eval_results["confusion_matrix"],
+            eval_results["labels"],
+            region_key,
+            str(out_dir / "confusion_matrix.png")
+        )
+        plot_feature_importance(
+            eval_results["feature_importance"],
+            region_key,
+            str(out_dir / "feature_importance.png")
+        )
+        plot_speed_profiles(
+            raw_df, region_key,
+            str(out_dir / "speed_profiles.png")
+        )
+
+        # Real data integration (GFW 2023)
+        try:
+            real_map = build_real_fishing_map(
+                region_key, str(out_dir / "real_fishing_map.html"))
+            plot_real_fleet_composition(
+                region_key, str(out_dir / "real_fleet_composition.png"))
+            plot_model_vs_reality(
+                region_key, results_df, str(out_dir / "model_vs_reality.png"))
+            print_region_intelligence_report(region_key)
+            print(f"      Real-data map:   {real_map}")
+        except FileNotFoundError as e:
+            print(f"      [skipping real data: {e}]")
+
+    # ── Console summary tables ────────────────────────────────────────────────
+        # Merge results with dark scores
+        summary = results_df.merge(
+            dark_df[["mmsi", "dark_risk_score", "anomaly_flags", "max_gap_h"]],
+            on="mmsi", how="left"
+        )
+        
+        _print_table(
+            summary.sort_values("overall_anomaly_score", ascending=False),
+            cols=["mmsi", "name", "flag", "pred_vessel_label",
+                "pred_activity_label", "activity_confidence",
+                "dark_risk_score", "iuu_fishing_risk", "sts_evasion_risk"],
+            title=f"ALL VESSELS — Ranked by Anomaly Score ({region_name})",
+            n=30,
+        )
+
+        flagged = summary[summary["anomaly_flags"] != "NONE"].sort_values(
+            "dark_risk_score", ascending=False)
+        if not flagged.empty:
+            _print_table(
+                flagged,
+                cols=["mmsi", "name", "flag", "pred_activity_label",
+                    "dark_risk_score", "anomaly_flags"],
+                title=f"FLAGGED ANOMALOUS VESSELS ({region_name})",
+                n=20,
+            )
+
     # ── Console summary tables ────────────────────────────────────────────────
     # Merge results with dark scores
     summary = results_df.merge(
@@ -175,22 +275,19 @@ def run_region(region_key: str, n_fishing: int = 20, n_cargo: int = 12) -> dict:
         on="mmsi", how="left"
     )
 
-    flagged = summary[summary["anomaly_flags"] != "NONE"].sort_values(
-        "dark_risk_score", ascending=False)
-
     # ── Algorithm performance summary ────────────────────────────────────────
-    log(f"\n{'─'*80}")
-    log(f"  ALGORITHM PERFORMANCE — {region_name}")
-    log(f"{'─'*80}")
-    log(f"  Simulated vessels:     {n_vessels}")
-    log(f"  Total AIS pings:       {n_pings:,}")
-    log(f"  Dark fraction:         {dark_pings/n_pings:.1%}")
-    log(f"  Activity F1 (macro):   {macro_f1:.3f}")
-    log(f"  Activity F1 (weighted):{weighted_f1:.3f}")
-    log(f"  Dark vessel detections:{n_dark_flagged}")
-    log(f"  High-risk vessels:     {len(high_risk)}")
-    log(f"  Output dir:            {out_dir}/")
-    log()
+    print(f"\n{'─'*80}")
+    print(f"  ALGORITHM PERFORMANCE — {region_name}")
+    print(f"{'─'*80}")
+    print(f"  Simulated vessels:     {n_vessels}")
+    print(f"  Total AIS pings:       {n_pings:,}")
+    print(f"  Dark fraction:         {dark_pings/n_pings:.1%}")
+    print(f"  Activity F1 (macro):   {macro_f1:.3f}")
+    print(f"  Activity F1 (weighted):{weighted_f1:.3f}")
+    print(f"  Dark vessel detections:{n_dark_flagged}")
+    print(f"  High-risk vessels:     {len(high_risk)}")
+    print(f"  Output dir:            {out_dir}/")
+    print()
 
     return {
         "region": region_key,
@@ -202,6 +299,7 @@ def run_region(region_key: str, n_fishing: int = 20, n_cargo: int = 12) -> dict:
         "n_dark_flagged": n_dark_flagged,
         "n_high_risk": len(high_risk),
         "output_dir": str(out_dir),
+        "map_path": map_path,
         "classification_report": report,
     }
 
@@ -231,14 +329,14 @@ def run_partial_track_training(
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    log(f"\n{'═'*80}")
-    log(f"  PARTIAL TRACK CLASSIFIER — Training")
-    log(f"  Backend: {BACKEND}  |  Device: {compute_device}")
-    log(f"{'═'*80}")
+    print(f"\n{'═'*80}")
+    print(f"  PARTIAL TRACK CLASSIFIER — Training")
+    print(f"  Backend: {BACKEND}  |  Device: {compute_device}")
+    print(f"{'═'*80}")
 
     all_dfs = []
     for fpath in ais_files:
-        log(f"\n  Loading {Path(fpath).name} ...")
+        print(f"\n  Loading {Path(fpath).name} ...")
         df = load_ais_file(fpath, source=source, max_rows=max_rows_per_file)
         # Subsample vessels
         mmsis = df["mmsi"].unique()
@@ -249,15 +347,15 @@ def run_partial_track_training(
         # Drop short tracks
         counts = df["mmsi"].value_counts()
         df = df[df["mmsi"].isin(counts[counts >= 10].index)]
-        log(f"      {df['mmsi'].nunique()} vessels  |  {len(df):,} pings")
+        print(f"      {df['mmsi'].nunique()} vessels  |  {len(df):,} pings")
         all_dfs.append(df)
 
     if not all_dfs:
-        log("No data loaded.")
+        print("No data loaded.")
         return {}
 
     full_df = pd.concat(all_dfs, ignore_index=True)
-    log(f"\n  Combined: {full_df['mmsi'].nunique():,} vessels  |  {len(full_df):,} pings")
+    print(f"\n  Combined: {full_df['mmsi'].nunique():,} vessels  |  {len(full_df):,} pings")
 
     # Train/test split by vessel
     all_mmsis = np.array(full_df["mmsi"].unique())
@@ -272,68 +370,68 @@ def run_partial_track_training(
 
     n_lengths = [1, 2, 3, 5, 8, 10, 15, 20, 30, 50]
 
-    log(f"\n  Building training data at N = {n_lengths} pings ...")
+    print(f"\n  Building training data at N = {n_lengths} pings ...")
     train_feat = build_training_data(train_df, source, n_lengths, n_jobs=-1)
-    log(f"  Training examples: {len(train_feat):,}")
+    print(f"  Training examples: {len(train_feat):,}")
 
-    log("  Building test data ...")
+    print("  Building test data ...")
     test_feat  = build_training_data(test_df,  source, n_lengths, n_jobs=-1)
-    log(f"  Test examples:     {len(test_feat):,}")
+    print(f"  Test examples:     {len(test_feat):,}")
 
-    log("\n  Training classifier (GPU XGBoost) ...")
+    print("\n  Training classifier (GPU XGBoost) ...")
     clf = PartialTrackClassifier()
     clf.fit(train_feat)
 
-    log("  Evaluating ...")
+    print("  Evaluating ...")
     results = clf.evaluate(test_feat, by_n_obs=True)
 
     # Print results
-    log(f"\n{'═'*80}")
-    log("  PARTIAL TRACK CLASSIFIER — Results")
-    log(f"{'═'*80}")
-    log(f"  Activity  F1 macro:    {results.get('activity_f1_macro', 0):.3f}")
-    log(f"  Activity  F1 weighted: {results.get('activity_f1_weighted', 0):.3f}")
-    log(f"  Vess.type F1 macro:    {results.get('vtype_f1_macro', 0):.3f}")
-    log(f"  Vess.type F1 weighted: {results.get('vtype_f1_weighted', 0):.3f}")
+    print(f"\n{'═'*80}")
+    print("  PARTIAL TRACK CLASSIFIER — Results")
+    print(f"{'═'*80}")
+    print(f"  Activity  F1 macro:    {results.get('activity_f1_macro', 0):.3f}")
+    print(f"  Activity  F1 weighted: {results.get('activity_f1_weighted', 0):.3f}")
+    print(f"  Vess.type F1 macro:    {results.get('vtype_f1_macro', 0):.3f}")
+    print(f"  Vess.type F1 weighted: {results.get('vtype_f1_weighted', 0):.3f}")
 
     by_n = results.get("activity_f1_by_n_obs", {})
     if by_n:
-        log(f"\n  Activity F1 by track length:")
+        print(f"\n  Activity F1 by track length:")
         for n_obs in sorted(by_n):
             bar = "█" * int(by_n[n_obs] * 40)
-            log(f"    N={n_obs:>3} pings  {bar:<40}  F1={by_n[n_obs]:.3f}")
+            print(f"    N={n_obs:>3} pings  {bar:<40}  F1={by_n[n_obs]:.3f}")
 
     # Per-class breakdown
     act_report = results.get("activity_report", {})
     if act_report:
-        log(f"\n  Per-class activity performance:")
+        print(f"\n  Per-class activity performance:")
         for label in ACTIVITY_LABELS:
             r = act_report.get(label, {})
             if isinstance(r, dict) and r.get("support", 0) > 0:
-                log(f"    {label:<14}  P={r.get('precision',0):.2f}  "
+                print(f"    {label:<14}  P={r.get('precision',0):.2f}  "
                       f"R={r.get('recall',0):.2f}  "
                       f"F1={r.get('f1-score',0):.2f}  "
                       f"n={int(r.get('support',0))}")
 
     vt_report = results.get("vtype_report", {})
     if vt_report:
-        log(f"\n  Per-class vessel type performance:")
+        print(f"\n  Per-class vessel type performance:")
         for vtype in UNIFIED_VESSEL_TYPES:
             r = vt_report.get(vtype, {})
             if isinstance(r, dict) and r.get("support", 0) > 0:
-                log(f"    {vtype:<18}  P={r.get('precision',0):.2f}  "
+                print(f"    {vtype:<18}  P={r.get('precision',0):.2f}  "
                       f"R={r.get('recall',0):.2f}  "
                       f"F1={r.get('f1-score',0):.2f}  "
                       f"n={int(r.get('support',0))}")
 
     # Save model
     clf.save(model_save_path)
-    log(f"\n  Model saved: {model_save_path}")
+    print(f"\n  Model saved: {model_save_path}")
 
     # Demo: single-observation predictions
-    log(f"\n{'─'*80}")
-    log("  DEMO — Single-Observation Predictions (EO satellite pass)")
-    log(f"{'─'*80}")
+    print(f"\n{'─'*80}")
+    print("  DEMO — Single-Observation Predictions (EO satellite pass)")
+    print(f"{'─'*80}")
     demos = [
         # (lat, lon, sog, heading, vessel_type, sensor, nav_status, note)
         dict(lat=1.2,  lon=104.0, sog=2.1,  heading=45,  vessel_type=None,      nav_status=None, sensor="eo",    note="Malacca — slow, unknown type"),
@@ -355,7 +453,7 @@ def run_partial_track_training(
         # Top-2 activity probabilities
         act_proba = sorted(r.get("activity_proba", {}).items(), key=lambda x: -x[1])[:2]
         top2 = "  ".join(f"{a}:{p:.2f}" for a, p in act_proba)
-        log(f"  ({d['lat']:>6.1f}°, {d['lon']:>7.1f}°)  sog={d.get('sog','?'):>5}kn  "
+        print(f"  ({d['lat']:>6.1f}°, {d['lon']:>7.1f}°)  sog={d.get('sog','?'):>5}kn  "
               f"sensor={d['sensor']:<13}"
               f"→ {r['activity']:<10}  {r['vessel_type']:<16}  "
               f"conf={r['confidence']:.2f}   [{top2}]   {d['note']}")
@@ -376,20 +474,20 @@ def compare_regions(region_keys: list) -> None:
         r = run_region(rk)
         results.append(r)
 
-    log(f"\n{'═'*80}")
-    log("  CROSS-REGION ALGORITHM PERFORMANCE COMPARISON")
-    log(f"{'═'*80}")
-    log(f"  {'Region':<28} {'F1 Macro':>9} {'F1 Weighted':>12} "
+    print(f"\n{'═'*80}")
+    print("  CROSS-REGION ALGORITHM PERFORMANCE COMPARISON")
+    print(f"{'═'*80}")
+    print(f"  {'Region':<28} {'F1 Macro':>9} {'F1 Weighted':>12} "
           f"{'Dark%':>7} {'Dark Flagged':>13} {'High Risk':>10}")
-    log(f"  {'─'*28} {'─'*9} {'─'*12} {'─'*7} {'─'*13} {'─'*10}")
+    print(f"  {'─'*28} {'─'*9} {'─'*12} {'─'*7} {'─'*13} {'─'*10}")
     for r in results:
-        log(f"  {r['region']:<28} "
+        print(f"  {r['region']:<28} "
               f"{r['macro_f1']:>9.3f} "
               f"{r['weighted_f1']:>12.3f} "
               f"{r['dark_fraction']:>7.1%} "
               f"{r['n_dark_flagged']:>13} "
               f"{r['n_high_risk']:>10}")
-    log()
+    print()
 
     # Save comparison JSON
     OUTPUT_DIR.mkdir(exist_ok=True)
@@ -399,7 +497,7 @@ def compare_regions(region_keys: list) -> None:
                   for k, v in r.items() if k != "classification_report"}
                  for r in results]
         json.dump(clean, f, indent=2)
-    log(f"  Comparison saved to {OUTPUT_DIR / 'region_comparison.json'}")
+    print(f"  Comparison saved to {OUTPUT_DIR / 'region_comparison.json'}")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -431,15 +529,15 @@ def run_enhanced_intelligence(
     out_dir = Path(output_dir) if output_dir else Path("outputs/enhanced")
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    log(f"\n{'═'*80}")
-    log("  ENHANCED ACTIVITY INTELLIGENCE PIPELINE")
-    log(f"{'═'*80}")
+    print(f"\n{'═'*80}")
+    print("  ENHANCED ACTIVITY INTELLIGENCE PIPELINE")
+    print(f"{'═'*80}")
 
     # ── 1. Load AIS ───────────────────────────────────────────────────────────
-    log(f"\n[1/6] Loading {Path(ais_path).name} …")
+    print(f"\n[1/6] Loading {Path(ais_path).name} …")
     df = load_ais_file(ais_path, source=source, max_rows=max_rows, bbox=bbox)
     if df.empty:
-        log("  No data loaded.")
+        print("  No data loaded.")
         return {}
 
     # Subsample vessels
@@ -450,15 +548,15 @@ def run_enhanced_intelligence(
         df    = df[df["mmsi"].isin(mmsis)]
     counts = df["mmsi"].value_counts()
     df = df[df["mmsi"].isin(counts[counts >= 5].index)]
-    log(f"      {df['mmsi'].nunique()} vessels  |  {len(df):,} pings")
+    print(f"      {df['mmsi'].nunique()} vessels  |  {len(df):,} pings")
 
     # ── 2. Compute segment features ───────────────────────────────────────────
-    log("[2/6] Computing segment features …")
+    print("[2/6] Computing segment features …")
     seg_df = compute_segment_features(df, window_size=20, step_size=10, n_jobs=-1)
-    log(f"      {len(seg_df):,} segments  |  {seg_df['mmsi'].nunique()} vessels")
+    print(f"      {len(seg_df):,} segments  |  {seg_df['mmsi'].nunique()} vessels")
 
     # ── 3. Geo-feature augmentation ───────────────────────────────────────────
-    log("[3/6] Augmenting with GFW fishing effort + lane proximity …")
+    print("[3/6] Augmenting with GFW fishing effort + lane proximity …")
     aug      = GeoFeatureAugmenter(fetch_depth=False)
 
     # Add centroid lat/lon to seg_df if not present (derived from raw pings)
@@ -477,10 +575,10 @@ def run_enhanced_intelligence(
 
     effort_mean = seg_df["gfw_effort"].mean() if "gfw_effort" in seg_df.columns else 0
     lane_mean   = seg_df["lane_proximity"].mean() if "lane_proximity" in seg_df.columns else 0
-    log(f"      Mean GFW effort: {effort_mean:.3f}  |  Mean lane proximity: {lane_mean:.3f}")
+    print(f"      Mean GFW effort: {effort_mean:.3f}  |  Mean lane proximity: {lane_mean:.3f}")
 
     # ── 4. Train classifier + vessel baseline ─────────────────────────────────
-    log("[4/6] Training classifier + per-vessel behavioural baselines …")
+    print("[4/6] Training classifier + per-vessel behavioural baselines …")
     from src.classifier import ActivityIntelligenceClassifier
 
     # Add missing required columns if absent
@@ -531,7 +629,7 @@ def run_enhanced_intelligence(
     vbp.fit(train_seg)
     seg_df = vbp.score(seg_df)
 
-    log(f"      Baseline profiles: {len(vbp._profiles)} vessels")
+    print(f"      Baseline profiles: {len(vbp._profiles)} vessels")
 
     # Predict on all segments
     try:
@@ -561,23 +659,34 @@ def run_enhanced_intelligence(
             .reset_index()
         )
     except Exception as e:
-        log(f"  [classifier error: {e}]")
+        print(f"  [classifier error: {e}]")
         vessel_results = pd.DataFrame({"mmsi": seg_df["mmsi"].unique()})
 
     # ── 5. Rendezvous detection ───────────────────────────────────────────────
-    log("[5/6] Running rendezvous / proximity event detection …")
+    print("[5/6] Running rendezvous / proximity event detection …")
     rz     = RendezvousDetector(prox_nm=0.5, min_duration_s=600)
     events = rz.detect(df)
 
     if not events.empty:
         vessel_rz_risk = rz.vessel_risk_scores(events)
         vessel_results["rendezvous_risk"] = vessel_results["mmsi"].map(vessel_rz_risk).fillna(0)
-        log(f"      {len(events)} rendezvous events  |  "
+        print(f"      {len(events)} rendezvous events  |  "
               f"max risk: {events['risk_score'].max():.2f}")
-        events.to_csv(out_dir / "rendezvous_events.csv", index=False)
-    else:
-        vessel_results["rendezvous_risk"] = 0.0
-        log("      No rendezvous events detected")
+        if not vessel_results.empty and "overall_anomaly_score" in vessel_results.columns:
+            _print_table(
+                vessel_results.sort_values("overall_anomaly_score", ascending=False),
+                cols=[c for c in ["mmsi", "pred_activity", "pred_vessel_type",
+                                "activity_confidence", "iuu_fishing_risk",
+                                "sts_evasion_risk", "rendezvous_risk",
+                                "overall_anomaly_score"]
+                    if c in vessel_results.columns],
+                title="TOP VESSELS BY ANOMALY SCORE (Enhanced Intelligence)",
+                n=20,
+            )
+            events.to_csv(out_dir / "rendezvous_events.csv", index=False)
+        else:
+            vessel_results["rendezvous_risk"] = 0.0
+            print("      No rendezvous events detected")
 
     # Update composite anomaly score
     if "rendezvous_risk" in vessel_results.columns and "overall_anomaly_score" in vessel_results.columns:
@@ -586,7 +695,7 @@ def run_enhanced_intelligence(
         ]].max(axis=1)
 
     # ── 6. Dark-period dead-reckoning for top-risk vessels ────────────────────
-    log("[6/6] Dark-period dead-reckoning for high-risk vessels …")
+    print("[6/6] Dark-period dead-reckoning for high-risk vessels …")
     dpp = DarkPeriodPredictor(n_samples=1000)
     dpp.fit(df)
 
@@ -619,28 +728,40 @@ def run_enhanced_intelligence(
         if dark_summaries:
             dark_sum_df = pd.DataFrame(dark_summaries)
             dark_sum_df.to_csv(out_dir / "dark_period_cones.csv", index=False)
-            log(f"      {len(dark_periods)} dark periods  |  "
+            print(f"      {len(dark_periods)} dark periods  |  "
                   f"{len(dark_summaries)} cones computed for top-risk vessels")
         else:
-            log(f"      {len(dark_periods)} dark periods detected")
+            print(f"      {len(dark_periods)} dark periods detected")
     else:
-        log("      No dark periods detected")
+        print("      No dark periods detected")
 
     # ── Save & report ─────────────────────────────────────────────────────────
     vessel_results.to_csv(out_dir / "vessel_intelligence.csv", index=False)
     seg_df.to_csv(out_dir / "segments_augmented.csv", index=False)
 
-    log(f"\n{'─'*80}")
-    log("  ENHANCED INTELLIGENCE SUMMARY")
-    log(f"{'─'*80}")
-    log(f"  Vessels analysed:      {len(vessel_results)}")
-    log(f"  Segments processed:    {len(seg_df):,}")
+    print(f"\n{'─'*80}")
+    print("  ENHANCED INTELLIGENCE SUMMARY")
+    print(f"{'─'*80}")
+    print(f"  Vessels analysed:      {len(vessel_results)}")
+    print(f"  Segments processed:    {len(seg_df):,}")
     if "overall_anomaly_score" in vessel_results.columns:
         high_risk = vessel_results[vessel_results["overall_anomaly_score"] > 0.5]
-        log(f"  High-risk vessels:     {len(high_risk)}")
-    log(f"  Rendezvous events:     {len(events) if not events.empty else 0}")
-    log(f"  Dark periods logged:   {len(dark_periods)}")
-    log(f"  Output dir:            {out_dir}/")
+        print(f"  High-risk vessels:     {len(high_risk)}")
+    print(f"  Rendezvous events:     {len(events) if not events.empty else 0}")
+    print(f"  Dark periods logged:   {len(dark_periods)}")
+    print(f"  Output dir:            {out_dir}/")
+
+    if not vessel_results.empty and "overall_anomaly_score" in vessel_results.columns and visualise:
+        _print_table(
+            vessel_results.sort_values("overall_anomaly_score", ascending=False),
+            cols=[c for c in ["mmsi", "pred_activity", "pred_vessel_type",
+                               "activity_confidence", "iuu_fishing_risk",
+                               "sts_evasion_risk", "rendezvous_risk",
+                               "overall_anomaly_score"]
+                  if c in vessel_results.columns],
+            title="TOP VESSELS BY ANOMALY SCORE (Enhanced Intelligence)",
+            n=20,
+        )
 
     return {
         "n_vessels":     len(vessel_results),
@@ -691,9 +812,9 @@ def main():
     args = parser.parse_args()
 
     if args.list_regions:
-        log("\nAvailable regions:")
+        print("\nAvailable regions:")
         for k, v in REGIONS.items():
-            log(f"  {k:<30} {v['name']}")
+            print(f"  {k:<30} {v['name']}")
         return
 
     OUTPUT_DIR.mkdir(exist_ok=True)
@@ -701,14 +822,14 @@ def main():
     # ── Enhanced intelligence mode ───────────────────────────────────────────
     if args.enhanced:
         if not args.real_ais:
-            log("--enhanced requires --real-ais <path>")
+            print("--enhanced requires --real-ais <path>")
             sys.exit(1)
         bbox = None
         if args.bbox:
             try:
                 bbox = tuple(float(x) for x in args.bbox.split(","))
             except ValueError:
-                log("--bbox must be: lon_min,lat_min,lon_max,lat_max")
+                print("--bbox must be: lon_min,lat_min,lon_max,lat_max")
                 sys.exit(1)
         run_enhanced_intelligence(
             ais_path    = args.real_ais,
@@ -727,9 +848,9 @@ def main():
         # Exclude the small INFORE dataset (no nav_status GT, different schema)
         ais_files = [f for f in ais_files if "INFORE" not in f.name]
         if not ais_files:
-            log(f"No AIS zip files found in {ais_dir}")
+            print(f"No AIS zip files found in {ais_dir}")
             sys.exit(1)
-        log(f"  Found {len(ais_files)} AIS files: {[f.name for f in ais_files]}")
+        print(f"  Found {len(ais_files)} AIS files: {[f.name for f in ais_files]}")
         run_partial_track_training(
             ais_files=[str(f) for f in ais_files],
             source="noaa",
@@ -747,7 +868,7 @@ def main():
             try:
                 bbox = tuple(float(x) for x in args.bbox.split(","))
             except ValueError:
-                log("--bbox must be: lon_min,lat_min,lon_max,lat_max")
+                print("--bbox must be: lon_min,lat_min,lon_max,lat_max")
                 sys.exit(1)
 
         validate_real_ais(
@@ -765,11 +886,12 @@ def main():
         compare_regions(list(REGIONS.keys()))
     else:
         if args.region not in REGIONS:
-            log(f"Unknown region '{args.region}'. "
+            print(f"Unknown region '{args.region}'. "
                   f"Use --list-regions to see options.")
             sys.exit(1)
         run_region(args.region)
 
 
 if __name__ == "__main__":
+    start_time = datetime.now()
     main()
