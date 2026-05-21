@@ -500,6 +500,27 @@ def get_future_intersections_in_area(lat: str, lon: str, radius_nm: str) -> str:
         return "Error:\n" + str(e)
 
 # ============================================================================
+# Tools: Geographic Queries
+# ============================================================================
+
+@mcp.tool()
+def get_vessels_in_area(lat: str, lon: str, radius_nm: str):
+    """Retrieves the mmsis of all the vessels in the radius of a certain point.
+    
+    Args:
+        lat: Latitude of the point
+        lon: Longitude of the point
+    
+    Returns: 
+        str: List of MMSIs in within the radius of the point
+    """
+    try:
+        return get_vessels_in_area_helper(lat, lon, radius_nm)
+    except Exception as e: 
+        return "Error:\n" + str(e)
+
+
+# ============================================================================
 # Server Entry Point
 # ============================================================================
 
