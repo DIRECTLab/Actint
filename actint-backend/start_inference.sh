@@ -19,7 +19,7 @@ echo "Model: $MODEL_ID"
 EXTRA_ARGS=""
 if [ "$MODEL_ID" = "google/gemma-4-31B-it" ]; then
     echo "Setting max-model-len to 131392 for $MODEL_ID"
-    EXTRA_ARGS="--max-model-len 131392"
+    EXTRA_ARGS="--max-model-len 131392 --dtype bfloat16"
 fi
 
 # Start the vllm server

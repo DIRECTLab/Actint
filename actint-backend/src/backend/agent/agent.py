@@ -133,6 +133,7 @@ async def query_agent_instance(
         result = await loop.run_in_executor(
             None, lambda: agent.run(query, reset=False)
         )
+        
         return result
     except AgentMaxStepsError:
         print(f"Agent hit max steps.", file=sys.stderr)
