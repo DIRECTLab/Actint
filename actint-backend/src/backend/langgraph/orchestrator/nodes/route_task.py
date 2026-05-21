@@ -13,7 +13,6 @@ Classify the request into one of these labels:
 - adsb
 - both
 - final_response
-- unknown
 
 Definitions:
 - ais: Use this when the request should be handled by the AIS agent,
@@ -29,8 +28,6 @@ Definitions:
   knowledge, casual conversation, writing help, coding help, math, and any
   other unrelated question. If the question is unrelated to AIS/ADS-B data,
   always choose final_response.
-- unknown: Use this when the request is too vague, ambiguous, or missing
-  enough information that you cannot confidently route it.
 
 Routing rules:
 - If the request is about AIS data, choose ais.

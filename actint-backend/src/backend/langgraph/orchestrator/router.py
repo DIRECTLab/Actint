@@ -73,7 +73,7 @@ def run_orchestrator_sync(
     result = app.invoke(state)
 
     return {
-        "route": result.get("route", "unknown"),
+        "route": result.get("route"),
         "ais_result": result.get("ais_result"),
         "adsb_result": result.get("adsb_result"),
         "final_answer": result.get("final_answer", ""),

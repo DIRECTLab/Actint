@@ -23,5 +23,5 @@ User query:
 
 Response:
 """
-    final_answer = await generate(prompt, max_tokens=500)
+    final_answer = await generate(prompt, max_tokens=10000)
     return {"final_answer": final_answer}

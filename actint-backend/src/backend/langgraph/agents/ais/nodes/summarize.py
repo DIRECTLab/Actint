@@ -31,5 +31,5 @@ Agent reasoning:
 
 Provide your summary of the AIS Agent's reasoning and actions in response to the user's query:
 """
-    final_answer = await generate(prompt, max_tokens=500)
+    final_answer = await generate(prompt, max_tokens=10000)
     return {"final_answer": final_answer}
