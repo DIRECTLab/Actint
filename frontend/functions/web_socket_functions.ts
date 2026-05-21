@@ -79,7 +79,7 @@ export const create_map_functions = ({
 
   socket.on("draw_line", (data) => {
     console.log("set AI objects", data);
-    setAI_objects((prev) => [...prev, { type: "line", data }]);
+    setAI_objects((prev) => [...prev, {  type: "line", data }]);
   });
 
   socket.on("draw_polygon", (data) => {
@@ -88,8 +88,14 @@ export const create_map_functions = ({
   });
 
   socket.on("delete_object", (data) => {
+    console.log(aiObjectsRef)
     console.log("Deleting object", data)
-    setAI_objects((prev) => prev.filter(obj => obj.id !== data.object_number));
+    console.log(aiObjectsRef)
+    // setAI_objects((prev) => prev.filter(obj => obj.id !== data.object_number));
+    
+    setAI_objects((prev) => prev.filter((_, index) => index !== data.object_number));
+    
+    
   });
 
   socket.on("get_map_information", (data, callback) => {
