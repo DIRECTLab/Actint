@@ -559,21 +559,6 @@ def query_database(sql_query: str, max_rows: int | str = 200) -> str:
     except Exception as e:
         return json.dumps({"error": f"Query error: {str(e)}"})
 
-# ============================================================================
-# Trying out making an mcp resource
-# ============================================================================
-
-@mcp.tool()
-def get_silly_greeting() -> str:
-    """Example MCP tool that returns a silly greeting."""
-    return get_silly_greeting()
-
-@mcp.resource("resource://sillygreeting")
-def get_silly_greeting() -> str:
-    """Example MCP resource that returns a silly greeting."""
-    with open('backend/mcp_servers/ais/sillygreeting.txt', 'r') as f:
-        greeting = f.read()
-    return greeting
 
 # ============================================================================
 # Server Entry Point
