@@ -25,7 +25,7 @@ DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
 DB_DIR = DATA_DIR / "db"
 SQLITE_PATH = DB_DIR / "ais.db"
 
-#dark_vessel_startup.run()
+dark_vessel_startup.run()
 
 def _resolve_sqlite_path() -> Path:
     """Resolve SQLite path, allowing benchmark overrides via env var."""

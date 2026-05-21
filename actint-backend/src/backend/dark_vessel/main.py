@@ -23,19 +23,6 @@ from src.simulator        import simulate_region
 from src.features         import compute_vessel_features, compute_segment_features
 from src.classifier       import ActivityIntelligenceClassifier
 from src.dark_vessel_detector import DarkVesselDetector
-from src.visualizer       import (
-    build_region_map,
-    plot_activity_distribution,
-    plot_confusion_matrix,
-    plot_feature_importance,
-    plot_speed_profiles,
-)
-from src.real_data_viz import (
-    build_real_fishing_map,
-    plot_real_fleet_composition,
-    plot_model_vs_reality,
-    print_region_intelligence_report,
-)
 from src.real_ais_validator import validate_real_ais
 from src.partial_track_classifier import (
     PartialTrackClassifier, build_training_data, PARTIAL_FEATURES,
@@ -54,29 +41,6 @@ OUTPUT_DIR = Path("outputs")
 #log errors so json output isn't compromised
 def log(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Helper: pretty print table
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _print_table(df: pd.DataFrame, cols: list, title: str, n: int = 20):
-    log(f"\n{'─'*80}")
-    log(f"  {title}")
-    log(f"{'─'*80}")
-    sub = df[cols].head(n)
-    # Right-pad/truncate strings
-    col_widths = {}
-    for c in cols:
-        col_widths[c] = max(len(str(c)), sub[c].astype(str).str.len().max())
-        col_widths[c] = min(col_widths[c], 22)
-
-    header = "  ".join(str(c).ljust(col_widths[c]) for c in cols)
-    log(header)
-    log("  ".join("─" * col_widths[c] for c in cols))
-    for _, row in sub.iterrows():
-        log("  ".join(str(row[c])[:col_widths[c]].ljust(col_widths[c]) for c in cols))
-    log()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -204,46 +168,6 @@ def run_region(region_key: str, n_fishing: int = 20, n_cargo: int = 12) -> dict:
     results_df.to_csv(out_dir / "predictions.csv", index=False)
     dark_df.to_csv(out_dir / "dark_analysis.csv",  index=False)
 
-    # Charts
-    plot_activity_distribution(
-        results_df, region_key,
-        str(out_dir / "activity_distribution.png")
-    )
-    plot_confusion_matrix(
-        eval_results["confusion_matrix"],
-        eval_results["labels"],
-        region_key,
-        str(out_dir / "confusion_matrix.png")
-    )
-    plot_feature_importance(
-        eval_results["feature_importance"],
-        region_key,
-        str(out_dir / "feature_importance.png")
-    )
-    plot_speed_profiles(
-        raw_df, region_key,
-        str(out_dir / "speed_profiles.png")
-    )
-
-    # Interactive map
-    map_path = build_region_map(
-        raw_df, results_df, dark_df, region_key,
-        str(out_dir / "map.html")
-    )
-    log(f"      Interactive map: {map_path}")
-
-    # Real data integration (GFW 2023)
-    try:
-        real_map = build_real_fishing_map(
-            region_key, str(out_dir / "real_fishing_map.html"))
-        plot_real_fleet_composition(
-            region_key, str(out_dir / "real_fleet_composition.png"))
-        plot_model_vs_reality(
-            region_key, results_df, str(out_dir / "model_vs_reality.png"))
-        log(f"      Real-data map:   {real_map}")
-    except FileNotFoundError as e:
-        log(f"      [skipping real data: {e}]")
-
     # ── Console summary tables ────────────────────────────────────────────────
     # Merge results with dark scores
     summary = results_df.merge(
@@ -251,25 +175,8 @@ def run_region(region_key: str, n_fishing: int = 20, n_cargo: int = 12) -> dict:
         on="mmsi", how="left"
     )
 
-    _print_table(
-        summary.sort_values("overall_anomaly_score", ascending=False),
-        cols=["mmsi", "name", "flag", "pred_vessel_label",
-              "pred_activity_label", "activity_confidence",
-              "dark_risk_score", "iuu_fishing_risk", "sts_evasion_risk"],
-        title=f"ALL VESSELS — Ranked by Anomaly Score ({region_name})",
-        n=30,
-    )
-
     flagged = summary[summary["anomaly_flags"] != "NONE"].sort_values(
         "dark_risk_score", ascending=False)
-    if not flagged.empty:
-        _print_table(
-            flagged,
-            cols=["mmsi", "name", "flag", "pred_activity_label",
-                  "dark_risk_score", "anomaly_flags"],
-            title=f"FLAGGED ANOMALOUS VESSELS ({region_name})",
-            n=20,
-        )
 
     # ── Algorithm performance summary ────────────────────────────────────────
     log(f"\n{'─'*80}")
@@ -295,7 +202,6 @@ def run_region(region_key: str, n_fishing: int = 20, n_cargo: int = 12) -> dict:
         "n_dark_flagged": n_dark_flagged,
         "n_high_risk": len(high_risk),
         "output_dir": str(out_dir),
-        "map_path": map_path,
         "classification_report": report,
     }
 
@@ -735,18 +641,6 @@ def run_enhanced_intelligence(
     log(f"  Rendezvous events:     {len(events) if not events.empty else 0}")
     log(f"  Dark periods logged:   {len(dark_periods)}")
     log(f"  Output dir:            {out_dir}/")
-
-    if not vessel_results.empty and "overall_anomaly_score" in vessel_results.columns:
-        _print_table(
-            vessel_results.sort_values("overall_anomaly_score", ascending=False),
-            cols=[c for c in ["mmsi", "pred_activity", "pred_vessel_type",
-                               "activity_confidence", "iuu_fishing_risk",
-                               "sts_evasion_risk", "rendezvous_risk",
-                               "overall_anomaly_score"]
-                  if c in vessel_results.columns],
-            title="TOP VESSELS BY ANOMALY SCORE (Enhanced Intelligence)",
-            n=20,
-        )
 
     return {
         "n_vessels":     len(vessel_results),
