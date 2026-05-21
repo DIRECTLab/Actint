@@ -240,7 +240,6 @@ def run_region(region_key: str, n_fishing: int = 20, n_cargo: int = 12) -> dict:
             region_key, str(out_dir / "real_fleet_composition.png"))
         plot_model_vs_reality(
             region_key, results_df, str(out_dir / "model_vs_reality.png"))
-        print_region_intelligence_report(region_key)
         log(f"      Real-data map:   {real_map}")
     except FileNotFoundError as e:
         log(f"      [skipping real data: {e}]")
