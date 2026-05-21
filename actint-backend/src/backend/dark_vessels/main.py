@@ -200,7 +200,6 @@ def run_region(region_key: str, n_fishing: int = 20, n_cargo: int = 12, visualis
     dark_df.to_csv(out_dir / "dark_analysis.csv",  index=False)
 
     # Charts
-
     map_path = build_region_map(
         raw_df, results_df, dark_df, region_key,
         str(out_dir / "map.html")
