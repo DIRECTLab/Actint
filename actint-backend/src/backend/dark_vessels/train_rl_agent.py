@@ -350,6 +350,7 @@ def main():
     parser.add_argument("--seed",      type=int,  default=42)
     parser.add_argument("--eval-only", type=str,  default=None,
                         help="Path to saved checkpoint; skip training")
+    parser.add_argument("--build", action="store_true", help="Build the RL model")  # don't crash when called from dark_vessel_analysis.py
     args = parser.parse_args()
 
     print("=" * 60)
