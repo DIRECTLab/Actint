@@ -341,7 +341,7 @@ def plot_per_class_comparison(rl_metrics: dict, rf_metrics: dict):
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
-def main():
+def main(visualise: bool = False):
     parser = argparse.ArgumentParser(
         description="Train DQN Activity Detection Agent"
     )
@@ -351,6 +351,7 @@ def main():
     parser.add_argument("--eval-only", type=str,  default=None,
                         help="Path to saved checkpoint; skip training")
     parser.add_argument("--build", action="store_true", help="Build the RL model")  # don't crash when called from dark_vessel_analysis.py
+    parser.add_argument("--vis", action="store_true", help="Visualise results after training")  # optional flag to control visualisation
     args = parser.parse_args()
 
     print("=" * 60)
@@ -397,11 +398,12 @@ def main():
     print(f"\nResults saved → {results_path}")
 
     # ── Figures ───────────────────────────────────────────────────────────────
-    print("\nGenerating figures...")
-    if history.get("steps"):
-        plot_training_curves(history, rf_metrics)
-    if history.get("final_eval") and rf_metrics:
-        plot_per_class_comparison(history["final_eval"], rf_metrics)
+    if visualise:
+        print("\nGenerating figures...")
+        if history.get("steps"):
+            plot_training_curves(history, rf_metrics)
+        if history.get("final_eval") and rf_metrics:
+            plot_per_class_comparison(history["final_eval"], rf_metrics)
 
     print("\n" + "=" * 60)
     print("  Done.")
