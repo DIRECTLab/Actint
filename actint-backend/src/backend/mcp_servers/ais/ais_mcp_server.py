@@ -48,12 +48,7 @@ mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 # ============================================================================
 
 @mcp.tool()
-def run_dark_vessel_startup() -> str:
-    """Run the dark vessel startup script to analyze dark vessel patterns."""
-    dark_vessel_startup.run()
-
-@mcp.tool()
-def summarise_dark_vessels() -> str:
+def evaluate_area_risk() -> str:
     """Summarise information about dark vessels in the database."""
     try:
         # Placeholder implementation - replace with actual logic
@@ -80,6 +75,11 @@ def evaluate_vessel_risk() -> str:
         return json.dumps(risk_evaluation, indent=2)
     except Exception as e:
         return json.dumps({"error": str(e)})
+
+@mcp.tool()
+def get_dark_analysis(mmsi):
+    #Calls a helper function in the helpers/dark_vessel_helper.py file of the same name
+    pass
 
 # ============================================================================
 # Health & Info Endpoints
