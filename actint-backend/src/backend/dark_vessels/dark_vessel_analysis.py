@@ -1,3 +1,12 @@
+"""
+run with python dark_vesel_analysis.py
+arguments:
+    --build: build the RL model (this will also run the analysis after building)
+    --vis: visualise the model on building and the analysis results
+    --all: run analysis on all regions instead of just brazil_eez
+"""
+
+
 import time
 import argparse
 import backend.dark_vessels.main as dark_vessels
