@@ -188,9 +188,6 @@ def search_region_for_ships(region: str) -> dict:
 # ============================================================================
 # Tools: Translation
 # ============================================================================
- 
-@mcp.tool()
-def get_vessel_mmsi(vessel_name: str) -> int:
 @mcp.tool()
 def get_vessel_mmsi(vessel_name: str) -> str:
     """Get the MMSI for a given vessel.
