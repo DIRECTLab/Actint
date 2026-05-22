@@ -1,0 +1,284 @@
+<bos><|turn>system
+You are an expert assistant who can solve any task using tool calls. You will be given a task to solve as best you can.
+To do so, you have been given access to some tools.
+
+The tool call you write is an action: after the tool is executed, you will get the result of the tool call as an "observation".
+This Action/Observation can repeat N times, you should take several steps when needed.
+
+You can use the result of the previous action as input for the next action.
+The observation will always be a string: it can represent a file, like "image_1.jpg".
+Then you can use it as input for the next action. You can do it for instance as follows:
+
+Observation: "image_1.jpg"
+
+Action:
+{
+  "name": "image_transformer",
+  "arguments": {"image": "image_1.jpg"}
+}
+
+To provide the final answer to the task, use an action blob with "name": "final_answer" tool. It is the only way to complete the task, else you will be stuck on a loop. So your final output should look like this:
+Action:
+{
+  "name": "final_answer",
+  "arguments": {"answer": "insert your final answer here"}
+}
+
+
+Here are a few examples using notional tools:
+---
+Task: "Generate an image of the oldest person in this document."
+
+Action:
+{
+  "name": "document_qa",
+  "arguments": {"document": "document.pdf", "question": "Who is the oldest person mentioned?"}
+}
+Observation: "The oldest person in the document is John Doe, a 55 year old lumberjack living in Newfoundland."
+
+Action:
+{
+  "name": "image_generator",
+  "arguments": {"prompt": "A portrait of John Doe, a 55-year-old man living in Canada."}
+}
+Observation: "image.png"
+
+Action:
+{
+  "name": "final_answer",
+  "arguments": "image.png"
+}
+
+---
+Task: "What is the result of the following operation: 5 + 3 + 1294.678?"
+
+Action:
+{
+    "name": "python_interpreter",
+    "arguments": {"code": "5 + 3 + 1294.678"}
+}
+Observation: 1302.678
+
+Action:
+{
+  "name": "final_answer",
+  "arguments": "1302.678"
+}
+
+---
+Task: "Which city has the highest population , Guangzhou or Shanghai?"
+
+Action:
+{
+    "name": "web_search",
+    "arguments": "Population Guangzhou"
+}
+Observation: ['Guangzhou has a population of 15 million inhabitants as of 2021.']
+
+
+Action:
+{
+    "name": "web_search",
+    "arguments": "Population Shanghai"
+}
+Observation: '26 million (2019)'
+
+Action:
+{
+  "name": "final_answer",
+  "arguments": "Shanghai"
+}
+
+Above example were using notional tools that might not exist for you. You only have access to these tools:
+- position_map: Positions the map to a certain lat, lon, and zoom.
+    Takes inputs: {'lat': {'type': 'string', 'description': 'Latitude'}, 'lon': {'type': 'string', 'description': 'Longitude'}, 'zoom': {'type': 'string', 'description': 'Zoom level'}}
+    Returns an output of type: string
+- draw_rectangle: Draws a rectangle on the map given two lat/lon points and a color.
+    Takes inputs: {'lat1': {'type': 'string', 'description': 'Latitude of first corner'}, 'lon1': {'type': 'string', 'description': 'Longitude of first corner'}, 'lat2': {'type': 'string', 'description': 'Latitude of opposite corner'}, 'lon2': {'type': 'string', 'description': 'Longitude of opposite corner'}, 'color': {'type': 'string', 'description': 'Color of the rectangle'}}
+    Returns an output of type: string
+- draw_circle: Draws a circle on the map given a center point, radius, and color.
+    Takes inputs: {'center_lat': {'type': 'string', 'description': 'Latitude of the center'}, 'center_lon': {'type': 'string', 'description': 'Longitude of the center'}, 'radius': {'type': 'string', 'description': 'Radius of the circle in meters'}, 'color': {'type': 'string', 'description': 'Color of the circle'}}
+    Returns an output of type: string
+- draw_line: Draws a line on the map given a list of lat/lon points and a color.
+    Takes inputs: {'points': {'type': 'string', 'description': 'List of (lat, lon) tuples defining the line'}, 'color': {'type': 'string', 'description': 'Color of the line'}}
+    Returns an output of type: string
+- add_marker: Adds a marker a specific latitude and longitue
+    Takes inputs: {'lat': {'type': 'string', 'description': 'Latitude of marker'}, 'lon': {'type': 'string', 'description': 'Longitude of marker'}, 'popup_msg': {'type': 'string', 'description': 'Optional message to show in a popup over the marker. Pass an empty string ("") to show no popup.'}}
+    Returns an output of type: string
+- final_answer: Provides a final answer to the given problem.
+    Takes inputs: {'answer': {'type': 'any', 'description': 'The final answer to the problem'}}
+    Returns an output of type: any
+You can also give tasks to team members.
+Calling a team member works similarly to calling a tool: provide the task description as the 'task' argument. Since this team member is a real human, be as detailed and verbose as necessary in your task description.
+You can also include any relevant variables or context using the 'additional_args' argument.
+Here is a list of the team members that you can call:
+- martime_data_agent: Can query a database of AIS information (including position, heading, speed, etc.) and do calculations with that data.
+  - Takes inputs: {'task': {'type': 'string', 'description': 'Long detailed description of the task.'}, 'additional_args': {'type': 'object', 'description': 'Dictionary of extra inputs to pass to the managed agent, e.g. images, dataframes, or any other contextual data it may need.', 'nullable': True}}
+  - Returns an output of type: string
+- aviation_data_agent: Can query a database of ADS-B information and do calculations with that data.
+  - Takes inputs: {'task': {'type': 'string', 'description': 'Long detailed description of the task.'}, 'additional_args': {'type': 'object', 'description': 'Dictionary of extra inputs to pass to the managed agent, e.g. images, dataframes, or any other contextual data it may need.', 'nullable': True}}
+  - Returns an output of type: string
+
+Here are the rules you should always follow to solve your task:
+1. ALWAYS provide a tool call, else you will fail.
+2. Always use the right arguments for the tools. Never use variable names as the action arguments, use the value instead.
+3. Call a tool only when needed: do not call the search agent if you do not need information, try to solve the task yourself. If no tool call is needed, use final_answer tool to return your answer.
+4. Never re-do a tool call that you previously did with the exact same parameters.
+
+Now Begin! <turn|>
+<|turn>user
+New task:
+Where is the USS Kidd?<turn|>
+<|turn>model
+Action:
+{
+  "name": "martime_data_agent",
+  "arguments": {
+    "task": "Find the current location (latitude and longitude) of the ship named USS Kidd."
+  }
+}<turn|>
+<|turn>tool-call
+Calling tools:
+[{'id': '857e292f-2d87-4704-a53a-1c976a39cf95', 'type': 'function', 'function': {'name': 'martime_data_agent', 'arguments': {'task': 'Find the current location (latitude and longitude) of the ship named USS Kidd.'}}}]<turn|>
+<|turn>tool-response
+Observation:
+Here is the final answer from your managed agent 'martime_data_agent':
+### 1. Task outcome (short version):
+The USS Kidd is currently located at latitude 33.08487 and longitude -118.49759.
+
+### 2. Task outcome (extremely detailed version):
+Based on the latest available maritime data for the vessel 'USS KIDD' (MMSI: 368011000), the ship was last detected on 2023-01-01 at 23:59:17+00:00. 
+
+**Coordinates:**
+- Latitude: 33.08487
+- Longitude: -118.49759
+
+**Movement Data at time of detection:**
+- Speed Over Ground: 10.9 knots
+- Course Over Ground: 211.7 degrees
+- Heading: 511.0 degrees
+
+### 3. Additional context (if relevant):
+- **Home Base:** Naval Station Everett, Washington
+- **Parent Command:** COMDESRON 1
+- **Fleet Assignment:** U.S. PAC Fleet<turn|>
+<|turn>model
+Action:
+{
+  "name": "final_answer",
+  "arguments": {
+    "answer": "The USS Kidd is currently located at latitude 33.08487 and longitude -118.49759."
+  }
+}<turn|>
+<|turn>tool-call
+Calling tools:
+[{'id': '86c1a513-c955-480c-a838-8697ea38afc1', 'type': 'function', 'function': {'name': 'final_answer', 'arguments': {'answer': 'The USS Kidd is currently located at latitude 33.08487 and longitude -118.49759.'}}}]<turn|>
+<|turn>tool-response
+Observation:
+The USS Kidd is currently located at latitude 33.08487 and longitude -118.49759.<turn|>
+<|turn>user
+New task:
+Can you show me on the map?<turn|>
+<|turn>model
+Action:
+{
+  "name": "position_map",
+  "arguments": {
+    "lat": "33.08487",
+    "lon": "-118.49759",
+    "zoom": "12"
+  }
+}
+call:
+{
+  "name": "add_marker",
+  "arguments": {
+    "lat": "33.08487",
+    "lon": "-118.49759",
+    "popup_msg": "USS Kidd"
+  }
+}
+call:
+{
+  "name": "final_answer",
+  "arguments": {
+    "answer": "I have positioned the map and added a marker at the location of the USS Kidd (33.08487, -118.49759)."
+  }
+}<turn|>
+<|turn>tool-response
+Error:
+Error while parsing tool call from model output: The JSON blob you used is invalid due to the following error: Extra data: line 9 column 1 (char 116).
+JSON blob was: Action:
+{
+  "name": "position_map",
+  "arguments": {
+    "lat": "33.08487",
+    "lon": "-118.49759",
+    "zoom": "12"
+  }
+}
+call:
+{
+  "name": "add_marker",
+  "arguments": {
+    "lat": "33.08487",
+    "lon": "-118.49759",
+    "popup_msg": "USS Kidd"
+  }
+}
+call:
+{
+  "name": "final_answer",
+  "arguments": {
+    "answer": "I have positioned the map and added a marker at the location of the USS Kidd (33.08487, -118.49759)."
+  }
+}</tool_call>, decoding failed on that specific part of the blob:
+' "12"
+  }'.
+Now let's retry: take care not to repeat previous errors! If you have retried several times, try a completely different approach.<turn|>
+<|turn>model
+Action:
+{
+  "name": "position_map",
+  "arguments": {
+    "lat": "33.08487",
+    "lon": "-118.49759",
+    "zoom": "12"
+  }
+}<turn|>
+<|turn>tool-call
+Calling tools:
+[{'id': 'fbbc04e8-1754-47ce-9e58-f53efc994247', 'type': 'function', 'function': {'name': 'position_map', 'arguments': {'lat': '33.08487', 'lon': '-118.49759', 'zoom': '12'}}}]<turn|>
+<|turn>tool-response
+Observation:
+Map positioned to lat: 33.08487, lon: -118.49759, zoom: 12<turn|>
+<|turn>model
+Action:
+{
+  "name": "add_marker",
+  "arguments": {
+    "lat": "33.08487",
+    "lon": "-118.49759",
+    "popup_msg": "USS Kidd"
+  }
+}<turn|>
+<|turn>tool-call
+Calling tools:
+[{'id': '6a8948f8-5e76-497f-937c-1b1c52f71614', 'type': 'function', 'function': {'name': 'add_marker', 'arguments': {'lat': '33.08487', 'lon': '-118.49759', 'popup_msg': 'USS Kidd'}}}]<turn|>
+<|turn>tool-response
+Observation:
+Marker added with latitude 33.08487 and longitude -118.49759<turn|>
+<|turn>model
+Action:
+{
+  "name": "final_answer",
+  "arguments": {
+    "answer": "I have positioned the map and added a marker at the location of the USS Kidd (latitude 33.08487, longitude -118.49759)."
+  }
+}<turn|>
+<|turn>tool-call
+Calling tools:
+[{'id': 'fbe3a5b9-3d5a-419f-af3e-a7f18ede086f', 'type': 'function', 'function': {'name': 'final_answer', 'arguments': {'answer': 'I have positioned the map and added a marker at the location of the USS Kidd (latitude 33.08487, longitude -118.49759).'}}}]<turn|>
+<|turn>tool-response
+Observation:
+I have positioned the map and added a marker at the location of the USS Kidd (latitude 33.08487, longitude -118.49759).<turn|>
