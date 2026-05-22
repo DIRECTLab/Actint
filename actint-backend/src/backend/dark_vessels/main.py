@@ -48,7 +48,7 @@ from src.rendezvous_detector import RendezvousDetector
 from src.dark_period_predictor import DarkPeriodPredictor, VesselState
 from src.vessel_baseline import VesselBaselineProfiler
 
-OUTPUT_DIR = Path("outputs")
+OUTPUT_DIR = Path(__file__).parent / "outputs"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
