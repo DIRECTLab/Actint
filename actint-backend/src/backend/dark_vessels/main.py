@@ -776,7 +776,7 @@ def run_enhanced_intelligence(
 # CLI
 # ─────────────────────────────────────────────────────────────────────────────
 
-def main():
+def main(visualise=False):
     parser = argparse.ArgumentParser(
         description="Maritime Activity Intelligence Engine")
     parser.add_argument("--region",  type=str, default=None,
@@ -889,9 +889,8 @@ def main():
             print(f"Unknown region '{args.region}'. "
                   f"Use --list-regions to see options.")
             sys.exit(1)
-        run_region(args.region)
+        run_region(args.region, visualise=visualise)
 
 
 if __name__ == "__main__":
-    start_time = datetime.now()
     main()
