@@ -33,6 +33,7 @@ dependencies = [
     "scikit-learn",
     "shapely<=2.1.2",
     #"gymnasium", - uncomment if we are actually going to use train_rl_agent.py
+    "rapidfuzz>=3.14"
 ]
 
 [build-system]

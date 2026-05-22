@@ -13,8 +13,10 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Optional
 
-from backend.mcp_servers.adsb.helpers.basic_tools import get_conn, normalize_icao
+from backend.mcp_servers.adsb.helpers.basic_tools import normalize_icao
 from backend.mcp_servers.utils.distance_calculation import haversine_distance_nm
+
+from backend.data_processing.query_database import DatabaseConnectionTypes, get_conn
 
 
 @dataclass
@@ -97,7 +99,7 @@ def get_vehicle_locations(
         "LIMIT %s;"
     )
 
-    with get_conn() as conn:
+    with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (icao_n, start_time, start_time, end_time, end_time, limit))
             colnames = [d.name for d in cur.description]
@@ -140,7 +142,7 @@ def get_track_summary(icao: str, lookback_hours: float = 6.0) -> dict:
           AND timestamp >= NOW() - (%s || ' hours')::interval;
     """
 
-    with get_conn() as conn:
+    with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
             cur.execute(sql, (icao_n, lookback_hours))
             row = cur.fetchone()

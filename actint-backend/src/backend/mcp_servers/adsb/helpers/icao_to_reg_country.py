@@ -6,7 +6,8 @@ using reg num use max fit search to find country iso in reg_num_to_country_iso
 use country_iso to find country name and other context in avi_countries
 """
 
-from backend.mcp_servers.adsb.helpers.basic_tools import get_conn, icao_to_reg, reg_to_country_iso, country_iso_to_name, normalize_icao
+from backend.mcp_servers.adsb.helpers.basic_tools import icao_to_reg, reg_to_country_iso, country_iso_to_name, normalize_icao
+from backend.data_processing.query_database import DatabaseConnectionTypes, get_conn
 
 
 def icao_to_country(icao: str) -> dict:
@@ -19,7 +20,7 @@ def icao_to_country(icao: str) -> dict:
     if not icao_n:
         raise ValueError("icao is required")
 
-    with get_conn() as conn:
+    with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         reg_num = icao_to_reg(conn, icao_n)
         iso_country = reg_to_country_iso(conn, reg_num) if reg_num else None
         country_name = country_iso_to_name(conn, iso_country) if iso_country else None

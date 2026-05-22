@@ -1,96 +1,59 @@
-import sqlite3 
-from datetime import datetime
-import os
+import psycopg
+from enum import Enum
+from backend.config import config
 
-from pathlib import Path
+class DatabaseConnectionTypes(Enum):
+    AIS = 0
+    ADSB = 1
 
-DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
-DB_DIR = DATA_DIR / "db"
-SQLITE_PATH_AIS = DB_DIR / "ais.db"
-SQLITE_PATH_ADSB = DB_DIR / "adsb.db"
+def _database_configs(conn_type: DatabaseConnectionTypes) -> dict:
+    if conn_type == DatabaseConnectionTypes.AIS:
+        return {
+            "host": config.DB_HOST,
+            "dbname": config.AIS_DB_NAME,
+            "user": config.DB_USER,
+            "password": config.DB_PASS,
+            "port": config.DB_PORT,
+        }
+    elif conn_type == DatabaseConnectionTypes.ADSB:
+        return {
+            "host": config.DB_HOST,
+            "dbname": config.ADSB_DB_NAME,
+            "user": config.DB_USER,
+            "password": config.DB_PASS,
+            "port": config.DB_PORT,
+        }
+    else:
+        raise ValueError(f"Unsupported connection type: {conn_type}")
 
+def get_conn(conn_type: DatabaseConnectionTypes = DatabaseConnectionTypes.AIS):
+    db_config = _database_configs(conn_type)
 
-def _resolve_sqlite_path() -> Path:
-    """Resolve SQLite path, allowing benchmark overrides via env var."""
-    override = os.getenv("ACTINT_SQLITE_PATH")
-    if override:
-        return Path(override).expanduser().resolve()
-    return SQLITE_PATH_AIS
+    # Validate required vars
+    for key, value in db_config.items():
+        if value is None:
+            raise ValueError(f"Missing environment variable: {key}")
 
-def _get_sqlite_connection() -> sqlite3.Connection:
-    """Get a SQLite connection."""
-    return sqlite3.connect(_resolve_sqlite_path())
-
-
-def _resolve_sqlite_path_asdb() -> Path:
-    """Resolve SQLite path, allowing benchmark overrides via env var."""
-    override = os.getenv("ACTINT_SQLITE_PATH")
-    if override:
-        return Path(override).expanduser().resolve()
-    return SQLITE_PATH_ADSB
-
-
-
-def _get_sqlite_connection_asdb() -> sqlite3.Connection:
-    """Get a SQLite connection."""
-    return sqlite3.connect(_resolve_sqlite_path_asdb())
-
-
-
-
-###################################### Functions for AIS/boats #######################################
-
-def query_ais_positions(searchQuery: dict, sort=False):
-    conn = _get_sqlite_connection()
-    cursor = conn.cursor()
-    for key, value in searchQuery.items():
-        cursor.execute(f"SELECT * FROM ais_positions WHERE {key} = ?", (value,))
-    results = cursor.fetchall()
-    print(results[0][2])
-    conn.close()
-    if(results and sort):
-        sorted_vessels = sorted(
-            results,
-            key=lambda x: datetime.strptime(x[2], "%Y-%m-%dT%H:%M:%S.%f"),
-            reverse=True
-        )
-        return sorted_vessels
-    return results
-
-
-
-def query_fleets(searchQuery: dict):
-    conn = _get_sqlite_connection()
-    cursor = conn.cursor()
-    for key, value in searchQuery.items():
-        cursor.execute(f"SELECT * FROM fleets WHERE {key} = ?", (value,))
-    results = cursor.fetchall()
-    conn.close()
-    return results
-
-
-
-def query_vessels(searchQuery: dict):
-    conn = _get_sqlite_connection()
-    cursor = conn.cursor()
-    for key, value in searchQuery.items():
-        cursor.execute(f"SELECT * FROM vessels WHERE {key} = ?", (value,))
-    results = cursor.fetchall()
-    conn.close()
-    return results
-
-
+    try:
+        conn = psycopg.connect(**db_config)
+        return conn
+    except psycopg.Error as e:
+        raise ConnectionError(f"Failed to connect to database: {e}") from e
 
 
 
 ######################################### Functions for planes ##########################################
 
-
 def query_adsb_positions(searchQuery: dict, sort=False):
-    conn = _get_sqlite_connection_asdb()
+    conn = get_conn(DatabaseConnectionTypes.ADSB)
     cursor = conn.cursor()
+
+    prompt = "SELECT * FROM adsb_positions WHERE "
     for key, value in searchQuery.items():
-        cursor.execute(f"SELECT * FROM adsb_positions WHERE {key} = ?", (value,))
+        prompt += f"{key} = %s AND "
+    prompt = prompt[:-5] + ";"  # Remove trailing ' AND ' and add semicolon
+    
+    cursor.execute(prompt, tuple(searchQuery.values()))
     results = cursor.fetchall()
     conn.close()
     if results and sort:
@@ -104,3 +67,6 @@ def query_adsb_positions(searchQuery: dict, sort=False):
     return results
 
 
+if (__name__ == "__main__"):
+    results = query_ais_positions({"MMSI": 368011000})
+    print(results)

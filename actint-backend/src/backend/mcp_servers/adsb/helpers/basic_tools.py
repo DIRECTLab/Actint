@@ -26,6 +26,8 @@ from psycopg.rows import dict_row
 import math
 from typing import Any, Iterable, Optional
 
+from backend.data_processing.query_database import DatabaseConnectionTypes, get_conn
+
 
 def normalize_icao(icao: str) -> str:
     """Normalize ICAO hex strings for consistent DB lookup."""
@@ -48,50 +50,6 @@ def bbox_from_radius_nm(lat: float, lon: float, radius_nm: float) -> tuple[float
     denom = 60.0 * max(math.cos(math.radians(lat)), 1e-6)
     dlon = radius_nm / denom
     return lat - dlat, lat + dlat, lon - dlon, lon + dlon
-
-def get_conn():
-    """Create a Postgres connection for ADS-B tooling.
-
-    Requires env vars: DB_HOST, DB_NAME, DB_USER, DB_PASS, DB_PORT.
-
-    Raises:
-        ValueError: if any required env var is missing/invalid.
-        psycopg.Error: if connection fails.
-    """
-    db_host = config.DB_HOST
-    db_name = config.DB_NAME
-    db_user = config.DB_USER
-    db_pass = config.DB_PASS
-    db_port_raw = config.DB_PORT
-
-    missing = [
-        name
-        for name, val in [
-            ("DB_HOST", db_host),
-            ("DB_NAME", db_name),
-            ("DB_USER", db_user),
-            ("DB_PASS", db_pass),
-            ("DB_PORT", db_port_raw),
-        ]
-        if not val
-    ]
-    if missing:
-        raise ValueError(f"Missing environment variables: {', '.join(missing)}")
-
-    try:
-        db_port = int(db_port_raw)
-    except Exception as e:
-        raise ValueError("DB_PORT must be an integer") from e
-
-    return psycopg.connect(
-        host=db_host,
-        dbname=db_name,
-        user=db_user,
-        password=db_pass,
-        port=db_port,
-    )
-
-
 
 def select_one(conn, table, select_col, where_col, where_val):
 
@@ -307,7 +265,7 @@ def count_rows(conn, table_name: str) -> int:
 if __name__ == "__main__":
     print("testing")
 
-    conn = get_conn()
+    conn = get_conn(DatabaseConnectionTypes.ADSB)
     test = get_last_seen_time(conn, '4baad9')
     print(f"value: {test}")
     
