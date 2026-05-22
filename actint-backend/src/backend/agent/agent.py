@@ -4,7 +4,7 @@ import sys
 from backend.config import config
 from pathlib import Path
 
-from smolagents import OpenAIServerModel, CodeAgent, MCPClient, AgentMaxStepsError, ActionStep, TaskStep
+from smolagents import OpenAIServerModel, ToolCallingAgent, MCPClient, AgentMaxStepsError, ActionStep, TaskStep
 from mcp import StdioServerParameters
 from backend.mcp_servers.ais import ais_mcp_server
 from backend.mcp_servers.adsb import adsb_mcp_server
@@ -73,13 +73,13 @@ def init_model() -> OpenAIServerModel:
 def create_agent(
     model,
     additional_tools: list = []
-) -> CodeAgent:
+) -> ToolCallingAgent:
     """Creates an agent, injecting relevant tools."""
     tools = []
     # tools += ais_mcp_tools
     # tools += adsb_mcp_tools
     
-    ais_agent = CodeAgent(
+    ais_agent = ToolCallingAgent(
         tools=ais_mcp_tools,
         model=model,
         max_steps=20,
@@ -87,7 +87,7 @@ def create_agent(
         description="Can query a database of AIS information (including position, heading, speed, etc.) and do calculations with that data."
     )
 
-    adsb_agent = CodeAgent(
+    adsb_agent = ToolCallingAgent(
         tools=adsb_mcp_tools,
         model=model,
         max_steps=20,
@@ -95,7 +95,7 @@ def create_agent(
         description="Can query a database of ADS-B information and do calculations with that data."
     )
 
-    # search_agent = CodeAgent(
+    # search_agent = ToolCallingAgent(
     #     tools=[WebSearchTool()],
     #     model=get_model(),
     #     max_steps=10,
@@ -118,10 +118,10 @@ def create_agent(
         # managed_agents.append(map_agent)
 
     
-    return CodeAgent(tools=tools, model=model, managed_agents=managed_agents)
+    return ToolCallingAgent(tools=tools, model=model, managed_agents=managed_agents)
 
 async def query_agent_instance(
-    agent: CodeAgent,
+    agent: ToolCallingAgent,
     query: str,
 ) -> str:
     """Entry point for both web and terminal to query an agent instance."""
@@ -133,7 +133,7 @@ async def query_agent_instance(
         result = await loop.run_in_executor(
             None, lambda: agent.run(query, reset=False)
         )
-        
+
         return result
     except AgentMaxStepsError:
         print(f"Agent hit max steps.", file=sys.stderr)
@@ -144,7 +144,7 @@ async def query_agent_instance(
 
 #======================================Summarization Agent==================================#
 
-def summarize_last_turn(instructions: str, agent: CodeAgent):
+def summarize_last_turn(instructions: str, agent: ToolCallingAgent):
     summarization_tools = []  # Define any tools specific to summarization if needed
 
     agent_memory = agent.memory
@@ -167,7 +167,7 @@ def summarize_last_turn(instructions: str, agent: CodeAgent):
     steps_to_summarize = agent_memory.steps[first_step:]
     prompt = create_prompt(instructions, steps_to_summarize)
 
-    summarizer_agent = CodeAgent(tools=summarization_tools, model=agent.model)
+    summarizer_agent = ToolCallingAgent(tools=summarization_tools, model=agent.model)
     import time
     start_time = time.time()
     summary = summarizer_agent.run(prompt, reset=True)
