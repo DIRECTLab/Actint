@@ -109,6 +109,12 @@ export function Chat() {
             </ChatContainer>
         </MainContainer>
         </div>
+        <button 
+            onClick={() => socket.emit("print_transcript")}
+            style={{ padding: "8px", background: "#f0f0f0", border: "1px solid #ccc", cursor: "pointer" }}
+        >
+            Print Transcript
+        </button>
     </div>
     );
 }

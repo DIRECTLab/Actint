@@ -73,6 +73,27 @@ async def handle_agent_query(sid, data):
 
     await sio.emit("send_response", new_msg, to=sid)
 
+@sio.on("print_transcript")
+async def handle_print_transcript(sid):
+    print("Printing transcript for", sid)
+    print_transcript(sid)
+
+def print_transcript(sid):
+    from transformers import AutoTokenizer
+    # Load the tokenizer for the model.
+    print(connections)
+    tokenizer = AutoTokenizer.from_pretrained(config.MODEL_ID)
+    agent = connections[sid].get("agent")
+    msg_objs = agent.write_memory_to_messages()
+    # returns a  List of ChatMessage objects, which we can't
+    # feed into apply_chat_template(). For that we need a list
+    # of dicts with values for 'role' and 'contents'
+    msgs = [ msg.__dict__ for msg in msg_objs ]
+    transcript = tokenizer.apply_chat_template(msgs, tokenize=False)
+
+    with open("/home/Meikul/Projects/Actint/actint-backend/src/backend/agent/outputs/new_output.txt", "w") as f:
+        print(transcript, file=f)
+
 if __name__ == "__main__":
     from backend.agent.agent import init_model
     app.model = init_model()
