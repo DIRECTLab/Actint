@@ -81,7 +81,6 @@ async def handle_print_transcript(sid):
 def print_transcript(sid):
     from transformers import AutoTokenizer
     # Load the tokenizer for the model.
-    print(connections)
     tokenizer = AutoTokenizer.from_pretrained(config.MODEL_ID)
     agent = connections[sid].get("agent")
     msg_objs = agent.write_memory_to_messages()
