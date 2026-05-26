@@ -5,9 +5,14 @@ from smolagents import Tool
 from backend.event_loop_registry import get_event_loop
 from backend.transport.server_sent_events.map_events import (
     set_map_position,
+    add_marker,
+    draw_vessel_trajectory,
     draw_rectangle,
     draw_circle,
     draw_line,
+    draw_polygon,
+    delete_object,
+    get_map_info,
 )
 
 
@@ -33,7 +38,61 @@ class ZoomTool(Tool):
         )
         future.result()
         return f"Map positioned to lat: {lat}, lon: {lon}, zoom: {zoom}"
+    
 
+class AddMarkerTool(Tool):
+    name="add_marker"
+    description = "Adds a marker a specific latitude and longitue"
+    inputs = {
+        "lat": {"type": "string", "description": "Latitude of marker"},
+        "lon": {"type": "string", "description": "Longitude of marker"},
+        "popup_description": {"type": "string", "description": "description for what the new marker is"}
+    }
+    output_type = "string"
+
+    def __init__(self, sid, sio_instance, **kwargs):
+        super().__init__(**kwargs)
+        self.sid = sid
+        self.sio = sio_instance
+
+    def forward(self, lat, lon, popup_description) -> str:
+        lat = float(lat)
+        lon = float(lon)
+        future = asyncio.run_coroutine_threadsafe(
+            add_marker(self.sid, lat=lat, lon=lon, popup_description=popup_description),
+            get_event_loop(),
+        )
+        future.result()
+        return (f"Marker added with latitude {lat} and longitude {lon}")
+
+
+class DrawVesselTrajectoryTool(Tool):
+    name = "draw_vessel_trajectory"
+    description = "Draws the trajectory of a vessel given its position and direction. Draws a specified number of nautical miles out."
+    inputs = {
+        "lat": {"type": "string", "description": "Latitude of marker"},
+        "lon": {"type": "string", "description": "Longitude of marker"},
+        "degree": {"type": "string", "description": "Degree of vessel course"},
+        "distance_nm": {"type": "string", "description": "How far to draw the vessel trajectory in nautical miles"},
+    }
+    output_type = "string"
+
+    def __init__(self, sid, sio_instance, **kwargs):
+        super().__init__(**kwargs)
+        self.sid = sid
+        self.sio = sio_instance
+
+    def forward(self, lat, lon, degree, distance_nm) -> str:
+        lat= float(lat)
+        lon = float(lon)
+        future = asyncio.run_coroutine_threadsafe(
+            draw_vessel_trajectory(
+                self.sid, lat=lat, lon=lon, degree=degree, distance_nm=distance_nm,
+            ),
+            get_event_loop(),
+        )
+        future.result()
+        return (f"Trajectory added to map with position Lat: {lat}, Lon: {lon}, with course {degree} and distance {distance_nm}")
 
 class DrawRectangleTool(Tool):
     name = "draw_rectangle"
@@ -129,3 +188,75 @@ class DrawLineTool(Tool):
         )
         future.result()
         return f"Line drawn with points {points} in {color}"
+
+
+class DrawPolygonTool(Tool):
+    name = "draw_polygon"
+    description = "Draws a polygon on the map given a list of lat/lon points and a color."
+    inputs = {
+        "points": {
+            "type": "string",
+            "description": "List of (lat, lon) tuples defining the polygon",
+        },
+        "color": {"type": "string", "description": "Color of the polygon"},
+    }
+    output_type = "string"
+
+    def __init__(self, sid, sio_instance, **kwargs):
+        super().__init__(**kwargs)
+        self.sid = sid
+        self.sio = sio_instance
+
+    def forward(self, points, color) -> str:
+        if isinstance(points, str):
+            points = json.loads(points)
+        future = asyncio.run_coroutine_threadsafe(
+            draw_polygon(self.sid, points=points, color=color), get_event_loop()
+        )
+        future.result()
+        return f"Polygon drawn with points {points} in {color}"
+
+
+class DeleteObjectTool(Tool):
+    name = "delete_object"
+    description = "Deletes objects drawn on the map"
+    inputs = {
+        "object_number": {
+            "type": "string",
+            "description": "the identifier of the object that needs deletion",
+        }
+    }
+    output_type = "string"
+    
+    def __init__(self, sid, sio_instance, **kwargs):
+        super().__init__(**kwargs)
+        self.sid = sid
+        self.sio = sio_instance
+
+    def forward(self, object_number) -> str:
+        
+        future = asyncio.run_coroutine_threadsafe(
+            delete_object(self.sid, object_number=object_number), get_event_loop()
+        )
+        future.result()
+        return f"Deleted object {object_number} from the map objects"
+
+
+class GetMapInfoTool(Tool):
+    name = "get_map_info"
+    description = "Gets information about things on the map"
+    inputs = {}
+    output_type = "string"
+
+    def __init__(self, sid, sio_instance):
+        super().__init__()
+        self.sid = sid
+        self.sio = sio_instance
+
+    def forward(self) -> str: 
+
+        future = asyncio.run_coroutine_threadsafe(
+            get_map_info(self.sid), get_event_loop()
+        )
+        result = future.result()
+        return result

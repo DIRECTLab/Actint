@@ -1,6 +1,6 @@
-import { Popup, Marker, Polyline, Rectangle, Circle } from 'react-leaflet'
+import { Popup, Marker, Polyline, Rectangle, Circle, Polygon } from 'react-leaflet'
 import { vehicles_current_positions, vehicles_previous_positions } from '@/types/vehicleSettings';
-
+import Trajectory from '@/components/Trajectory'
 
 import L from 'leaflet';
 
@@ -58,6 +58,33 @@ export function HandleMarkers({ vehiclesPreviousPositions, vehicleCurrentPositio
             {/* 3. Render AI Objects */}
             {AI_objects.map((obj, index) => {
             switch (obj.type) {
+                case "marker":
+                    return (
+                        <Marker
+                            key={index}
+                            position={[obj.data.lat, obj.data.lon]}
+                            icon={icon}
+                        >
+                            {obj.data.popup && (
+                                <Popup>
+                                    {obj.data.popup}
+                                </Popup>
+                            )}
+                        </Marker>
+                    );
+
+                case "trajectory":
+                    console.log("making trajectory")
+                    return (
+                        <Trajectory
+                            key={index}
+                            lat={obj.data.lat}
+                            lon={obj.data.lon}
+                            degree={obj.data.degree}
+                            distance_nm={obj.data.distance_nm}
+                        ></Trajectory>
+                    )
+
                 case "rectangle":
                 return (
                     <Rectangle
@@ -84,6 +111,13 @@ export function HandleMarkers({ vehiclesPreviousPositions, vehicleCurrentPositio
                         positions={obj.data.points}
                         color={obj.data.color}
                     ></Polyline>;
+
+                case "polygon":
+                    return <Polygon
+                        key={index}
+                        positions={obj.data.points}
+                        pathOptions={{ color: obj.data.color }}
+                    ></Polygon>;
 
                 default:
                     return null;

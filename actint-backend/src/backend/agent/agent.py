@@ -1,7 +1,7 @@
 # backend/agent/agent.py
 import os
 import asyncio
-from smolagents import ToolCallingAgent, TransformersModel, MCPClient, AgentMaxStepsError, ActionStep, TaskStep
+from smolagents import ToolCallingAgent, TransformersModel, MCPClient, AgentMaxStepsError, ActionStep, TaskStep, OpenAIModel
 from mcp import StdioServerParameters
 import sys
 from pathlib import Path
@@ -58,13 +58,21 @@ adsb_server_params = StdioServerParameters(
 adsb_mcp_client = MCPClient(adsb_server_params, structured_output=False)
 adsb_mcp_tools = adsb_mcp_client.get_tools()
 
-model = TransformersModel(
-    model_id=model_id,
-    max_new_tokens=config.MAX_NEW_TOKENS,
+# model = TransformersModel(
+#     model_id=model_id,
+#     max_new_tokens=config.MAX_NEW_TOKENS,
+# )
+
+
+model = OpenAIModel(
+    model_id="local",
+    api_base=config.LLAMA_BACKEND_SOCKET,
+    api_key="dummy"
 )
 
 def create_agent(
-    additional_tools: list = []
+    additional_tools: list = [],
+    
 ) -> ToolCallingAgent:
     """Creates an agent, injecting relevant tools."""
     tools = []
@@ -96,6 +104,7 @@ async def query_agent_instance(
         result = await loop.run_in_executor(
             None, lambda: agent.run(query, reset=False)
         )
+
         return result
     except AgentMaxStepsError:
         print(f"Agent hit max steps.", file=sys.stderr)
@@ -103,6 +112,7 @@ async def query_agent_instance(
     except Exception as e:
         print(f"Agent error: {e}", file=sys.stderr)
         return f"Agent encountered an error: {str(e)}"
+    
 
 #======================================Summarization Agent==================================#
 
