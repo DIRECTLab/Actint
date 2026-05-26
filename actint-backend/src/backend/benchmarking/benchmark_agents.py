@@ -1613,6 +1613,7 @@ def main() -> int:
 	print_human_summary(results["summary"])
 	print(f"\nSaved JSON results to: {output_json_path}")
 	print(f"Saved CSV results to: {output_csv_path}")
+	print("finished main")
 	return 0
 
 
