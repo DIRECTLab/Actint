@@ -95,7 +95,7 @@ def run_region(region_key: str, n_fishing: int = 20, n_cargo: int = 12, visualis
     n_pings    = len(raw_df)
     dark_pings = int((~raw_df["ais_on"]).sum())
     print(f"      {n_vessels} vessels  |  {n_pings:,} AIS pings  |  "
-          f"{dark_pings:,} dark pings ({dark_pings/n_pings:.1%})")
+          f"{dark_pings:,} dark pings ({dark_pings/n_pings:.1%})")                  # If I can get real AIS data to look like the dataframe, I'll be cooking
 
     # ── 2. Feature engineering ───────────────────────────────────────────────
     print("[2/6] Computing segment features (sliding window) ...")
@@ -809,7 +809,19 @@ def main(visualise=False):
     parser.add_argument("--enhanced", action="store_true",
                         help="Run full enhanced intelligence pipeline (geo + rendezvous + baseline + dark predictor)")
 
+    parser.add_argument("--use-database", type=str, action="store", help="Use the database to do simulation stuff as well.")
+
     args = parser.parse_args()
+
+    if args.use_database:
+        print("using database")
+        from backend.dark_vessels.database_info import get_ais_in_region, prepare_data_for_ML
+        location = args.use_database
+        ship_data = get_ais_in_region(location)
+        ML_ready_data = prepare_data_for_ML(ship_data)
+        print("Finished creating ML ready data")
+
+
 
     if args.list_regions:
         print("\nAvailable regions:")

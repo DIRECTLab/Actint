@@ -118,7 +118,23 @@ def get_vessel_position_history_helper(mmsi: int) -> list[dict]:
 
 
 def get_vessel_latest_location_helper(mmsi: int) -> dict:
-    return get_vessel_position_history_helper(mmsi)[0]
+    
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM ais_dynamic_data WHERE mmsi = %s ORDER BY basedatetime DESC LIMIT 1;", (mmsi,))
+    results = cursor.fetchall()
+    conn.close()
+
+    return [dict(zip([key[0] for key in cursor.description], row)) for row in results]
+
+def get_all_vessels_latest_location():
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute(""" SELECT * FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY mmsi ORDER BY basedatetime DESC) AS rn FROM ais_dynamic_data) sub WHERE rn = 1;""")
+    rows = cursor.fetchall()
+    columns = [desc[0] for desc in cursor.description]
+    conn.close()
+    return [dict(zip(columns, row)) for row in rows]
 
 def get_all_fleets() -> list[str]:
     """Get a list of all fleets."""
