@@ -66,7 +66,7 @@ adsb_mcp_tools = adsb_mcp_client.get_tools()
 
 model = OpenAIModel(
     model_id="local",
-    api_base="http://127.0.0.1:8000/v1",
+    api_base=config.LLAMA_BACKEND_SOCKET,
     api_key="dummy"
 )
 

@@ -97,27 +97,3 @@ def get_fleets_information_helper():
             f" - Position: {position}\n"
             )
     return result
-
-
-
-
-
-
-
-
-
-
-
-
-
-# def ship_near_fleet_helper(mmsi):
-#     vessel_info = get_static_data_helper(mmsi)
-#     fleet = vessel_info['fleet']
-#     if not fleet:
-#         return f"Vessel with MMSI {mmsi} is not assigned to a fleet."
-#     fleetLat, fleetLon = get_fleet_position_helper(fleet)
-#     most_rescent_position = get_vessel_latest_location_helper(mmsi)
-#     if haversine_distance_nm(most_rescent_position['lat'], most_rescent_position['lon'], fleetLat, fleetLon) <= DISTANCE_THRESHOLD:
-#         return f"This ship is considered to be in the fleet becuase it is within {DISTANCE_THRESHOLD} NM of the fleet position."
-#     else: 
-#         return f"This ship is not coonsidered to be in the fleet becuaase it is more than {DISTANCE_THRESHOLD} NM from the fleet position."
