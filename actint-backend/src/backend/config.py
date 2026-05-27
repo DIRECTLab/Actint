@@ -20,7 +20,13 @@ def env_int(name: str, default: int | None = None) -> int | None:
 
 @dataclass(frozen=True)
 class Config:
-    CONDA_PREFIX: str | None = env_str("CONDA_PREFIX")
+    CONDA_PREFIX: str | None = getenv("CONDA_PREFIX", None)
+    WEB_SOCKET_PORT: int = int(getenv("WEB_SOCKET_PORT", "3050"))
+    # DB Config
+    DB_USER: str | None = getenv("DB_USER", None)
+    DB_PASS: str | None = getenv("DB_PASS", None)
+    DB_PORT: int | None = int(getenv("DB_PORT", None)) if getenv("DB_PORT") else None
+    DB_HOST: str | None = getenv("DB_HOST", None)
 
     WEB_SOCKET_PORT: int | None = env_int("WEB_SOCKET_PORT", 3050)
 
