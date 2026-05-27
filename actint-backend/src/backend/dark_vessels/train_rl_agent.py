@@ -1,0 +1,415 @@
+"""
+Train the DQN Activity Detection Agent
+
+Builds training/eval environments from all four simulated regions,
+trains the Double-DQN agent, compares against the RandomForest baseline,
+and saves outputs to outputs/rl/.
+
+Usage
+-----
+    python train_rl_agent.py                  # full 200k-step run
+    python train_rl_agent.py --steps 50000    # quick sanity check
+    python train_rl_agent.py --eval-only outputs/rl/dqn_best.pt
+"""
+
+import argparse
+import json
+import warnings
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+warnings.filterwarnings("ignore")
+
+from src.simulator   import simulate_region
+from src.features    import compute_segment_features
+from src.classifier  import ActivityIntelligenceClassifier, ACTIVITY_FEATURES, ACTIVITY_LABELS
+from src.rl_env      import (AISActivityEnv, RunningNormaliser,
+                              LABEL_LIST, N_ACTIONS, IDX_TO_LABEL)
+from src.rl_agent    import DQNAgent
+
+OUT_DIR = Path("outputs/rl")
+OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+BG    = "#0d1117"
+PANEL = "#161b22"
+GRID  = "#21262d"
+TEXT  = "#e6edf3"
+ACCENT= "#58a6ff"
+GREEN = "#3fb950"
+ORANGE= "#f0883e"
+RED   = "#f85149"
+YELLOW= "#d29922"
+
+REGIONS = ["brazil_eez", "philippines_eez", "strait_of_malacca", "gulf_of_guinea"]
+
+
+# ── Data preparation ──────────────────────────────────────────────────────────
+
+def build_datasets(seed: int = 42):
+    """
+    Simulate all regions, compute segment features, split train/eval.
+    Vessel-based split to prevent data leakage.
+    """
+    print("Simulating regions and computing segment features...")
+    all_feats = []
+    for rk in REGIONS:
+        print(f"  {rk} ...", end=" ", flush=True)
+        raw   = simulate_region(rk)
+        feats = compute_segment_features(raw, region_key=rk)
+        all_feats.append(feats)
+        print(f"{len(feats)} segments")
+
+    feat_df = pd.concat(all_feats, ignore_index=True)
+    feat_df = feat_df.dropna(subset=["true_activity"])
+    feat_df = feat_df[feat_df["true_activity"].isin(ACTIVITY_LABELS)].copy()
+
+    # Vessel-based train/eval split (80/20 by MMSI)
+    rng    = np.random.default_rng(seed)
+    mmsis  = feat_df["mmsi"].unique()
+    rng.shuffle(mmsis)
+    split  = int(len(mmsis) * 0.8)
+    train_mmsi = set(mmsis[:split])
+    eval_mmsi  = set(mmsis[split:])
+
+    train_df = feat_df[feat_df["mmsi"].isin(train_mmsi)].reset_index(drop=True)
+    eval_df  = feat_df[feat_df["mmsi"].isin(eval_mmsi)].reset_index(drop=True)
+
+    print(f"\nDataset: {len(train_df)} train segs / {len(eval_df)} eval segs")
+    print(f"  Train activity distribution:")
+    vc = train_df["true_activity"].value_counts()
+    for act, cnt in vc.items():
+        print(f"    {act:<18} {cnt:>5}")
+
+    return train_df, eval_df
+
+
+def build_normaliser(train_df: pd.DataFrame) -> RunningNormaliser:
+    n_feat = len(ACTIVITY_FEATURES)
+    norm   = RunningNormaliser(n_feat)
+    X      = train_df[ACTIVITY_FEATURES].fillna(0).values
+    norm.fit(X)
+    return norm
+
+
+# ── RF baseline ───────────────────────────────────────────────────────────────
+
+def train_rf_baseline(train_df: pd.DataFrame, eval_df: pd.DataFrame) -> dict:
+    print("\nTraining RandomForest baseline...")
+    clf = ActivityIntelligenceClassifier()
+    clf.fit(train_df)
+    metrics = clf.evaluate(eval_df)
+    if not metrics:
+        return {}
+
+    report = metrics["classification_report"]
+    acc    = report.get("accuracy", 0)
+    macro  = report.get("macro avg", {}).get("f1-score", 0)
+
+    per_class = {
+        k: v.get("f1-score", 0)
+        for k, v in report.items()
+        if isinstance(v, dict) and k not in ("macro avg", "weighted avg")
+    }
+    hv_classes = ["sts", "transshipment", "bunkering"]
+    hv_f1 = np.mean([per_class.get(c, 0) for c in hv_classes if c in per_class])
+
+    print(f"  RF accuracy={acc:.4f}  macro-F1={macro:.4f}  HV-F1={hv_f1:.4f}")
+    return {
+        "accuracy":    acc,
+        "macro_f1":    macro,
+        "hv_f1":       hv_f1,
+        "per_class_f1": per_class,
+    }
+
+
+# ── RL training ───────────────────────────────────────────────────────────────
+
+def train_rl(
+    train_df: pd.DataFrame,
+    eval_df:  pd.DataFrame,
+    norm:     RunningNormaliser,
+    total_steps: int = 200_000,
+    seed: int = 42,
+) -> tuple[DQNAgent, dict]:
+    print(f"\nTraining DQN agent ({total_steps:,} steps)...")
+
+    train_env = AISActivityEnv(train_df, normaliser=norm, seed=seed)
+    eval_env  = AISActivityEnv(eval_df,  normaliser=norm, seed=seed + 1)
+
+    agent = DQNAgent(
+        obs_dim         = len(ACTIVITY_FEATURES),
+        n_actions       = N_ACTIONS,
+        hidden          = 256,
+        lr              = 3e-4,
+        gamma           = 0.95,
+        buffer_capacity = 100_000,
+        batch_size      = 128,
+        target_update   = 500,
+        eps_start       = 1.0,
+        eps_end         = 0.05,
+        eps_decay_steps = int(total_steps * 0.4),
+        warmup_steps    = 2_000,
+    )
+
+    # Curriculum callback: update env sampling weights at each eval checkpoint
+    eval_every = max(total_steps // 20, 1_000)
+    def curriculum_callback(step: int) -> None:
+        t = step / total_steps
+        train_env.set_curriculum_stage(t)
+        stage = ("warm-up" if t < 0.30 else "broadening" if t < 0.70 else "full")
+        alpha = train_env._hv_oversample_factor
+        print(f"  [Curriculum] stage={stage} α={alpha:.0f} (t={t:.2f})")
+
+    history = agent.train(
+        env              = train_env,
+        total_steps      = total_steps,
+        eval_every       = eval_every,
+        eval_env         = eval_env,
+        log_every        = max(total_steps // 40, 500),
+        save_dir         = str(OUT_DIR),
+        step_callback    = curriculum_callback,
+    )
+
+    # Final greedy evaluation
+    print("\nFinal greedy evaluation on held-out set...")
+    final = agent.evaluate(eval_env, n_episodes=100)
+    print(f"  DQN accuracy={final['accuracy']:.4f}"
+          f"  hv_recall={final['hv_recall']:.4f}")
+    print("  Per-class accuracy:")
+    for cls, acc in sorted(final["per_class_acc"].items()):
+        print(f"    {cls:<18} {acc:.3f}")
+
+    history["final_eval"] = final
+    return agent, history
+
+
+# ── Visualisation ─────────────────────────────────────────────────────────────
+
+def _style(fig, axes=None):
+    fig.patch.set_facecolor(BG)
+    if axes is None:
+        return
+    for ax in (axes if hasattr(axes, "__iter__") else [axes]):
+        if ax is None:
+            continue
+        ax.set_facecolor(PANEL)
+        ax.tick_params(colors=TEXT, labelsize=8)
+        ax.xaxis.label.set_color(TEXT)
+        ax.yaxis.label.set_color(TEXT)
+        ax.title.set_color(TEXT)
+        for sp in ax.spines.values():
+            sp.set_edgecolor(GRID)
+        ax.grid(color=GRID, linewidth=0.5, alpha=0.7)
+
+
+def plot_training_curves(history: dict, rf_metrics: dict):
+    fig, axes = plt.subplots(2, 2, figsize=(14, 8))
+    _style(fig, axes.ravel())
+
+    # 1. Episode return
+    ax = axes[0, 0]
+    if history["ep_return"]:
+        window = min(50, len(history["ep_return"]))
+        ret_smooth = pd.Series(history["ep_return"]).rolling(window, min_periods=1).mean()
+        ax.plot(history["steps"], history["ep_return"],
+                color=GRID, linewidth=0.6, alpha=0.4)
+        ax.plot(history["steps"], ret_smooth,
+                color=ACCENT, linewidth=1.8, label="DQN (smoothed)")
+        ax.axhline(0, color=TEXT, linestyle="--", linewidth=0.6, alpha=0.4)
+    ax.set_title("Episode Return", color=TEXT, fontsize=10, fontweight="bold")
+    ax.set_xlabel("Training Step", color=TEXT)
+    ax.set_ylabel("Cumulative Reward", color=TEXT)
+    ax.legend(facecolor=PANEL, edgecolor=GRID, labelcolor=TEXT, fontsize=8)
+
+    # 2. Accuracy
+    ax = axes[0, 1]
+    if history["ep_accuracy"]:
+        window = min(50, len(history["ep_accuracy"]))
+        acc_smooth = pd.Series(history["ep_accuracy"]).rolling(window, min_periods=1).mean()
+        ax.plot(history["steps"], history["ep_accuracy"],
+                color=GRID, linewidth=0.6, alpha=0.4)
+        ax.plot(history["steps"], acc_smooth,
+                color=GREEN, linewidth=1.8, label="DQN train (smoothed)")
+    if history.get("eval_accuracy"):
+        eval_steps = np.linspace(
+            history["steps"][0] if history["steps"] else 0,
+            history["steps"][-1] if history["steps"] else 1,
+            len(history["eval_accuracy"]),
+        )
+        ax.plot(eval_steps, history["eval_accuracy"],
+                color=ACCENT, linewidth=2.0, linestyle="--",
+                marker="o", markersize=5, label="DQN eval")
+    if rf_metrics.get("accuracy"):
+        ax.axhline(rf_metrics["accuracy"], color=ORANGE, linestyle=":",
+                   linewidth=2.0, label=f"RF baseline {rf_metrics['accuracy']:.3f}")
+    ax.set_title("Classification Accuracy", color=TEXT, fontsize=10, fontweight="bold")
+    ax.set_xlabel("Training Step", color=TEXT)
+    ax.set_ylabel("Accuracy", color=TEXT)
+    ax.set_ylim(0, 1.05)
+    ax.legend(facecolor=PANEL, edgecolor=GRID, labelcolor=TEXT, fontsize=8)
+
+    # 3. High-value recall
+    ax = axes[1, 0]
+    if history["hv_recall"]:
+        window = min(50, len(history["hv_recall"]))
+        hv_smooth = pd.Series(history["hv_recall"]).rolling(window, min_periods=1).mean()
+        ax.plot(history["steps"], history["hv_recall"],
+                color=GRID, linewidth=0.6, alpha=0.4)
+        ax.plot(history["steps"], hv_smooth,
+                color=RED, linewidth=1.8, label="HV recall (STS+transfer+bunker)")
+    if history.get("eval_hv_recall"):
+        eval_steps = np.linspace(
+            history["steps"][0] if history["steps"] else 0,
+            history["steps"][-1] if history["steps"] else 1,
+            len(history["eval_hv_recall"]),
+        )
+        ax.plot(eval_steps, history["eval_hv_recall"],
+                color=YELLOW, linewidth=2.0, linestyle="--",
+                marker="s", markersize=5, label="HV recall (eval)")
+    if rf_metrics.get("hv_f1"):
+        ax.axhline(rf_metrics["hv_f1"], color=ORANGE, linestyle=":",
+                   linewidth=2.0, label=f"RF HV-F1 {rf_metrics['hv_f1']:.3f}")
+    ax.set_title("High-Value Event Recall (STS / Transshipment / Bunkering)",
+                 color=TEXT, fontsize=9, fontweight="bold")
+    ax.set_xlabel("Training Step", color=TEXT)
+    ax.set_ylabel("Recall", color=TEXT)
+    ax.set_ylim(0, 1.05)
+    ax.legend(facecolor=PANEL, edgecolor=GRID, labelcolor=TEXT, fontsize=8)
+
+    # 4. Loss
+    ax = axes[1, 1]
+    if history["loss"]:
+        loss_smooth = pd.Series(history["loss"]).rolling(20, min_periods=1).mean()
+        ax.plot(history["steps"][:len(history["loss"])], history["loss"],
+                color=GRID, linewidth=0.6, alpha=0.4)
+        ax.plot(history["steps"][:len(history["loss"])], loss_smooth,
+                color=ACCENT, linewidth=1.8, label="TD loss (smoothed)")
+        ax.set_yscale("log")
+    ax.set_title("TD Loss (log scale)", color=TEXT, fontsize=10, fontweight="bold")
+    ax.set_xlabel("Training Step", color=TEXT)
+    ax.set_ylabel("Huber Loss", color=TEXT)
+    ax.legend(facecolor=PANEL, edgecolor=GRID, labelcolor=TEXT, fontsize=8)
+
+    fig.suptitle("DQN Activity Detection Agent — Training Curves",
+                 color=TEXT, fontsize=13, fontweight="bold")
+    path = OUT_DIR / "RL1_training_curves.png"
+    fig.savefig(path, dpi=150, bbox_inches="tight",
+                facecolor=BG, edgecolor="none")
+    plt.close(fig)
+    print(f"  saved: {path}")
+
+
+def plot_per_class_comparison(rl_metrics: dict, rf_metrics: dict):
+    """Bar chart comparing DQN vs RF per-class accuracy / F1."""
+    rl_pc  = rl_metrics.get("per_class_acc",  {})
+    rf_pc  = rf_metrics.get("per_class_f1", {})
+    classes = sorted(set(rl_pc) | set(rf_pc))
+
+    rl_vals = [rl_pc.get(c, 0) for c in classes]
+    rf_vals = [rf_pc.get(c, 0) for c in classes]
+
+    x    = np.arange(len(classes))
+    w    = 0.35
+    fig, ax = plt.subplots(figsize=(14, 5))
+    _style(fig, ax)
+
+    ax.bar(x - w / 2, rl_vals, w, color=ACCENT,  label="DQN (accuracy)", alpha=0.85)
+    ax.bar(x + w / 2, rf_vals, w, color=ORANGE,  label="RF (F1-score)",  alpha=0.85)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(
+        [ACTIVITY_LABELS.get(c, c) for c in classes],
+        rotation=30, ha="right", fontsize=8, color=TEXT,
+    )
+    ax.set_ylabel("Score", color=TEXT)
+    ax.set_ylim(0, 1.1)
+    ax.set_title("RL2 — Per-Class Performance: DQN Agent vs. RF Baseline",
+                 color=TEXT, fontsize=11, fontweight="bold")
+    ax.legend(facecolor=PANEL, edgecolor=GRID, labelcolor=TEXT, fontsize=9)
+
+    path = OUT_DIR / "RL2_per_class_comparison.png"
+    fig.savefig(path, dpi=150, bbox_inches="tight",
+                facecolor=BG, edgecolor="none")
+    plt.close(fig)
+    print(f"  saved: {path}")
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+
+def main(visualise: bool = False):
+    parser = argparse.ArgumentParser(
+        description="Train DQN Activity Detection Agent"
+    )
+    parser.add_argument("--steps",     type=int,  default=500_000,
+                        help="Total training steps (default 500000)")
+    parser.add_argument("--seed",      type=int,  default=42)
+    parser.add_argument("--eval-only", type=str,  default=None,
+                        help="Path to saved checkpoint; skip training")
+    parser.add_argument("--build", action="store_true", help="Build the RL model")  # don't crash when called from dark_vessel_analysis.py
+    parser.add_argument("--vis", action="store_true", help="Visualise results after training")  # optional flag to control visualisation
+    args = parser.parse_args()
+
+    print("=" * 60)
+    print("  AIS Activity Detection — RL Training Run")
+    print("=" * 60)
+
+    # ── Build data ────────────────────────────────────────────────────────────
+    train_df, eval_df = build_datasets(seed=args.seed)
+    norm              = build_normaliser(train_df)
+
+    # ── RF baseline ───────────────────────────────────────────────────────────
+    rf_metrics = train_rf_baseline(train_df, eval_df)
+
+    # ── RL training / loading ─────────────────────────────────────────────────
+    if args.eval_only:
+        print(f"\nLoading checkpoint: {args.eval_only}")
+        agent   = DQNAgent.load(args.eval_only,
+                                obs_dim=len(ACTIVITY_FEATURES),
+                                n_actions=N_ACTIONS)
+        eval_env = AISActivityEnv(eval_df, normaliser=norm, seed=args.seed)
+        final    = agent.evaluate(eval_env, n_episodes=100)
+        history  = {"final_eval": final,
+                    "steps": [], "ep_return": [], "ep_accuracy": [],
+                    "hv_recall": [], "loss": [],
+                    "eval_accuracy": [], "eval_hv_recall": []}
+    else:
+        agent, history = train_rl(
+            train_df, eval_df, norm,
+            total_steps=args.steps,
+            seed=args.seed,
+        )
+
+    # ── Save results ──────────────────────────────────────────────────────────
+    results = {
+        "rf_baseline":  rf_metrics,
+        "dqn_final":    history.get("final_eval", {}),
+        "total_steps":  args.steps,
+        "n_actions":    N_ACTIONS,
+        "label_list":   LABEL_LIST,
+    }
+    results_path = OUT_DIR / "results.json"
+    with open(results_path, "w") as f:
+        json.dump(results, f, indent=2)
+    print(f"\nResults saved → {results_path}")
+
+    # ── Figures ───────────────────────────────────────────────────────────────
+    if visualise:
+        print("\nGenerating figures...")
+        if history.get("steps"):
+            plot_training_curves(history, rf_metrics)
+        if history.get("final_eval") and rf_metrics:
+            plot_per_class_comparison(history["final_eval"], rf_metrics)
+
+    print("\n" + "=" * 60)
+    print("  Done.")
+    print(f"  Outputs → {OUT_DIR}/")
+    print("=" * 60)
+
+
+if __name__ == "__main__":
+    main()
