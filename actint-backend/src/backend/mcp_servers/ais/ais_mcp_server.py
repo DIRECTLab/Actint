@@ -165,11 +165,7 @@ def re_evaluate_region(region):
     """Re-run region analysis for fishy vessels."""
     
     return f"Region {region} has been re-evaluated for fishy vessels."
-
-
-# ============================================================================
-# Dark Vessel Detection Tools
-# ============================================================================
+    
 
 @mcp.tool()
 def run_dark_vessel_startup() -> str:
@@ -192,18 +188,36 @@ def summarise_dark_vessels() -> str:
 
 
 @mcp.tool()
-def evaluate_vessel_risk() -> str:
-    """Evaluate risk level of vessels based on dark behavior patterns."""
-    try:
-        # Placeholder implementation - replace with actual logic
-        risk_evaluation = {
-            "high_risk_vessels": 10,
-            "medium_risk_vessels": 20,
-            "low_risk_vessels": 12,
-        }
-        return json.dumps(risk_evaluation, indent=2)
-    except Exception as e:
-        return json.dumps({"error": str(e)})
+def evaluate_vessel_fishiness():
+    """Look for a vessel in the fishy vessels database and return if a vessel is fishy and why."""
+    pass
+
+
+@mcp.tool()
+def get_fishy_vessel_locations(region):
+    """Get the most recent locations of vessels in a region marked as suspicious and their tradjectories."""
+    pass
+
+
+@mcp.tool()
+def detect_fishy_clusters(region):
+    """Detect clusters of vessels in a region that may indicate suspicious activity."""
+    pass
+
+
+def summarise_insecure_areas():
+    """Give an analysis on what areas experience the most fishy vessel presence."""
+    pass
+
+
+def re_evaluate_region(region):
+    """Re-run region analysis for fishy vessels."""
+    pass
+
+
+def evaluate_model_performance():
+    """Evaluate the performance of the fishy vessel detection model using functions from the fishy_vessels repository"""
+    pass
 
 # ============================================================================
 # Health & Info Endpoints
@@ -577,7 +591,7 @@ def run_dark_vessel_tests():
     # print("detect_fishy_clusters: ", detect_fishy_clusters("brazil_eez"))
     print("summarise_insecure_areas: ", summarise_insecure_areas())
     # print("re_evaluate_region: ", re_evaluate_region("brazil_eez"))
-    
+
 
 if __name__ == "__main__":
     # mcp.run() # TODO: Uncomment before pushing
