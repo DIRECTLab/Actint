@@ -20,5 +20,7 @@ class Config:
     MODEL_ID: str = getenv("MODEL_ID", "Qwen/Qwen3.5-9B")
     MAX_NEW_TOKENS: int = int(getenv("MAX_NEW_TOKENS", "4096"))
     MAX_AGENT_STEPS: int = 20
+
+    MODEL_ID: str | None = getenv("MODEL_ID", None)
     
 config = Config()
