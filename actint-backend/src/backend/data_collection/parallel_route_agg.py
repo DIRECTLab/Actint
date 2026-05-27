@@ -1,69 +1,21 @@
 """
-Follow each aircrafts day of data individually, add traversal counts to heatmap bins, track transitions from bin to bin and record transition count, also track and record stats of the craft for each transition 
-| `segment_id` | FK → route_segments | |
-| `aircraft_type` | string | |
-| `ave_gnd_speed` | float | |
-| `altitude_band` | float | Use FL avi designation |
-| `ave_vert_rate` | float | |
-| `ave_ias` | float | indicated air speed |
+parallel pipeline design
 
-psuedocode
+single continuous ordered downloader 
+    downloads days continuously and keeps a max of 4 days stored at a time in the queue
+job dispatcher
+    gets next day from the queue and splits it into the aircraft trace files for that day
+    gets the trace file for each aircraft and passes it to a worker based on ICAO hash
+workers - processes
+    build aggregate data to insert, queues this data with a flush counter
+    has continued state storage for it's aircraft (process doesn't die and restart at all)
+DB inserter
+    takes data from the queue and runs a batch insert to the postgres DB 
+    single inserter to avoid deadlocks in the DB inserts
 
-For each day 
-    for each aircraft
-        download_day()
-        normalize_data()
-        determine_route()
-
-determine_route(normed_data):
-    
-    for entry in normed_data
-    
-
-        if altitude <= 1000 ft: #ignore airport ground traffic
-            continue
-
-        if(prev_time):
-            dt = cur_time - prev_time
-
-        if dt <= 0:
-            continue
-            
-        bin = get_h3_bin(lat,lon)
-            
-        if (dt <= 5 sec) and (h3_distance(prev_bin, bin) == 1) (reduce bouncing between cells)
-            continue 
-        
-            
-        implied speed = haversine(points)/dt
-            
-        if implied_speed > MAX_SPEED: # 800 knots, check for impossible transition, skip creating the edge segment and move on
-            prevbin and point = None
-            continue
-        
-
-        if bin == previous_bin 
-            
-            if message["gnd_speed"] not NULL:
-                cur_bin_gnd_speed_sum += message["gnd_speed"]
-                cur_bin_gnd_speed_count += 1
-            "" (duplicate for each summary stat)
-
-            continue
-            
-        else
-            new_bin_traversal += 1 
-            record transition
-            record_transition_stats(prev_bin, cur_bin)
-            prev_bin = cur_bin
-
-record_transition_stats(prev_bin, cur_bin):
-    sum prev and cur bin sums and counts
-    divide by counts
-    find heading variance from average heading in degrees
-    record in DB
 
 """
+
 
 
 from datetime import datetime, timedelta
@@ -89,8 +41,12 @@ from collections import defaultdict
 import math
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
-import multiprocessing
+import multiprocessing as mp
 from dateutil.relativedelta import relativedelta 
+
+import setproctitle
+import hashlib
+import time
 
 
 
@@ -101,7 +57,7 @@ BASE_URL = "https://github.com/adsblol/globe_history_{year}/releases/download"
 RES = 7
 MAX_SPEED = 2000
 OVERNIGHT_GAP = 3600 * 10 #if there is a 10 hour gap in data don't create an edge
-FLUSH_SIZE = 1_000
+FLUSH_SIZE = 50_000
 
 
 
@@ -338,19 +294,19 @@ def create_monthly_partitions(conn, start_str, end_str=None):
 
 
 
-def get_aircraft_count(tar_buffer):
+# def get_aircraft_count(tar_buffer):
 
-    with tarfile.open(fileobj=tar_buffer, mode="r:*") as tar:
-    #with tarfile.open(tar_buffer, mode="r:*") as tar:
+#     with tarfile.open(fileobj=tar_buffer, mode="r:*") as tar:
+#     #with tarfile.open(tar_buffer, mode="r:*") as tar:
 
-        total_matches = 0
+#         total_matches = 0
 
-        for member in tar.getmembers():
-            if re.match(r'^./traces/[0-9a-fA-F]{2}/.*\.json$', member.name):
+#         for member in tar.getmembers():
+#             if re.match(r'^./traces/[0-9a-fA-F]{2}/.*\.json$', member.name):
                 
-                total_matches = total_matches + 1
+#                 total_matches = total_matches + 1
 
-    return total_matches
+#     return total_matches
 
 
 
@@ -537,34 +493,31 @@ aircraft_state = {}  # ICAO -> AircraftState
 
 
 
-def determine_routes(conn, data, airport_cells):
+def determine_routes(item, db_queue):
 
-    if not data:
+    if not item:
         print("no flight data")
         return
-
-    def flush():
-        if heatmap_batch:
-            flush_heatmap_batch(conn, heatmap_batch, airport_cells)
-            heatmap_batch.clear()
-
-        if segment_batch:
-            flush_segment_batch(conn, segment_batch)
-            segment_batch.clear()
-
-        if stats_batch:
-            flush_segment_stats(conn, stats_batch)
-            stats_batch.clear()
-
-        conn.commit()
 
     heatmap_batch = defaultdict(int)
     segment_batch = defaultdict(int)
     stats_batch = {}
 
-    for entry in data:
+    def flush_local():
+        if heatmap_batch:
+            db_queue.put(("heatmap", dict(heatmap_batch)))
+            heatmap_batch.clear()
 
-        
+        if segment_batch:
+            db_queue.put(("segment", dict(segment_batch)))
+            segment_batch.clear()
+
+        if stats_batch:
+            db_queue.put(("stats", dict(stats_batch)))
+            stats_batch.clear()
+
+    for entry in item:
+
         # FILTER INVALID RECORDS
         if entry.get("ALTITUDE") is None or entry.get("ALTITUDE") <= 1000:
             continue
@@ -669,22 +622,21 @@ def determine_routes(conn, data, airport_cells):
             
             state.cell_stats.add(entry)
             state.prev_bin = cur_bin
-
         
         # UPDATE STATE
         state.prev_time = cur_time
         state.prev_point = cur_point
 
-        
         # FLUSH TRIGGER
         if (
             len(segment_batch) >= FLUSH_SIZE or
             len(heatmap_batch) >= FLUSH_SIZE or
             len(stats_batch) >= FLUSH_SIZE
         ):
-            flush()
+            flush_local()
 
-    flush()
+    flush_local()
+
 
 
 
@@ -775,6 +727,7 @@ def flush_segment_stats(conn, batch):
                 heading_cos_sum = segment_stats.heading_cos_sum + EXCLUDED.heading_cos_sum,
                 heading_count = segment_stats.heading_count + EXCLUDED.heading_count
         """, rows)
+
 
 
 
@@ -875,33 +828,162 @@ def load_airport_cells(conn):
 
 
 
-def process_day(day, airport_cells):
 
-    print(f"starting: {day}")
+def worker_loop(in_queue, db_queue):
 
-    with get_conn() as conn: 
+    setproctitle.setproctitle("route-worker")
 
+    while True:
+
+        item = in_queue.get()
+
+        if item == "STOP":
+            break
+
+        determine_routes(item, db_queue)
+
+
+
+
+def downloader_loop(day_queue, days):
+
+    setproctitle.setproctitle("route-downloader")
+
+    for day in days:
+        
+        start_time = time.time()
+        
         tar_buffer = download_Tar_File(day, day.year, show_bar=False)
 
-        aircraft_count = get_aircraft_count(tar_buffer)
-        tar_buffer.seek(0) 
+        download_end_time = time.time()
+        download_dt = download_end_time - start_time
+        download_dt_minutes = download_dt / (60)
+        print(f"day: {day} took {download_dt_minutes:.2f} minutes to download")
 
-        print(f"day: {day}   count: {aircraft_count}")
 
         for member, aircraft_data in iter_aircrafts_from_tar(tar_buffer):
+            normed = normalize_data([aircraft_data])
 
-            normed_data = normalize_data([aircraft_data])
-            determine_routes(conn, normed_data, airport_cells)
+            # STREAM INTO PIPELINE (NOT PROCESSPOOL ANYMORE)
+            day_queue.put(normed)
 
         del tar_buffer
-        del aircraft_count
         gc.collect()
 
+        end_time = time.time()
+        dt = end_time - start_time
+        dt_minutes = dt / (60)
+        print(f"\nday: {day} took {dt_minutes:.2f} minutes to process\n")
 
+    day_queue.put("STOP")
+
+
+
+
+def dispatcher_loop(day_queue, worker_queues, num_workers):
+    
+    setproctitle.setproctitle("route-dispatcher")
+
+    def shard(icao):
+        return int(hashlib.md5(icao.encode()).hexdigest(), 16) % num_workers
+
+    while True:
+        item = day_queue.get()
+
+        if item == "STOP":
+            break
+
+        entry = item[0]
+
+        icao = entry.get("ICAO")
+        if not icao or str(icao).startswith("~"):
+            continue
+
+        worker_id = shard(icao)
+
+        worker_queues[worker_id].put(item)
+
+
+
+def db_writer_loop(db_queue):
+
+    setproctitle.setproctitle("route-DB-writer")
+
+    with get_conn() as conn1:
+        with get_conn() as conn2:
+            with get_conn() as conn3:
+
+                airport_cells = load_airport_cells(conn1)
+
+
+                heatmap = defaultdict(int)
+                segment = defaultdict(int)
+                stats = {}
+
+                def flush():
+                    if heatmap:
+                        #print(f"flushing heatmap")
+                        flush_heatmap_batch(conn1, heatmap, airport_cells)
+                        heatmap.clear()
+
+                    if segment:
+                        #print(f"flushing segments")
+                        flush_segment_batch(conn2, segment)
+                        segment.clear()
+
+                    if stats:
+                        #print(f"flushing stats")
+                        flush_segment_stats(conn3, stats)
+                        stats.clear()
+
+                    conn1.commit()
+                    conn2.commit()
+                    conn3.commit()
+
+
+                while True:
+                    start_time = time.time_ns()
+
+                    item = db_queue.get()
+
+                    if item == "STOP":
+                        break
+
+                    kind, payload = item
+
+                    if kind == "heatmap":
+                        for k, v in payload.items():
+                            heatmap[k] += v
+
+                    elif kind == "segment":
+                        for k, v in payload.items():
+                            segment[k] += v
+
+                    elif kind == "stats":
+                        for k, v in payload.items():
+                            if k not in stats:
+                                stats[k] = RouteStatsAccumulator()
+                            stats[k].merge(v)
+
+                    if (
+                        len(segment) >= FLUSH_SIZE or
+                        len(heatmap) >= FLUSH_SIZE or
+                        len(stats) >= FLUSH_SIZE
+                    ):
+                        #print(f"flushing {len(heatmap)} heatmap entries")
+                        flush()
+
+                    end_time = time.time_ns()
+                    dt = end_time - start_time
+                    #print(f"db_writer loop dt: {dt}")
+
+                #print(f"flushing {len(heatmap)} heatmap entries")
+                flush()
 
 
 
 def main():
+    NUM_WORKERS = 4
 
     start_day = "5/1/25"
     end_day = "5/1/26"
@@ -909,82 +991,61 @@ def main():
     days = build_date_range(1, start_day, end_day)
 
     with get_conn() as conn:
-       
         create_tables(conn)
         create_monthly_partitions(conn, start_day, end_day)
-        airport_cells = load_airport_cells(conn)
 
-    try: 
+    mp.set_start_method("spawn")
 
-        workers = 4 #max(1, multiprocessing.cpu_count() - 1)
+    day_queue = mp.Queue(maxsize=1000)
+    db_queue = mp.Queue(maxsize=1000)
 
-        with ProcessPoolExecutor(max_workers=workers) as executor:
+    worker_queues = [
+        mp.Queue(maxsize=100) for _ in range(NUM_WORKERS)
+    ]
 
-            futures = [executor.submit(process_day, day, airport_cells) for day in days]
+    workers = [
+        mp.Process(target=worker_loop, args=(worker_queues[i], db_queue), name=f"route-worker-{i}")
+        for i in range(NUM_WORKERS)
+    ]
 
-            for future in as_completed(futures):
+    dispatcher = mp.Process(
+        target=dispatcher_loop,
+        args=(day_queue, worker_queues, NUM_WORKERS),
+        name="route-dispatcher"
+    )
 
-                try:
-                    future.result()
+    db_writer = mp.Process(
+        target=db_writer_loop,
+        args=(db_queue,),
+        name="route-DB-writer"
+    )
 
-                except Exception as e:
-                    print(f"Worker failed: {e}")
+    downloader = mp.Process(
+        target=downloader_loop,
+        args=(day_queue, days),
+        name="route-downloader"
+    )
 
+    for w in workers:
+        w.start()
 
-    except KeyboardInterrupt:
-        print("Stopping, Interrupted by user")
-        executor.shutdown(cancel_futures=True)
-        print("Stopped")
+    dispatcher.start()
+    db_writer.start()
+    downloader.start()
 
-        
+    downloader.join()
 
+    day_queue.put("STOP")
+    dispatcher.join()
 
+    for q in worker_queues:
+        q.put("STOP")
 
-def old_main(): #old main for records
+    for w in workers:
+        w.join()
 
-    start_day = "5/1/25"
-    end_day = "5/1/26"
-
-    days = build_date_range(1, start_day, end_day)
-
-    with get_conn() as conn:
-       
-        create_tables(conn)
-        create_monthly_partitions(conn, start_day, end_day)
-        airport_cells = load_airport_cells(conn)
-
-        for day in days:
-
-            tar_buffer = download_Tar_File(day, day.year)
-            #tar_buffer = RAW_DIR/"2024.01.03.tar"
-
-            aircraft_count = get_aircraft_count(tar_buffer)
-            tar_buffer.seek(0) 
-
-            print(f"count: {aircraft_count}")
-
-            with alive_bar(aircraft_count) as bar:
-
-                bar.title = 'Processing Aircrafts'
-
-                count = 0
-
-                for member, aircraft_data in iter_aircrafts_from_tar(tar_buffer):
-                    count += 1
-                    
-                    if count > 100:
-                       break
-                
-                    bar.text(f"File: {member.name[-11:]}")
-
-                    normed_data = normalize_data([aircraft_data])
-                    determine_routes(conn, normed_data, airport_cells)
-
-                    bar()
-
-            del tar_buffer
-            del aircraft_count
-            gc.collect()
+    db_queue.put("STOP")
+    db_writer.join()
 
 
 
