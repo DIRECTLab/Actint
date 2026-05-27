@@ -61,7 +61,7 @@ class RemoteAgentClient:
 
     async def query(self, message: str) -> str:
         # Note: matches the typo in web_socket.py event name
-        await self._sio.emit("recieve_message", {"message": message})
+        await self._sio.emit("chat_message", {"message": message})
         response = await self._response_queue.get()
         return response.get("message", "Agent failed to respond.")
 
