@@ -83,37 +83,41 @@ mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 # ============================================================================
 
 @mcp.tool()
-def evaluate_area_risk() -> str:
-    """Summarise information about dark vessels in the database."""
-    try:
-        # Placeholder implementation - replace with actual logic
-        summary = {
-            "total_dark_vessels": 42,
-            "recent_dark_vessels": 5,
-            "regions_with_dark_vessels": ["Gulf of Aden", "Strait of Malacca"],
-        }
-        return json.dumps(summary, indent=2)
-    except Exception as e:
-        return json.dumps({"error": str(e)})
+def summarise_fishy_vessels_in_region(region):
+    """Get a summary of vessels in a region marked as suspicious based on dark vessel analysis."""
+    pass
 
 
 @mcp.tool()
-def evaluate_vessel_risk() -> str:
-    """Evaluate risk level of vessels based on dark behavior patterns."""
-    try:
-        # Placeholder implementation - replace with actual logic
-        risk_evaluation = {
-            "high_risk_vessels": 10,
-            "medium_risk_vessels": 20,
-            "low_risk_vessels": 12,
-        }
-        return json.dumps(risk_evaluation, indent=2)
-    except Exception as e:
-        return json.dumps({"error": str(e)})
+def evaluate_vessel_fishiness():
+    """Look for a vessel in the fishy vessels database and return if a vessel is fishy and why."""
+    pass
+
 
 @mcp.tool()
-def get_dark_analysis(mmsi):
-    #Calls a helper function in the helpers/dark_vessel_helper.py file of the same name
+def get_fishy_vessel_locations(region):
+    """Get the most recent locations of vessels in a region marked as suspicious and their tradjectories."""
+    pass
+
+
+@mcp.tool()
+def detect_fishy_clusters(region):
+    """Detect clusters of vessels in a region that may indicate suspicious activity."""
+    pass
+
+
+def summarise_insecure_areas():
+    """Give an analysis on what areas experience the most fishy vessel presence."""
+    pass
+
+
+def re_evaluate_region(region):
+    """Re-run region analysis for fishy vessels."""
+    pass
+
+
+def evaluate_model_performance():
+    """Evaluate the performance of the fishy vessel detection model using functions from the fishy_vessels repository"""
     pass
 
 # ============================================================================
