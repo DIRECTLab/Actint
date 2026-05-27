@@ -815,7 +815,7 @@ def main(visualise=False):
 
     if args.use_database:
         print("using database")
-        from backend.dark_vessels.database_info import get_ais_in_region, prepare_data_for_ML
+        from backend.dark_vessels.data.gfw.database_functions.suspicious_vessels_database import get_ais_in_region, prepare_data_for_ML
         location = args.use_database
         ship_data = get_ais_in_region(location)
         ML_ready_data = prepare_data_for_ML(ship_data)
