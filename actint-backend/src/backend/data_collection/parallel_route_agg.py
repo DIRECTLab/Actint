@@ -26,8 +26,7 @@ import json
 from pathlib import Path
 
 from h3 import cell_to_latlng, latlng_to_cell
-from backend.mcp_servers.adsb.helpers.adsb_locations import bbox_from_radius_nm, get_conn
-from backend.mcp_servers.adsb.helpers.airport_tools import find_nearest_airport
+from backend.mcp_servers.adsb.helpers.adsb_locations import get_conn
 from backend.mcp_servers.utils.distance_calculation import haversine_distance_nm
 
 from contextlib import nullcontext
@@ -40,7 +39,6 @@ from dataclasses import dataclass
 from collections import defaultdict
 import math
 
-from concurrent.futures import ProcessPoolExecutor, as_completed
 import multiprocessing as mp
 from dateutil.relativedelta import relativedelta 
 
@@ -52,6 +50,10 @@ import time
 
 DATA_DIR = Path(__file__).parent / "data"
 RAW_DIR = DATA_DIR / "raw"
+
+LOG_DIR = Path(__file__).parent / "logging"
+PIPELINELOG = LOG_DIR / "pipeline.log"
+LOG = LOG_DIR / "log.log"
 
 BASE_URL = "https://github.com/adsblol/globe_history_{year}/releases/download"
 RES = 7
@@ -202,7 +204,7 @@ def create_tables(conn):
 
     with conn.cursor() as cur:
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS heatmap_bins (
+            CREATE TABLE IF NOT EXISTS route_heatmap_bins (
         
                 h3_index BIGINT PRIMARY KEY,
                 lat_center DOUBLE PRECISION,
@@ -222,9 +224,7 @@ def create_tables(conn):
             )
         """)
         cur.execute("""               
-            CREATE TABLE IF NOT EXISTS segment_stats (
-
-                day DATE NOT NULL,
+            CREATE TABLE IF NOT EXISTS route_segment_stats (
                     
                 start_bin BIGINT NOT NULL,
                 end_bin   BIGINT NOT NULL,
@@ -245,52 +245,70 @@ def create_tables(conn):
                 heading_cos_sum REAL DEFAULT 0,
                 heading_count BIGINT DEFAULT 0,
 
-                PRIMARY KEY (day, start_bin, end_bin, aircraft_type, altitude_band)
+                PRIMARY KEY (start_bin, end_bin, aircraft_type, altitude_band)
             )
-            PARTITION BY RANGE (day);
+            PARTITION BY HASH (start_bin, end_bin);
         """)
 
     conn.commit()
 
 
-def create_monthly_partitions(conn, start_str, end_str=None):
 
-    cur = conn.cursor()
+def create_hash_partitions(conn, base_table="route_segment_stats", num_partitions=16):
+    """
+    Creates a hash-partitioned table and N partitions for (start_bin, end_bin).
+    """
+    with conn.cursor() as cur:
 
-    # parse inputs (fixed bug: no variable shadowing)
-    start = datetime.strptime(start_str, "%m/%d/%y")
-    end = datetime.strptime(end_str, "%m/%d/%y") if end_str else start
-
-    # normalize to month boundaries
-    current = start.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    end_boundary = end.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-    # create monthly partitions
-    while current < end_boundary:
-        next_month = current + relativedelta(months=1)
-
-        table_name = f"segment_stats{current.strftime('%Y_%m')}"
-        start_bound = current.strftime('%Y-%m-%d')
-        end_bound = next_month.strftime('%Y-%m-%d')
-
-        query = f"""
-        CREATE TABLE IF NOT EXISTS {table_name}
-        PARTITION OF segment_stats
-        FOR VALUES FROM ('{start_bound}') TO ('{end_bound}');
-        """
-
-        cur.execute(query)
-
-        current = next_month
-
-    # DEFAULT partition (catch-all)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS segment_stats_default
-        PARTITION OF segment_stats
-        DEFAULT;
-    """)
+        # 2. Create partitions
+        for i in range(num_partitions):
+            cur.execute(f"""
+                CREATE TABLE IF NOT EXISTS {base_table}_p{i}
+                PARTITION OF {base_table}
+                FOR VALUES WITH (MODULUS {num_partitions}, REMAINDER {i});
+            """)
 
     conn.commit()
+
+
+# def create_monthly_partitions(conn, start_str, end_str=None):
+
+#     cur = conn.cursor()
+
+#     # parse inputs (fixed bug: no variable shadowing)
+#     start = datetime.strptime(start_str, "%m/%d/%y")
+#     end = datetime.strptime(end_str, "%m/%d/%y") if end_str else start
+
+#     # normalize to month boundaries
+#     current = start.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+#     end_boundary = end.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+#     # create monthly partitions
+#     while current < end_boundary:
+#         next_month = current + relativedelta(months=1)
+
+#         table_name = f"route_segment_stats{current.strftime('%Y_%m')}"
+#         start_bound = current.strftime('%Y-%m-%d')
+#         end_bound = next_month.strftime('%Y-%m-%d')
+
+#         query = f"""
+#         CREATE TABLE IF NOT EXISTS {table_name}
+#         PARTITION OF route_segment_stats
+#         FOR VALUES FROM ('{start_bound}') TO ('{end_bound}');
+#         """
+
+#         cur.execute(query)
+
+#         current = next_month
+
+#     # DEFAULT partition (catch-all)
+#     cur.execute("""
+#         CREATE TABLE IF NOT EXISTS route_segment_stats_default
+#         PARTITION OF route_segment_stats
+#         DEFAULT;
+#     """)
+
+#     conn.commit()
 
 
 
@@ -599,10 +617,9 @@ def determine_routes(item, db_queue):
 
             aircraft_type = entry.get("TYPE") or "unknown"
             altitude_band = get_altitude_band(state.cell_stats)
-            day = datetime.fromtimestamp(cur_time)
+            #day = datetime.fromtimestamp(cur_time)
 
             key = (
-                day,
                 state.prev_bin,
                 cur_bin,
                 aircraft_type,
@@ -659,14 +676,13 @@ def get_altitude_band(stats, step=10):
 
 
 
-def flush_segment_stats(conn, batch):
+def flush_route_segment_stats(conn, batch):
 
     rows = []
 
-    for (day, start_bin, end_bin, aircraft_type, altitude_band), stats in batch.items():
+    for (start_bin, end_bin, aircraft_type, altitude_band), stats in batch.items():
 
         rows.append((
-            day,
             int(start_bin, 16),
             int(end_bin, 16),
             aircraft_type,
@@ -689,8 +705,7 @@ def flush_segment_stats(conn, batch):
     with conn.cursor() as cur:
 
         cur.executemany("""
-            INSERT INTO segment_stats (
-                day,
+            INSERT INTO route_segment_stats (
                 start_bin,
                 end_bin,
                 aircraft_type,
@@ -709,23 +724,23 @@ def flush_segment_stats(conn, batch):
                 heading_cos_sum,
                 heading_count
             )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
 
-            ON CONFLICT (day, start_bin, end_bin, aircraft_type, altitude_band)
+            ON CONFLICT (start_bin, end_bin, aircraft_type, altitude_band)
             DO UPDATE SET
 
-                gnd_speed_sum = segment_stats.gnd_speed_sum + EXCLUDED.gnd_speed_sum,
-                gnd_speed_count = segment_stats.gnd_speed_count + EXCLUDED.gnd_speed_count,
+                gnd_speed_sum = route_segment_stats.gnd_speed_sum + EXCLUDED.gnd_speed_sum,
+                gnd_speed_count = route_segment_stats.gnd_speed_count + EXCLUDED.gnd_speed_count,
 
-                vert_rate_sum = segment_stats.vert_rate_sum + EXCLUDED.vert_rate_sum,
-                vert_rate_count = segment_stats.vert_rate_count + EXCLUDED.vert_rate_count,
+                vert_rate_sum = route_segment_stats.vert_rate_sum + EXCLUDED.vert_rate_sum,
+                vert_rate_count = route_segment_stats.vert_rate_count + EXCLUDED.vert_rate_count,
 
-                ias_sum = segment_stats.ias_sum + EXCLUDED.ias_sum,
-                ias_count = segment_stats.ias_count + EXCLUDED.ias_count,
+                ias_sum = route_segment_stats.ias_sum + EXCLUDED.ias_sum,
+                ias_count = route_segment_stats.ias_count + EXCLUDED.ias_count,
 
-                heading_sin_sum = segment_stats.heading_sin_sum + EXCLUDED.heading_sin_sum,
-                heading_cos_sum = segment_stats.heading_cos_sum + EXCLUDED.heading_cos_sum,
-                heading_count = segment_stats.heading_count + EXCLUDED.heading_count
+                heading_sin_sum = route_segment_stats.heading_sin_sum + EXCLUDED.heading_sin_sum,
+                heading_cos_sum = route_segment_stats.heading_cos_sum + EXCLUDED.heading_cos_sum,
+                heading_count = route_segment_stats.heading_count + EXCLUDED.heading_count
         """, rows)
 
 
@@ -757,7 +772,7 @@ def flush_heatmap_batch(conn, heatmap_batch, airport_cells):
     with conn.cursor() as cur:
 
         cur.executemany("""
-            INSERT INTO heatmap_bins (
+            INSERT INTO route_heatmap_bins (
                 h3_index,
                 lat_center,
                 lon_center,
@@ -769,7 +784,7 @@ def flush_heatmap_batch(conn, heatmap_batch, airport_cells):
             ON CONFLICT (h3_index)
             DO UPDATE SET
                 traversal_count =
-                    heatmap_bins.traversal_count
+                    route_heatmap_bins.traversal_count
                     + EXCLUDED.traversal_count
         """, rows)
 
@@ -835,13 +850,16 @@ def worker_loop(in_queue, db_queue):
 
     while True:
 
-        item = in_queue.get()
+        try: 
+            item = in_queue.get()
 
-        if item == "STOP":
-            break
+            if item == "STOP":
+                break
 
-        determine_routes(item, db_queue)
+            determine_routes(item, db_queue)
 
+        except Exception as e:
+            log(f"DB writer error: {e}")
 
 
 
@@ -858,7 +876,7 @@ def downloader_loop(day_queue, days):
         download_end_time = time.time()
         download_dt = download_end_time - start_time
         download_dt_minutes = download_dt / (60)
-        print(f"day: {day} took {download_dt_minutes:.2f} minutes to download")
+        log(f"day: {day} took {download_dt_minutes:.2f} minutes to download")
 
 
         for member, aircraft_data in iter_aircrafts_from_tar(tar_buffer):
@@ -873,10 +891,9 @@ def downloader_loop(day_queue, days):
         end_time = time.time()
         dt = end_time - start_time
         dt_minutes = dt / (60)
-        print(f"\nday: {day} took {dt_minutes:.2f} minutes to process\n")
+        log(f"\nday: {day} took {dt_minutes:.2f} minutes to process\n")
 
     day_queue.put("STOP")
-
 
 
 
@@ -888,20 +905,25 @@ def dispatcher_loop(day_queue, worker_queues, num_workers):
         return int(hashlib.md5(icao.encode()).hexdigest(), 16) % num_workers
 
     while True:
-        item = day_queue.get()
+        
+        try:
+            item = day_queue.get()
 
-        if item == "STOP":
-            break
+            if item == "STOP":
+                break
 
-        entry = item[0]
+            entry = item[0]
 
-        icao = entry.get("ICAO")
-        if not icao or str(icao).startswith("~"):
-            continue
+            icao = entry.get("ICAO")
+            if not icao or str(icao).startswith("~"):
+                continue
 
-        worker_id = shard(icao)
+            worker_id = shard(icao)
 
-        worker_queues[worker_id].put(item)
+            worker_queues[worker_id].put(item)
+
+        except Exception as e:
+            log(f"Dispatcher error: {e}")
 
 
 
@@ -909,76 +931,121 @@ def db_writer_loop(db_queue):
 
     setproctitle.setproctitle("route-DB-writer")
 
-    with get_conn() as conn1:
-        with get_conn() as conn2:
-            with get_conn() as conn3:
+    try: 
+        with (
+            get_conn() as conn1,
+            get_conn() as conn2,
+            get_conn() as conn3,
+        ):
 
-                airport_cells = load_airport_cells(conn1)
+            airport_cells = load_airport_cells(conn1)
+
+            heatmap = defaultdict(int)
+            segment = defaultdict(int)
+            stats = {}
+
+            def flush():
+                if heatmap:
+                    #print(f"flushing heatmap")
+                    flush_heatmap_batch(conn1, heatmap, airport_cells)
+                    heatmap.clear()
+
+                if segment:
+                    #print(f"flushing segments")
+                    flush_segment_batch(conn2, segment)
+                    segment.clear()
+
+                if stats:
+                    #print(f"flushing stats")
+                    flush_route_segment_stats(conn3, stats)
+                    stats.clear()
+
+                conn1.commit()
+                conn2.commit()
+                conn3.commit()
+
+            while True:
+                start_time = time.time_ns()
+
+                item = db_queue.get()
+
+                if item == "STOP":
+                    break
+
+                kind, payload = item
+
+                if kind == "heatmap":
+                    for k, v in payload.items():
+                        heatmap[k] += v
+
+                elif kind == "segment":
+                    for k, v in payload.items():
+                        segment[k] += v
+
+                elif kind == "stats":
+                    for k, v in payload.items():
+                        if k not in stats:
+                            stats[k] = RouteStatsAccumulator()
+                        stats[k].merge(v)
+
+                if (
+                    len(segment) >= FLUSH_SIZE or
+                    len(heatmap) >= FLUSH_SIZE or
+                    len(stats) >= FLUSH_SIZE
+                ):
+                    #print(f"flushing {len(heatmap)} heatmap entries")
+                    flush()
+
+                end_time = time.time_ns()
+                dt = end_time - start_time
+                #print(f"db_writer loop dt: {dt}")
+
+            #print(f"flushing {len(heatmap)} heatmap entries")
+            flush()
+
+    except Exception as e:
+        log(f"DB writer error: {e}")
 
 
-                heatmap = defaultdict(int)
-                segment = defaultdict(int)
-                stats = {}
 
-                def flush():
-                    if heatmap:
-                        #print(f"flushing heatmap")
-                        flush_heatmap_batch(conn1, heatmap, airport_cells)
-                        heatmap.clear()
+def print_pipeline_stats(day_queue, db_queue, worker_queues, counter=None):
 
-                    if segment:
-                        #print(f"flushing segments")
-                        flush_segment_batch(conn2, segment)
-                        segment.clear()
+    workers = [
+        q.qsize()
+        for q in worker_queues
+    ]
 
-                    if stats:
-                        #print(f"flushing stats")
-                        flush_segment_stats(conn3, stats)
-                        stats.clear()
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-                    conn1.commit()
-                    conn2.commit()
-                    conn3.commit()
+    stats = (
+        f"[{timestamp}] "
+        f"day_q={day_queue.qsize()} | \t"
+        f"db_q={db_queue.qsize()} | \t"
+        f"workers={workers}"
+    )
+
+    if counter is not None:
+        stats += f" | aircraft_processed={counter.value}"
+
+    #print(stats, flush=True)
+
+    with open(PIPELINELOG, "a") as f:
+        f.write(stats + "\n")
 
 
-                while True:
-                    start_time = time.time_ns()
 
-                    item = db_queue.get()
+def log(*args, sep=" ", end="\n"):
 
-                    if item == "STOP":
-                        break
+    message = sep.join(str(arg) for arg in args) + end
 
-                    kind, payload = item
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-                    if kind == "heatmap":
-                        for k, v in payload.items():
-                            heatmap[k] += v
+    line = f"[{timestamp}] {message}"
 
-                    elif kind == "segment":
-                        for k, v in payload.items():
-                            segment[k] += v
+    print(line, end="", flush=True)
 
-                    elif kind == "stats":
-                        for k, v in payload.items():
-                            if k not in stats:
-                                stats[k] = RouteStatsAccumulator()
-                            stats[k].merge(v)
-
-                    if (
-                        len(segment) >= FLUSH_SIZE or
-                        len(heatmap) >= FLUSH_SIZE or
-                        len(stats) >= FLUSH_SIZE
-                    ):
-                        #print(f"flushing {len(heatmap)} heatmap entries")
-                        flush()
-
-                    end_time = time.time_ns()
-                    dt = end_time - start_time
-                    #print(f"db_writer loop dt: {dt}")
-
-                #print(f"flushing {len(heatmap)} heatmap entries")
-                flush()
+    with open(LOG, "a") as f:
+        f.write(line)
 
 
 
@@ -988,11 +1055,15 @@ def main():
     start_day = "5/1/25"
     end_day = "5/1/26"
 
+    Path(LOG).unlink(missing_ok=True)
+    Path(PIPELINELOG).unlink(missing_ok=True)
+
     days = build_date_range(1, start_day, end_day)
 
     with get_conn() as conn:
         create_tables(conn)
-        create_monthly_partitions(conn, start_day, end_day)
+        create_hash_partitions(conn)
+        #create_monthly_partitions(conn, start_day, end_day)
 
     mp.set_start_method("spawn")
 
@@ -1026,6 +1097,7 @@ def main():
         name="route-downloader"
     )
 
+    #Start up
     for w in workers:
         w.start()
 
@@ -1033,6 +1105,26 @@ def main():
     db_writer.start()
     downloader.start()
 
+    #Logging
+    while True:
+
+        print_pipeline_stats(
+            day_queue,
+            db_queue,
+            worker_queues
+        )
+
+        if not any([
+            downloader.is_alive(),
+            dispatcher.is_alive(),
+            db_writer.is_alive(),
+            *[w.is_alive() for w in workers]
+        ]):
+            break
+
+        time.sleep(1)
+
+    #Shutdown process
     downloader.join()
 
     day_queue.put("STOP")
