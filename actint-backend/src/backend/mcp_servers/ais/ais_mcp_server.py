@@ -62,7 +62,49 @@ from backend.mcp_servers.ais.helpers.similartiy import (
 mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 
 # ============================================================================
-# General Information
+# Dark Vessel Detection Tools
+# ============================================================================
+
+@mcp.tool()
+def summarise_fishy_vessels_in_region(region):
+    """Get a summary of vessels in a region marked as suspicious based on dark vessel analysis."""
+    pass
+
+
+@mcp.tool()
+def evaluate_vessel_fishiness():
+    """Look for a vessel in the fishy vessels database and return if a vessel is fishy and why."""
+    pass
+
+
+@mcp.tool()
+def get_fishy_vessel_locations(region):
+    """Get the most recent locations of vessels in a region marked as suspicious and their tradjectories."""
+    pass
+
+
+@mcp.tool()
+def detect_fishy_clusters(region):
+    """Detect clusters of vessels in a region that may indicate suspicious activity."""
+    pass
+
+
+def summarise_insecure_areas():
+    """Give an analysis on what areas experience the most fishy vessel presence."""
+    pass
+
+
+def re_evaluate_region(region):
+    """Re-run region analysis for fishy vessels."""
+    pass
+
+
+def evaluate_model_performance():
+    """Evaluate the performance of the fishy vessel detection model using functions from the fishy_vessels repository"""
+    pass
+
+# ============================================================================
+# Health & Info Endpoints
 # ============================================================================
 
 """ This isn't very good, there is too much output, there are too many ships"""
