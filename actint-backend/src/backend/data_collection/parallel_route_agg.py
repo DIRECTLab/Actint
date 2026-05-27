@@ -200,55 +200,58 @@ def build_date_range(day_delta, start_str, end_str=None):
     return days
 
 
-def create_tables(conn):
+def create_tables(conn, num_workers):
 
     with conn.cursor() as cur:
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS route_heatmap_bins (
-        
-                h3_index BIGINT PRIMARY KEY,
-                lat_center DOUBLE PRECISION,
-                lon_center DOUBLE PRECISION,
-                traversal_count BIGINT NOT NULL,
-                contains_airport BOOLEAN
-            )
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS route_segments (
-        
-                start_bin BIGINT NOT NULL,
-                end_bin BIGINT NOT NULL,
-                transition_count BIGINT NOT NULL,
-                    
-                PRIMARY KEY (start_bin, end_bin)
-            )
-        """)
-        cur.execute("""               
-            CREATE TABLE IF NOT EXISTS route_segment_stats (
-                    
-                start_bin BIGINT NOT NULL,
-                end_bin   BIGINT NOT NULL,
 
-                aircraft_type TEXT NOT NULL,
-                altitude_band TEXT NOT NULL,
+        for i in range(num_workers):
 
-                gnd_speed_sum REAL DEFAULT 0,
-                gnd_speed_count BIGINT DEFAULT 0,
+            cur.execute(f"""
+                CREATE TABLE IF NOT EXISTS route_heatmap_bins_{i} (
+            
+                    h3_index BIGINT PRIMARY KEY,
+                    lat_center DOUBLE PRECISION,
+                    lon_center DOUBLE PRECISION,
+                    traversal_count BIGINT NOT NULL,
+                    contains_airport BOOLEAN
+                )
+            """)
+            cur.execute(f"""
+                CREATE TABLE IF NOT EXISTS route_segments_{i} (
+            
+                    start_bin BIGINT NOT NULL,
+                    end_bin BIGINT NOT NULL,
+                    transition_count BIGINT NOT NULL,
+                        
+                    PRIMARY KEY (start_bin, end_bin)
+                )
+            """)
+            cur.execute(f"""               
+                CREATE TABLE IF NOT EXISTS route_segment_stats_{i} (
+                        
+                    start_bin BIGINT NOT NULL,
+                    end_bin   BIGINT NOT NULL,
 
-                vert_rate_sum REAL DEFAULT 0,
-                vert_rate_count BIGINT DEFAULT 0,
+                    aircraft_type TEXT NOT NULL,
+                    altitude_band TEXT NOT NULL,
 
-                ias_sum REAL DEFAULT 0,
-                ias_count BIGINT DEFAULT 0,
+                    gnd_speed_sum REAL DEFAULT 0,
+                    gnd_speed_count BIGINT DEFAULT 0,
 
-                heading_sin_sum REAL DEFAULT 0,
-                heading_cos_sum REAL DEFAULT 0,
-                heading_count BIGINT DEFAULT 0,
+                    vert_rate_sum REAL DEFAULT 0,
+                    vert_rate_count BIGINT DEFAULT 0,
 
-                PRIMARY KEY (start_bin, end_bin, aircraft_type, altitude_band)
-            )
-            PARTITION BY HASH (start_bin, end_bin);
-        """)
+                    ias_sum REAL DEFAULT 0,
+                    ias_count BIGINT DEFAULT 0,
+
+                    heading_sin_sum REAL DEFAULT 0,
+                    heading_cos_sum REAL DEFAULT 0,
+                    heading_count BIGINT DEFAULT 0,
+
+                    PRIMARY KEY (start_bin, end_bin, aircraft_type, altitude_band)
+                )
+                PARTITION BY HASH (start_bin, end_bin);
+            """)
 
     conn.commit()
 
@@ -511,7 +514,7 @@ aircraft_state = {}  # ICAO -> AircraftState
 
 
 
-def determine_routes(item, db_queue):
+def determine_routes(item, worker, airport_cells):
 
     if not item:
         print("no flight data")
@@ -521,138 +524,148 @@ def determine_routes(item, db_queue):
     segment_batch = defaultdict(int)
     stats_batch = {}
 
-    def flush_local():
-        if heatmap_batch:
-            db_queue.put(("heatmap", dict(heatmap_batch)))
-            heatmap_batch.clear()
+    with (
+            get_conn() as conn1,
+            get_conn() as conn2,
+            get_conn() as conn3,
+        ):
 
-        if segment_batch:
-            db_queue.put(("segment", dict(segment_batch)))
-            segment_batch.clear()
+        def flush():
+            if heatmap_batch:
+                flush_heatmap_batch(conn1, heatmap_batch, airport_cells, worker)
+                heatmap_batch.clear()
 
-        if stats_batch:
-            db_queue.put(("stats", dict(stats_batch)))
-            stats_batch.clear()
+            if segment_batch:
+                flush_segment_batch(conn2, segment_batch, worker)
+                segment_batch.clear()
 
-    for entry in item:
+            if stats_batch:
+                flush_route_segment_stats(conn3, stats_batch, worker)
+                stats_batch.clear()
 
-        # FILTER INVALID RECORDS
-        if entry.get("ALTITUDE") is None or entry.get("ALTITUDE") <= 1000:
-            continue
+            conn1.commit()
+            conn2.commit()
+            conn3.commit()
 
-        icao = entry.get("ICAO")
-        if not icao or str(icao).startswith("~"):
-            continue
+        for entry in item:
 
-        state = aircraft_state.setdefault(icao, AircraftState())
-
-        cur_time = entry.get("TIMESTAMP")
-        lat = entry.get("LAT")
-        lon = entry.get("LON")
-
-        cur_point = lat, lon
-
-        if lat is None or lon is None:
-            continue
-
-        cur_bin = latlng_to_cell(lat, lon, RES)
-
-        
-        # OVERNIGHT / GAP RESET
-        if state.prev_time is not None:
-            dt = cur_time - state.prev_time
-
-            if dt <= 0:
+            # FILTER INVALID RECORDS
+            if entry.get("ALTITUDE") is None or entry.get("ALTITUDE") <= 1000:
                 continue
 
-            if dt > OVERNIGHT_GAP:
-                state.prev_time = cur_time
-                state.prev_bin = None
-                state.prev_point = None
-                state.cell_stats = RouteStatsAccumulator()
-                state.last_cell_stats = RouteStatsAccumulator()
-                state.cell_stats.add(entry)
+            icao = entry.get("ICAO")
+            if not icao or str(icao).startswith("~"):
                 continue
 
-        
-        # SPEED VALIDATION
-        if state.prev_point and state.prev_time:
-            dt = cur_time - state.prev_time
-            dt_hours = dt / 3600
+            state = aircraft_state.setdefault(icao, AircraftState())
 
-            speed = haversine_distance_nm(
-                lat, lon,
-                state.prev_point[0], state.prev_point[1]
-            ) / dt_hours
+            cur_time = entry.get("TIMESTAMP")
+            lat = entry.get("LAT")
+            lon = entry.get("LON")
 
-            if speed > MAX_SPEED:
-                state.prev_time = cur_time
+            cur_point = lat, lon
+
+            if lat is None or lon is None:
+                continue
+
+            cur_bin = latlng_to_cell(lat, lon, RES)
+
+            
+            # OVERNIGHT / GAP RESET
+            if state.prev_time is not None:
+                dt = cur_time - state.prev_time
+
+                if dt <= 0:
+                    continue
+
+                if dt > OVERNIGHT_GAP:
+                    state.prev_time = cur_time
+                    state.prev_bin = None
+                    state.prev_point = None
+                    state.cell_stats = RouteStatsAccumulator()
+                    state.last_cell_stats = RouteStatsAccumulator()
+                    state.cell_stats.add(entry)
+                    continue
+
+            
+            # SPEED VALIDATION
+            if state.prev_point and state.prev_time:
+                dt = cur_time - state.prev_time
+                dt_hours = dt / 3600
+
+                speed = haversine_distance_nm(
+                    lat, lon,
+                    state.prev_point[0], state.prev_point[1]
+                ) / dt_hours
+
+                if speed > MAX_SPEED:
+                    state.prev_time = cur_time
+                    state.prev_bin = cur_bin
+                    state.prev_point = cur_point
+                    state.cell_stats = RouteStatsAccumulator()
+                    state.last_cell_stats = RouteStatsAccumulator()
+                    state.cell_stats.add(entry)
+
+            
+            # CELL INITIALIZATION
+            if state.prev_bin is None:
                 state.prev_bin = cur_bin
+                state.prev_time = cur_time
                 state.prev_point = cur_point
                 state.cell_stats = RouteStatsAccumulator()
-                state.last_cell_stats = RouteStatsAccumulator()
+                state.cell_stats.add(entry)
+                continue
+
+            
+            # SAME CELL → ACCUMULATE
+            if cur_bin == state.prev_bin:
                 state.cell_stats.add(entry)
 
-        
-        # CELL INITIALIZATION
-        if state.prev_bin is None:
-            state.prev_bin = cur_bin
+            
+            # TRANSITION EVENT
+            else:
+
+                heatmap_batch[cur_bin] += 1
+                segment_batch[(state.prev_bin, cur_bin)] += 1
+
+                aircraft_type = entry.get("TYPE") or "unknown"
+                altitude_band = get_altitude_band(state.cell_stats)
+                #day = datetime.fromtimestamp(cur_time)
+
+                key = (
+                    state.prev_bin,
+                    cur_bin,
+                    aircraft_type,
+                    altitude_band
+                )
+
+                if key not in stats_batch:
+                    stats_batch[key] = RouteStatsAccumulator()
+
+                # FULL BIDIRECTIONAL CELL MERGE
+                stats_batch[key].merge(state.last_cell_stats)
+                stats_batch[key].merge(state.cell_stats)
+
+                # shift window forward
+                state.last_cell_stats = state.cell_stats
+                state.cell_stats = RouteStatsAccumulator()
+                
+                state.cell_stats.add(entry)
+                state.prev_bin = cur_bin
+            
+            # UPDATE STATE
             state.prev_time = cur_time
             state.prev_point = cur_point
-            state.cell_stats = RouteStatsAccumulator()
-            state.cell_stats.add(entry)
-            continue
 
-        
-        # SAME CELL → ACCUMULATE
-        if cur_bin == state.prev_bin:
-            state.cell_stats.add(entry)
+            # FLUSH TRIGGER
+            if (
+                len(segment_batch) >= FLUSH_SIZE or
+                len(heatmap_batch) >= FLUSH_SIZE or
+                len(stats_batch) >= FLUSH_SIZE
+            ):
+                flush()
 
-        
-        # TRANSITION EVENT
-        else:
-
-            heatmap_batch[cur_bin] += 1
-            segment_batch[(state.prev_bin, cur_bin)] += 1
-
-            aircraft_type = entry.get("TYPE") or "unknown"
-            altitude_band = get_altitude_band(state.cell_stats)
-            #day = datetime.fromtimestamp(cur_time)
-
-            key = (
-                state.prev_bin,
-                cur_bin,
-                aircraft_type,
-                altitude_band
-            )
-
-            if key not in stats_batch:
-                stats_batch[key] = RouteStatsAccumulator()
-
-            # FULL BIDIRECTIONAL CELL MERGE
-            stats_batch[key].merge(state.last_cell_stats)
-            stats_batch[key].merge(state.cell_stats)
-
-            # shift window forward
-            state.last_cell_stats = state.cell_stats
-            state.cell_stats = RouteStatsAccumulator()
-            
-            state.cell_stats.add(entry)
-            state.prev_bin = cur_bin
-        
-        # UPDATE STATE
-        state.prev_time = cur_time
-        state.prev_point = cur_point
-
-        # FLUSH TRIGGER
-        if (
-            len(segment_batch) >= FLUSH_SIZE or
-            len(heatmap_batch) >= FLUSH_SIZE or
-            len(stats_batch) >= FLUSH_SIZE
-        ):
-            flush_local()
-
-    flush_local()
+        flush()
 
 
 
@@ -676,9 +689,10 @@ def get_altitude_band(stats, step=10):
 
 
 
-def flush_route_segment_stats(conn, batch):
+def flush_route_segment_stats(conn, batch, worker):
 
     rows = []
+    table_name = f"route_segment_stats_{worker}"
 
     for (start_bin, end_bin, aircraft_type, altitude_band), stats in batch.items():
 
@@ -704,8 +718,8 @@ def flush_route_segment_stats(conn, batch):
 
     with conn.cursor() as cur:
 
-        cur.executemany("""
-            INSERT INTO route_segment_stats (
+        cur.executemany(f"""
+            INSERT INTO {table_name} (
                 start_bin,
                 end_bin,
                 aircraft_type,
@@ -729,28 +743,29 @@ def flush_route_segment_stats(conn, batch):
             ON CONFLICT (start_bin, end_bin, aircraft_type, altitude_band)
             DO UPDATE SET
 
-                gnd_speed_sum = route_segment_stats.gnd_speed_sum + EXCLUDED.gnd_speed_sum,
-                gnd_speed_count = route_segment_stats.gnd_speed_count + EXCLUDED.gnd_speed_count,
+                gnd_speed_sum = {table_name}.gnd_speed_sum + EXCLUDED.gnd_speed_sum,
+                gnd_speed_count = {table_name}.gnd_speed_count + EXCLUDED.gnd_speed_count,
 
-                vert_rate_sum = route_segment_stats.vert_rate_sum + EXCLUDED.vert_rate_sum,
-                vert_rate_count = route_segment_stats.vert_rate_count + EXCLUDED.vert_rate_count,
+                vert_rate_sum = {table_name}.vert_rate_sum + EXCLUDED.vert_rate_sum,
+                vert_rate_count = {table_name}.vert_rate_count + EXCLUDED.vert_rate_count,
 
-                ias_sum = route_segment_stats.ias_sum + EXCLUDED.ias_sum,
-                ias_count = route_segment_stats.ias_count + EXCLUDED.ias_count,
+                ias_sum = {table_name}.ias_sum + EXCLUDED.ias_sum,
+                ias_count = {table_name}.ias_count + EXCLUDED.ias_count,
 
-                heading_sin_sum = route_segment_stats.heading_sin_sum + EXCLUDED.heading_sin_sum,
-                heading_cos_sum = route_segment_stats.heading_cos_sum + EXCLUDED.heading_cos_sum,
-                heading_count = route_segment_stats.heading_count + EXCLUDED.heading_count
+                heading_sin_sum = {table_name}.heading_sin_sum + EXCLUDED.heading_sin_sum,
+                heading_cos_sum = {table_name}.heading_cos_sum + EXCLUDED.heading_cos_sum,
+                heading_count = {table_name}.heading_count + EXCLUDED.heading_count
         """, rows)
 
 
 
 
-def flush_heatmap_batch(conn, heatmap_batch, airport_cells):
+def flush_heatmap_batch(conn, heatmap_batch, airport_cells, worker):
 
     if not heatmap_batch:
         return
 
+    table_name = f"route_heatmap_bins_{worker}"
     rows = []
 
     for h3_cell, traversal_count in heatmap_batch.items():
@@ -771,8 +786,8 @@ def flush_heatmap_batch(conn, heatmap_batch, airport_cells):
 
     with conn.cursor() as cur:
 
-        cur.executemany("""
-            INSERT INTO route_heatmap_bins (
+        cur.executemany(f"""
+            INSERT INTO {table_name} (
                 h3_index,
                 lat_center,
                 lon_center,
@@ -784,18 +799,19 @@ def flush_heatmap_batch(conn, heatmap_batch, airport_cells):
             ON CONFLICT (h3_index)
             DO UPDATE SET
                 traversal_count =
-                    route_heatmap_bins.traversal_count
+                    {table_name}.traversal_count
                     + EXCLUDED.traversal_count
         """, rows)
 
 
 
 
-def flush_segment_batch(conn, segment_batch):
+def flush_segment_batch(conn, segment_batch, worker):
 
     if not segment_batch:
         return
 
+    table_name = f"route_segments_{worker}"
     rows = []
 
     for (start_bin, end_bin), transition_count in segment_batch.items():
@@ -808,8 +824,8 @@ def flush_segment_batch(conn, segment_batch):
 
     with conn.cursor() as cur:
 
-        cur.executemany("""
-            INSERT INTO route_segments (
+        cur.executemany(f"""
+            INSERT INTO {table_name} (
                 start_bin,
                 end_bin,
                 transition_count
@@ -819,7 +835,7 @@ def flush_segment_batch(conn, segment_batch):
             ON CONFLICT (start_bin, end_bin)
             DO UPDATE SET
                 transition_count =
-                    route_segments.transition_count
+                    {table_name}.transition_count
                     + EXCLUDED.transition_count
         """, rows)
 
@@ -844,19 +860,27 @@ def load_airport_cells(conn):
 
 
 
-def worker_loop(in_queue, db_queue):
+def worker_loop(worker_num, in_queue):
 
-    setproctitle.setproctitle("route-worker")
+    setproctitle.setproctitle(f"route-worker-{worker_num}")
 
     while True:
 
         try: 
-            item = in_queue.get()
 
+            with get_conn() as conn1:
+                airport_cells = load_airport_cells(conn1)
+
+            item = in_queue.get()
+            counter = 0
             if item == "STOP":
                 break
 
-            determine_routes(item, db_queue)
+            determine_routes(item, worker_num, airport_cells)
+            counter += 1
+
+            if counter % 100 == 0:
+                log(f"route_worker_{worker_num} counter: {counter}")
 
         except Exception as e:
             log(f"DB writer error: {e}")
@@ -866,6 +890,12 @@ def worker_loop(in_queue, db_queue):
 def downloader_loop(day_queue, days):
 
     setproctitle.setproctitle("route-downloader")
+    
+    queued_count = 0
+
+    rate_window_start = time.time()
+    last_rate_log = time.time()
+
 
     for day in days:
         
@@ -876,14 +906,37 @@ def downloader_loop(day_queue, days):
         download_end_time = time.time()
         download_dt = download_end_time - start_time
         download_dt_minutes = download_dt / (60)
+        
         log(f"day: {day} took {download_dt_minutes:.2f} minutes to download")
 
 
         for member, aircraft_data in iter_aircrafts_from_tar(tar_buffer):
+            
             normed = normalize_data([aircraft_data])
 
-            # STREAM INTO PIPELINE (NOT PROCESSPOOL ANYMORE)
             day_queue.put(normed)
+            queued_count += 1
+            current_time = time.time()
+
+            #log(f"queued: {day} member: {member.name}")
+
+            # LOG RATE EVERY 15 SECONDS
+            if current_time - last_rate_log >= 15:
+
+                elapsed = current_time - rate_window_start
+
+                rate = queued_count / elapsed if elapsed > 0 else 0
+
+                log(
+                    f"queue_rate={rate:.2f} items/sec "
+                    f"queued={queued_count} "
+                    f"day_queue_size={day_queue.qsize()}"
+                )
+
+                # RESET WINDOW
+                queued_count = 0
+                rate_window_start = current_time
+                last_rate_log = current_time
 
         del tar_buffer
         gc.collect()
@@ -1008,7 +1061,7 @@ def db_writer_loop(db_queue):
 
 
 
-def print_pipeline_stats(day_queue, db_queue, worker_queues, counter=None):
+def print_pipeline_stats(day_queue, worker_queues, counter=None):
 
     workers = [
         q.qsize()
@@ -1020,7 +1073,7 @@ def print_pipeline_stats(day_queue, db_queue, worker_queues, counter=None):
     stats = (
         f"[{timestamp}] "
         f"day_q={day_queue.qsize()} | \t"
-        f"db_q={db_queue.qsize()} | \t"
+        #f"db_q={db_queue.qsize()} | \t"
         f"workers={workers}"
     )
 
@@ -1049,10 +1102,202 @@ def log(*args, sep=" ", end="\n"):
 
 
 
-def main():
-    NUM_WORKERS = 4
+def merge_worker_tables(conn, num_workers):
+    
+    log(f"starting final merge")
+    with conn.cursor() as cur:
 
-    start_day = "5/1/25"
+        #create main tables
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS route_heatmap_bins (
+        
+                h3_index BIGINT PRIMARY KEY,
+                lat_center DOUBLE PRECISION,
+                lon_center DOUBLE PRECISION,
+                traversal_count BIGINT NOT NULL,
+                contains_airport BOOLEAN
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS route_segments (
+        
+                start_bin BIGINT NOT NULL,
+                end_bin BIGINT NOT NULL,
+                transition_count BIGINT NOT NULL,
+                    
+                PRIMARY KEY (start_bin, end_bin)
+            )
+        """)
+        cur.execute("""               
+            CREATE TABLE IF NOT EXISTS route_segment_stats (
+                    
+                start_bin BIGINT NOT NULL,
+                end_bin   BIGINT NOT NULL,
+
+                aircraft_type TEXT NOT NULL,
+                altitude_band TEXT NOT NULL,
+
+                gnd_speed_sum REAL DEFAULT 0,
+                gnd_speed_count BIGINT DEFAULT 0,
+
+                vert_rate_sum REAL DEFAULT 0,
+                vert_rate_count BIGINT DEFAULT 0,
+
+                ias_sum REAL DEFAULT 0,
+                ias_count BIGINT DEFAULT 0,
+
+                heading_sin_sum REAL DEFAULT 0,
+                heading_cos_sum REAL DEFAULT 0,
+                heading_count BIGINT DEFAULT 0,
+
+                PRIMARY KEY (start_bin, end_bin, aircraft_type, altitude_band)
+            )
+            PARTITION BY HASH (start_bin, end_bin);
+        """)
+
+        conn.commit()
+
+        create_hash_partitions(conn, base_table=f"route_segment_stats")
+        conn.commit()
+
+        # -------------------------
+        # HEATMAP MERGE
+        # -------------------------
+        heatmap_union = " UNION ALL ".join(
+            f"SELECT h3_index, lat_center, lon_center, traversal_count, contains_airport "
+            f"FROM route_heatmap_bins_{i}"
+            for i in range(num_workers)
+        )
+
+        cur.execute(f"""
+            INSERT INTO route_heatmap_bins (h3_index, lat_center, lon_center, traversal_count, contains_airport)
+            SELECT 
+                h3_index,
+                MIN(lat_center) AS lat_center,
+                MIN(lon_center) AS lon_center,
+                SUM(traversal_count) AS traversal_count,
+                BOOL_OR(contains_airport) AS contains_airport
+            FROM ({heatmap_union}) AS all_bins
+            GROUP BY h3_index
+            ON CONFLICT (h3_index)
+            DO UPDATE SET
+                traversal_count = route_heatmap_bins.traversal_count + EXCLUDED.traversal_count,
+                contains_airport = route_heatmap_bins.contains_airport OR EXCLUDED.contains_airport;
+        """)
+        conn.commit()
+
+        # -------------------------
+        # SEGMENTS MERGE
+        # -------------------------
+        segments_union = " UNION ALL ".join(
+            f"SELECT start_bin, end_bin, transition_count "
+            f"FROM route_segments_{i}"
+            for i in range(num_workers)
+        )
+
+        cur.execute(f"""
+            INSERT INTO route_segments (start_bin, end_bin, transition_count)
+            SELECT
+                start_bin,
+                end_bin,
+                SUM(transition_count)
+            FROM ({segments_union}) AS all_segments
+            GROUP BY start_bin, end_bin
+            ON CONFLICT (start_bin, end_bin)
+            DO UPDATE SET
+                transition_count =
+                    route_segments.transition_count + EXCLUDED.transition_count;
+        """)
+        conn.commit()
+
+        # -------------------------
+        # STATS MERGE
+        # -------------------------
+        stats_union = " UNION ALL ".join(
+            f"""
+            SELECT 
+                start_bin,
+                end_bin,
+                aircraft_type,
+                altitude_band,
+                gnd_speed_sum,
+                gnd_speed_count,
+                vert_rate_sum,
+                vert_rate_count,
+                ias_sum,
+                ias_count,
+                heading_sin_sum,
+                heading_cos_sum,
+                heading_count
+            FROM route_segment_stats_{i}
+            """
+            for i in range(num_workers)
+        )
+
+        cur.execute(f"""
+            INSERT INTO route_segment_stats (
+                start_bin,
+                end_bin,
+                aircraft_type,
+                altitude_band,
+                gnd_speed_sum,
+                gnd_speed_count,
+                vert_rate_sum,
+                vert_rate_count,
+                ias_sum,
+                ias_count,
+                heading_sin_sum,
+                heading_cos_sum,
+                heading_count
+            )
+            SELECT
+                start_bin,
+                end_bin,
+                aircraft_type,
+                altitude_band,
+                SUM(gnd_speed_sum),
+                SUM(gnd_speed_count),
+                SUM(vert_rate_sum),
+                SUM(vert_rate_count),
+                SUM(ias_sum),
+                SUM(ias_count),
+                SUM(heading_sin_sum),
+                SUM(heading_cos_sum),
+                SUM(heading_count)
+            FROM ({stats_union}) AS all_stats
+            GROUP BY start_bin, end_bin, aircraft_type, altitude_band
+            ON CONFLICT (start_bin, end_bin, aircraft_type, altitude_band)
+            DO UPDATE SET
+                gnd_speed_sum = route_segment_stats.gnd_speed_sum + EXCLUDED.gnd_speed_sum,
+                gnd_speed_count = route_segment_stats.gnd_speed_count + EXCLUDED.gnd_speed_count,
+                vert_rate_sum = route_segment_stats.vert_rate_sum + EXCLUDED.vert_rate_sum,
+                vert_rate_count = route_segment_stats.vert_rate_count + EXCLUDED.vert_rate_count,
+                ias_sum = route_segment_stats.ias_sum + EXCLUDED.ias_sum,
+                ias_count = route_segment_stats.ias_count + EXCLUDED.ias_count,
+                heading_sin_sum = route_segment_stats.heading_sin_sum + EXCLUDED.heading_sin_sum,
+                heading_cos_sum = route_segment_stats.heading_cos_sum + EXCLUDED.heading_cos_sum,
+                heading_count = route_segment_stats.heading_count + EXCLUDED.heading_count;
+        """)
+
+        conn.commit()
+
+        for i in range(num_workers):
+
+            cur.execute(f"DROP TABLE IF EXISTS route_heatmap_bins_{i} CASCADE;")
+            cur.execute(f"DROP TABLE IF EXISTS route_segments_{i} CASCADE;")
+            cur.execute(f"DROP TABLE IF EXISTS route_segment_stats_{i} CASCADE;")
+
+    conn.commit()
+
+    log(f"finished final merge")
+
+
+
+def main():
+    NUM_WORKERS = 6
+
+    start_day = "4/1/26"
     end_day = "5/1/26"
 
     Path(LOG).unlink(missing_ok=True)
@@ -1061,21 +1306,22 @@ def main():
     days = build_date_range(1, start_day, end_day)
 
     with get_conn() as conn:
-        create_tables(conn)
-        create_hash_partitions(conn)
+        create_tables(conn, NUM_WORKERS)
+        for i in range(NUM_WORKERS):
+            create_hash_partitions(conn, base_table=f"route_segment_stats_{i}")
         #create_monthly_partitions(conn, start_day, end_day)
 
     mp.set_start_method("spawn")
 
     day_queue = mp.Queue(maxsize=1000)
-    db_queue = mp.Queue(maxsize=1000)
+    #db_queue = mp.Queue(maxsize=1000)
 
     worker_queues = [
         mp.Queue(maxsize=100) for _ in range(NUM_WORKERS)
     ]
 
     workers = [
-        mp.Process(target=worker_loop, args=(worker_queues[i], db_queue), name=f"route-worker-{i}")
+        mp.Process(target=worker_loop, args=(i, worker_queues[i]), name=f"route-worker-{i}")
         for i in range(NUM_WORKERS)
     ]
 
@@ -1085,11 +1331,11 @@ def main():
         name="route-dispatcher"
     )
 
-    db_writer = mp.Process(
-        target=db_writer_loop,
-        args=(db_queue,),
-        name="route-DB-writer"
-    )
+    # db_writer = mp.Process(
+    #     target=db_writer_loop,
+    #     args=(db_queue,),
+    #     name="route-DB-writer"
+    # )
 
     downloader = mp.Process(
         target=downloader_loop,
@@ -1102,7 +1348,7 @@ def main():
         w.start()
 
     dispatcher.start()
-    db_writer.start()
+    #db_writer.start()
     downloader.start()
 
     #Logging
@@ -1110,19 +1356,19 @@ def main():
 
         print_pipeline_stats(
             day_queue,
-            db_queue,
+            #db_queue,
             worker_queues
         )
 
         if not any([
             downloader.is_alive(),
             dispatcher.is_alive(),
-            db_writer.is_alive(),
+            #db_writer.is_alive(),
             *[w.is_alive() for w in workers]
         ]):
             break
 
-        time.sleep(1)
+        time.sleep(15)
 
     #Shutdown process
     downloader.join()
@@ -1136,8 +1382,11 @@ def main():
     for w in workers:
         w.join()
 
-    db_queue.put("STOP")
-    db_writer.join()
+    #final merge
+    merge_worker_tables(conn,NUM_WORKERS)
+
+    #db_queue.put("STOP")
+    #db_writer.join()
 
 
 
