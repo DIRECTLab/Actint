@@ -59,7 +59,7 @@ BASE_URL = "https://github.com/adsblol/globe_history_{year}/releases/download"
 RES = 7
 MAX_SPEED = 2000
 OVERNIGHT_GAP = 3600 * 10 #if there is a 10 hour gap in data don't create an edge
-FLUSH_SIZE = 50_000
+FLUSH_SIZE = 150_000
 
 
 
@@ -207,7 +207,7 @@ def create_tables(conn, num_workers):
         for i in range(num_workers):
 
             cur.execute(f"""
-                CREATE TABLE IF NOT EXISTS route_heatmap_bins_{i} (
+                CREATE UNLOGGED TABLE IF NOT EXISTS route_heatmap_bins_{i} (
             
                     h3_index BIGINT PRIMARY KEY,
                     lat_center DOUBLE PRECISION,
@@ -217,7 +217,7 @@ def create_tables(conn, num_workers):
                 )
             """)
             cur.execute(f"""
-                CREATE TABLE IF NOT EXISTS route_segments_{i} (
+                CREATE UNLOGGED TABLE IF NOT EXISTS route_segments_{i} (
             
                     start_bin BIGINT NOT NULL,
                     end_bin BIGINT NOT NULL,
@@ -227,7 +227,7 @@ def create_tables(conn, num_workers):
                 )
             """)
             cur.execute(f"""               
-                CREATE TABLE IF NOT EXISTS route_segment_stats_{i} (
+                CREATE UNLOGGED TABLE IF NOT EXISTS route_segment_stats_{i} (
                         
                     start_bin BIGINT NOT NULL,
                     end_bin   BIGINT NOT NULL,
@@ -273,6 +273,22 @@ def create_hash_partitions(conn, base_table="route_segment_stats", num_partition
 
     conn.commit()
 
+
+def create_unlogged_hash_partitions(conn, base_table="route_segment_stats", num_partitions=16):
+    """
+    Creates a hash-partitioned table and N partitions for (start_bin, end_bin).
+    """
+    with conn.cursor() as cur:
+
+        # 2. Create partitions
+        for i in range(num_partitions):
+            cur.execute(f"""
+                CREATE UNLOGGED TABLE IF NOT EXISTS {base_table}_p{i}
+                PARTITION OF {base_table}
+                FOR VALUES WITH (MODULUS {num_partitions}, REMAINDER {i});
+            """)
+
+    conn.commit()
 
 # def create_monthly_partitions(conn, start_str, end_str=None):
 
@@ -1308,7 +1324,7 @@ def main():
     with get_conn() as conn:
         create_tables(conn, NUM_WORKERS)
         for i in range(NUM_WORKERS):
-            create_hash_partitions(conn, base_table=f"route_segment_stats_{i}")
+            create_unlogged_hash_partitions(conn, base_table=f"route_segment_stats_{i}")
         #create_monthly_partitions(conn, start_day, end_day)
 
     mp.set_start_method("spawn")
