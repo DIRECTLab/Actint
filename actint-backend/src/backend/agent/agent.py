@@ -4,7 +4,7 @@ import sys
 from backend.config import config
 from pathlib import Path
 
-from smolagents import OpenAIServerModel, VLLMModel, TransformersModel, ToolCallingAgent, MCPClient, AgentMaxStepsError, ActionStep, TaskStep
+from smolagents import OpenAIServerModel, VLLMModel, TransformersModel, CodeAgent, MCPClient, AgentMaxStepsError, ActionStep, TaskStep
 from mcp import StdioServerParameters
 from backend.mcp_servers.ais import ais_mcp_server
 from backend.mcp_servers.adsb import adsb_mcp_server
@@ -64,31 +64,27 @@ def init_model() -> TransformersModel:
     if config.MODEL_ID == 'google/gemma-4-31B-it':
         model_kwargs={'max_model_len': 131392}
 
-    return TransformersModel(
-        model_id=config.MODEL_ID,
-        max_tokens=131192
-    )
+    # return TransformersModel(
+    #     model_id=config.MODEL_ID,
+    #     max_tokens=131192
+    # )
     # return OpenAIServerModel(
     #     model_id=config.MODEL_ID,
     #     api_base=f"http://localhost:{config.INFERENCE_SERVER_PORT}/v1",
     #     api_key="EMPTY" # vLLM doesn't strictly need one by default but requires a string here
-    # )
-    # return TransformersModel(
-    #     model_id=config.MODEL_ID,
-    #     max_tokens=131392
     # )
 
 
 def create_agent(
     model,
     additional_tools: list = []
-) -> ToolCallingAgent:
+) -> CodeAgent:
     """Creates an agent, injecting relevant tools."""
     tools = []
     # tools += ais_mcp_tools
     # tools += adsb_mcp_tools
     
-    ais_agent = ToolCallingAgent(
+    ais_agent = CodeAgent(
         tools=ais_mcp_tools,
         model=model,
         max_steps=20,
@@ -96,7 +92,7 @@ def create_agent(
         description="Can query a database of AIS information (including position, heading, speed, etc.) and do calculations with that data."
     )
 
-    adsb_agent = ToolCallingAgent(
+    adsb_agent = CodeAgent(
         tools=adsb_mcp_tools,
         model=model,
         max_steps=20,
@@ -104,7 +100,7 @@ def create_agent(
         description="Can query a database of ADS-B information and do calculations with that data."
     )
 
-    # search_agent = ToolCallingAgent(
+    # search_agent = CodeAgent(
     #     tools=[WebSearchTool()],
     #     model=get_model(),
     #     max_steps=10,
@@ -117,7 +113,7 @@ def create_agent(
     
     if additional_tools:
         tools.extend(additional_tools)
-        # map_agent = ToolCallingAgent(
+        # map_agent = CodeAgent(
         #     tools=additional_tools,
         #     model=get_model(),
         #     max_steps=10,
@@ -127,10 +123,10 @@ def create_agent(
         # managed_agents.append(map_agent)
 
     
-    return ToolCallingAgent(tools=tools, model=model, managed_agents=managed_agents)
+    return CodeAgent(tools=tools, model=model, managed_agents=managed_agents)
 
 async def query_agent_instance(
-    agent: ToolCallingAgent,
+    agent: CodeAgent,
     query: str,
 ) -> str:
     """Entry point for both web and terminal to query an agent instance."""
@@ -153,7 +149,7 @@ async def query_agent_instance(
 
 #======================================Summarization Agent==================================#
 
-def summarize_last_turn(instructions: str, agent: ToolCallingAgent):
+def summarize_last_turn(instructions: str, agent: CodeAgent):
     summarization_tools = []  # Define any tools specific to summarization if needed
 
     agent_memory = agent.memory
@@ -176,7 +172,7 @@ def summarize_last_turn(instructions: str, agent: ToolCallingAgent):
     steps_to_summarize = agent_memory.steps[first_step:]
     prompt = create_prompt(instructions, steps_to_summarize)
 
-    summarizer_agent = ToolCallingAgent(tools=summarization_tools, model=agent.model)
+    summarizer_agent = CodeAgent(tools=summarization_tools, model=agent.model)
     import time
     start_time = time.time()
     summary = summarizer_agent.run(prompt, reset=True)

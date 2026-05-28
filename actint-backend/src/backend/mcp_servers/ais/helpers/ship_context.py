@@ -70,8 +70,8 @@ def get_vessel_locations_helper(mmsi: str, page: str = '1') -> str:
         prompt = (
         f"Vessel positions ({start_index + 1}-{end_index + 1})\n\n"
         f"{positions_prompt}\n"
-        f"To retrieve the next 8 positions:\n"
-        f"  get_vessel_locations({mmsi}, {page + 1})"
+        f"If you need to retrieve the next 8 positions, use:\n"
+        f"  get_vessel_locations(mmsi=\"{mmsi}\", page=\"{page + 1})\""
         )
 
     return prompt
