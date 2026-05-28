@@ -205,16 +205,19 @@ def detect_fishy_clusters(region):
     pass
 
 
+@mcp.tool()
 def summarise_insecure_areas():
     """Give an analysis on what areas experience the most fishy vessel presence."""
     pass
 
 
+@mcp.tool()
 def re_evaluate_region(region):
     """Re-run region analysis for fishy vessels."""
     pass
 
 
+@mcp.tool()
 def evaluate_model_performance():
     """Evaluate the performance of the fishy vessel detection model using functions from the fishy_vessels repository"""
     pass
