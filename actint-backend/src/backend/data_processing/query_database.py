@@ -5,12 +5,21 @@ from backend.config import config
 class DatabaseConnectionTypes(Enum):
     AIS = 0
     ADSB = 1
+    FISHY_VESSELS = 2
 
 def _database_configs(conn_type: DatabaseConnectionTypes) -> dict:
     if config.DB_USING_SQLITE:
         return {
             "path": config.DB_PATH
         }
+    elif conn_type == DatabaseConnectionTypes.FISHY_VESSELS:
+        return {
+            "host": config.DB_HOST,
+            "dbname": config.FISHY_VESSELS_DB_NAME,
+            "user": config.DB_USER,
+            "password": config.DB_PASS,
+            "port": config.DB_PORT,
+        }    
     else:
         if conn_type == DatabaseConnectionTypes.AIS:
             return {

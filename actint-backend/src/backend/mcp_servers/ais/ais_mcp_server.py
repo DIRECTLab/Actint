@@ -18,6 +18,14 @@ from backend.mcp_servers.ais.helpers.area_context import get_future_intersection
 from fastmcp import FastMCP
 import json
 # Import tool functions from parent package
+from backend.mcp_servers.ais.helpers.dark_vessel_helper import (
+    query_region,
+    query_vessel,
+    get_fishy_vessel_locations,
+    detect_fishy_clusters,
+    re_evaluate_region,
+    get_fishy_vessel_trajectories,
+)
 from backend.mcp_servers.ais.helpers.ship_context import (
     get_vessel_general_information_helper,
     get_vessel_locations_helper,
@@ -85,6 +93,8 @@ mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 @mcp.tool()
 def summarise_fishy_vessels_in_region(region):
     """Get a summary of vessels in a region marked as suspicious based on dark vessel analysis."""
+    #TODO: Make sure this tool returns something useful for the llm
+    query_region(region)
     pass
 
 
@@ -106,16 +116,19 @@ def detect_fishy_clusters(region):
     pass
 
 
+@mcp.tool()
 def summarise_insecure_areas():
     """Give an analysis on what areas experience the most fishy vessel presence."""
     pass
 
 
+@mcp.tool()
 def re_evaluate_region(region):
     """Re-run region analysis for fishy vessels."""
     pass
 
 
+@mcp.tool()
 def evaluate_model_performance():
     """Evaluate the performance of the fishy vessel detection model using functions from the fishy_vessels repository"""
     pass
