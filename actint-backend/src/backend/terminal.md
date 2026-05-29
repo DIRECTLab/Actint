@@ -77,7 +77,7 @@ python terminal.py --remote --host 192.168.1.100 --debug
 The remote backend must be running before you connect:
 
 ```bash
-python -m backend.transport.web_socket
+python -m backend.transport.start_web_socket
 ```
 
 ---
