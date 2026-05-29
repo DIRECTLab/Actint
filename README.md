@@ -36,13 +36,13 @@ python -m backend.agent.agent
 To run the websocket / LLM backend server:
 
 ```bash
-python -m backend.transport.web_socket
+python -m backend.transport.start_web_socket
 ```
 
 You can also launch the ASGI app directly with Uvicorn:
 
 ```bash
-uvicorn backend.transport.web_socket:app --host 0.0.0.0 --port 3050
+uvicorn backend.transport.start_web_socket:app --host 0.0.0.0 --port 3050
 ```
 
 If you want to launch the Phoenix telemetry server:
@@ -75,7 +75,7 @@ To experiment with the backend without the frontend:
 
 - Run backend modules with `python -m backend...`
 - Run the websocket / LLM backend with
-  `python -m backend.transport.web_socket`
+  `python -m backend.transport.start_web_socket`
 - Use `python -m phoenix.server.main serve` if you need Phoenix telemetry
 
 To run the frontend interface:
