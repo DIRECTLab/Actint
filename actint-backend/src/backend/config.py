@@ -16,6 +16,7 @@ class Config:
     DB_USER: str | None = getenv("DB_USER", None)
     DB_PASS: str | None = getenv("DB_PASS", None)
     DB_PORT: int | None = int(getenv("DB_PORT", None)) if getenv("DB_PORT") else None
+    MODEL_ID: str | None = getenv("MODEL_ID", None)
 
     MAX_AGENT_STEPS: int = 20
     INFERENCE_SERVER_URL: str = f"http://127.0.0.1:{getenv("INFERENCE_SERVER_PORT", "8000")}/v1"
