@@ -96,7 +96,7 @@ def get_vessel_general_information(mmsi: str) -> str:
     """Get information about a vessel. This includes the name, time and most rescent location, heading, cargo, course and speed overground, ect.
     
     Args: 
-        mmsi (int): Maritime Mobile Service Identity number of the vessel
+        mmsi (str): Maritime Mobile Service Identity number of the vessel
         
     Returns: 
         str: Informatioon about the vessel
