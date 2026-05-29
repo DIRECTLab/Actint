@@ -30,8 +30,8 @@ else:
         file=sys.stderr
     )
 
-model_id = config.MODEL_ID
-print("Model ID: " + model_id)
+model_id = config.MODEL_ID or ""
+print("\033[0;34mModel ID: \033[1;34m" + model_id + "\033[0m")
 
 if config.CONDA_PREFIX:
     python_path = str(Path(config.CONDA_PREFIX) / "bin" / "python")
