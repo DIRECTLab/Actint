@@ -68,10 +68,10 @@ def get_vessel_locations_helper(mmsi: str, page: str = '1') -> str:
         )
 
         prompt = (
-        f"Vessel positions ({start_index + 1}-{end_index + 1})\n\n"
-        f"{positions_prompt}\n"
-        f"To retrieve the next 8 positions:\n"
-        f"  get_vessel_locations({mmsi}, {page + 1})"
+            f"Vessel positions ({start_index + 1}-{end_index + 1})\n\n"
+            f"{positions_prompt}\n"
+            f"If you need to retrieve the next 8 positions, use:\n"
+            f"get_vessel_locations(mmsi=\"{mmsi}\", page=\"{page + 1})\""
         )
 
     return prompt
@@ -102,7 +102,7 @@ def get_vessels_last_seen_helper():
             f"{time_str}\n"
         )
 
-    prompt += ("\nTo get even more information on any of these ships, run get_vessel_general_information() with the correct mmsi")
+    prompt += ("\nTo get even more information on any of these ships, use the get_vessel_general_information tool with the correct mmsi")
 
     return prompt
 
@@ -196,7 +196,7 @@ def get_vessels_in_area_helper(lat: str, lon: str, distance_nm: str):
     prompt += ("\nList of MMSIs with latitude or longitude as None:\n")
     for baka in sussy_bakas:
         prompt += str(baka['mmsi'])
-    prompt += ("\n\nTo get even more information on any of these ships, run get_vessel_general_information() with the correct mmsi")
+    prompt += ("\n\nTo get even more information on any of these ships, use the get_vessel_general_information tool with the correct mmsi")
 
     prompt += str(len(vessels_in_area))
     return prompt
