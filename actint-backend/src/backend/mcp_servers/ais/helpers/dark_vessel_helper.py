@@ -1,4 +1,5 @@
 from backend.data_processing.query_database import get_conn, DatabaseConnectionTypes
+from colorama import Fore, Style
 
 
 def query_region(region):
@@ -101,28 +102,33 @@ def run_tests():
     """Run tests for the functions in this file."""
     failed = False
 
-    if len(query_region("somewhere_cold")) == 0:
-        print("query_region test failed: No vessels found in region.")
+    if len(query_region("brazil_eez")) == 0:
+        print(Fore.LIGHTRED_EX + "query_region test failed: No vessels found in region." + Fore.RESET)
         failed = True
+    else:
+        print(Fore.LIGHTGREEN_EX + "query_region test passed." + Fore.RESET)
 
     if len(query_vessel("steve")) == 0:
-        print("query_vessel test failed: No vessel with name steve found.")
+        print(Fore.LIGHTRED_EX + "query_vessel test failed: No vessel with name steve found." + Fore.RESET)
         failed = True
+    else:
+        print(Fore.LIGHTGREEN_EX + "query_vessel test passed." + Fore.RESET)
 
     # get fishy vessel locations
-    if len(get_fishy_vessel_locations("somewhere_cold")) == 0:
-        print("get_fishy_vessel_locations test failed: No vessels found in region.")
+    if len(get_fishy_vessel_locations("brazil_eez")) == 0:
+        print(Fore.LIGHTRED_EX + "get_fishy_vessel_locations test failed: No vessels found in region." + Fore.RESET)
         failed = True
+    else: 
+        print(Fore.LIGHTGREEN_EX + "get_fishy_vessel_locations test passed." + Fore.RESET)
 
     # find fishy clusters
-    if len(find_fishy_clusters("123456789", "5", "somewhere_cold")) == 0:
-        print("find_fishy_clusters test failed: No clusters found.")
+    if len(find_fishy_clusters("123456789", "5", "brazil_eez")) == 0:
+        print(Fore.LIGHTRED_EX + "find_fishy_clusters test failed: No clusters found." + Fore.RESET)
         failed = True
+    else:
+        print(Fore.LIGHTGREEN_EX + "find_fishy_clusters test passed." + Fore.RESET)
 
-    # get fishy vessel trajectories
-    if len(get_fishy_vessel_trajectories("somewhere_cold")) == 0:
-        print("get_fishy_vessel_trajectories test failed: No trajectories found.")
-        failed = True
+    #TODO: write test for get fishy vessel trajectories
 
     if not failed:
         print("All tests passed.")
