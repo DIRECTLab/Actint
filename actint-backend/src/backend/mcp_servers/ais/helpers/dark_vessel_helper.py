@@ -30,23 +30,27 @@ def get_fishy_vessel_locations(region):
     """Get the most recent locations of vessels in a region marked as suspicious based on dark vessel analysis."""
     conn = get_conn(DatabaseConnectionTypes.FISHY_VESSELS)
     cursor = conn.cursor()
-    cursor.execute("SELECT name, lat, lon FROM sampletable WHERE region = %s;", (region,))
+    cursor.execute("SELECT mmsi, lat, lon FROM sampletable WHERE region = %s;", (region,))
     results = cursor.fetchall()
     conn.close()
-    return results
+    return dict(zip([key[0] for key in cursor.description], results))
 
 
 def find_fishy_clusters(mmsi: str, number_ships: str, region: str) -> str:
     mmsi = int(mmsi)
     number_ships = int(number_ships)
     detections = get_fishy_vessel_locations(region)
-    mmsis = get_all_mmsis()
+    mmsis = get_fishy_mmsis(region)
     if mmsi not in mmsis:
         raise ValueError("MMSI not in vessels")
     primary_ship_location = get_vessel_latest_location_helper(mmsi)
-    primary_lat = primary_ship_location['lat']
-    primary_lon = primary_ship_location['lon']
+    primary_lat = primary_ship_location[2]  #TODO: Make it so these don't need to be hardcoded
+    primary_lon = primary_ship_location[3]
     distances = []
+
+    #debugging prints
+    #print(Fore.YELLOW + "We made it this far" + Fore.RESET)
+    #print(Fore.LIGHTBLUE_EX + "Detections: " + str(detections) + Fore.RESET)
 
     for detection in detections:
         if detection['mmsi'] == mmsi:
@@ -87,6 +91,27 @@ def find_fishy_clusters(mmsi: str, number_ships: str, region: str) -> str:
     return output
 
 
+def get_fishy_mmsis(region):
+    """Get the MMSIs of vessels in a region marked as suspicious based on dark vessel analysis."""
+    conn = get_conn(DatabaseConnectionTypes.FISHY_VESSELS)
+    cursor = conn.cursor()
+    cursor.execute("SELECT mmsi FROM sampletable WHERE region = %s;", (region,))
+    results = cursor.fetchall()
+    conn.close()
+    return [row[0] for row in results if row[0] is not None]
+
+
+def get_vessel_latest_location_helper(mmsi: int) -> dict | None:
+    """Get the latest known location of a vessel given its MMSI."""
+    conn = get_conn(DatabaseConnectionTypes.FISHY_VESSELS)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM sampletable WHERE mmsi = %s ORDER BY basedatetime DESC LIMIT 1;", (mmsi,))
+    result = cursor.fetchone()
+    conn.close()
+    
+    return result
+
+
 def get_fishy_vessel_trajectories(region):
     """Use the ship_going tools to figure out where each fishy vessel in a region is likely headed"""
 
@@ -122,7 +147,7 @@ def run_tests():
         print(Fore.LIGHTGREEN_EX + "get_fishy_vessel_locations test passed." + Fore.RESET)
 
     # find fishy clusters
-    if len(find_fishy_clusters("123456789", "5", "brazil_eez")) == 0:
+    if len(find_fishy_clusters("9", "5", "brazil_eez")) == 0:
         print(Fore.LIGHTRED_EX + "find_fishy_clusters test failed: No clusters found." + Fore.RESET)
         failed = True
     else:
