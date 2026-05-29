@@ -13,7 +13,7 @@ class Config:
     DB_USER: str | None = getenv("DB_USER", None)
     DB_PASS: str | None = getenv("DB_PASS", None)
     DB_PORT: int | None = int(getenv("DB_PORT", None)) if getenv("DB_PORT") else None
-    DB_HOST: str | None = getenv("DB_HOST", None)
+    MODEL_ID: str | None = getenv("MODEL_ID", None)
 
     ADSB_DB_NAME: str | None = getenv("ADSB_DB_NAME", None)
     AIS_DB_NAME: str | None = getenv("AIS_DB_NAME", None)
