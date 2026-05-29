@@ -22,7 +22,7 @@ from backend.mcp_servers.ais.helpers.dark_vessel_helper import (
     query_region,
     query_vessel,
     get_fishy_vessel_locations,
-    detect_fishy_clusters,
+    find_fishy_clusters,
     re_evaluate_region,
     get_fishy_vessel_trajectories,
 )
@@ -91,7 +91,7 @@ mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 # ============================================================================
 
 @mcp.tool()
-def summarise_fishy_vessels_in_region(region):
+def summarise_fishy_vessels_in_region(region: str):
     """Get a summary of vessels in a region marked as suspicious based on dark vessel analysis."""
     #TODO: Make sure this tool returns something useful for the llm
     query_region(region)
@@ -99,21 +99,28 @@ def summarise_fishy_vessels_in_region(region):
 
 
 @mcp.tool()
-def evaluate_vessel_fishiness():
+def evaluate_vessel_fishiness(vessel_name: str):
     """Look for a vessel in the fishy vessels database and return if a vessel is fishy and why."""
+    query_vessel(vessel_name)
+    # turn the result of that query into something helpful for the llm
     pass
 
 
 @mcp.tool()
-def get_fishy_vessel_locations(region):
+def get_fishy_vessel_locations(region: str):
     """Get the most recent locations of vessels in a region marked as suspicious and their tradjectories."""
+    # get info about vessels in the region
+    # strip down the info to names and lat/lon
+    # return that info in a format that is easy for the llm to use
     pass
 
 
 @mcp.tool()
-def detect_fishy_clusters(region):
+def detect_fishy_clusters(region: str):
     """Detect clusters of vessels in a region that may indicate suspicious activity."""
-    pass
+    clusters = find_fishy_clusters(region)
+    # turn this into something agent-readable
+    return clusters
 
 
 @mcp.tool()
@@ -125,7 +132,8 @@ def summarise_insecure_areas():
 @mcp.tool()
 def re_evaluate_region(region):
     """Re-run region analysis for fishy vessels."""
-    pass
+    # run region analysis
+    return f"Region {region} has been re-evaluated for fishy vessels."
 
 
 @mcp.tool()
