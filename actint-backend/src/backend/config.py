@@ -28,25 +28,15 @@ class Config:
     DB_PORT: int | None = int(getenv("DB_PORT", None)) if getenv("DB_PORT") else None
     DB_HOST: str | None = getenv("DB_HOST", None)
 
-    WEB_SOCKET_PORT: int | None = env_int("WEB_SOCKET_PORT", 3050)
-
-    DB_HOST: str | None = env_str("DB_HOST")
-    ADSB_DB_NAME: str | None = env_str("ADSB_DB_NAME")
-    AIS_DB_NAME: str | None = env_str("AIS_DB_NAME")
-    FISHY_VESSELS_DB_NAME: str | None = env_str("FISHY_VESSELS_DB_NAME")
-    FISHY_REPORTS_DB_NAME: str | None = env_str("FISHY_REPORTS_DB_NAME")
-    DB_USER: str | None = env_str("DB_USER")
-    DB_PASS: str | None = env_str("DB_PASS")
-    DB_PORT: int | None = env_int("DB_PORT")
-
-    MODEL_ID: str | None = env_str("MODEL_ID")
-    MAX_NEW_TOKENS: int | None = env_int("MAX_NEW_TOKENS", 2048)
-
-    MAX_AGENT_STEPS: int | None = env_int("MAX_AGENT_STEPS", 20)
-
-    INFERENCE_SERVER_PORT: int | None = env_int("INFERENCE_SERVER_PORT", 8000)
-    INFERENCE_SERVER_HOST: str | None = env_str("INFERENCE_SERVER_HOST", "127.0.0.1")
-    INFERENCE_SERVER_URL: str = f"http://{INFERENCE_SERVER_HOST}:{INFERENCE_SERVER_PORT}/v1"
-
-
+    ADSB_DB_NAME: str | None = getenv("ADSB_DB_NAME", None)
+    AIS_DB_NAME: str | None = getenv("AIS_DB_NAME", None)
+    FISHY_VESSELS_DB_NAME: str | None = getenv("FISHY_VESSELS_DB_NAME")
+    FISHY_REPORTS_DB_NAME: str | None = getenv("FISHY_REPORTS_DB_NAME")
+    
+    # LLM Model Configuration (Hugging Face model ID and generation parameters)
+    
+    LLAMA_BACKEND_SOCKET: str = "http://127.0.0.1:8000/v1"
+    MAX_AGENT_STEPS: int = 20
+    INFERENCE_SERVER_URL: str = f"http://127.0.0.1:{getenv("INFERENCE_SERVER_PORT", "8000")}/v1"
+    
 config = Config()
