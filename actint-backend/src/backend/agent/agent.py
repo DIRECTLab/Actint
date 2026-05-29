@@ -69,11 +69,19 @@ adsb_server_params = StdioServerParameters(
     cwd=os.getcwd()
 )
 
-_agent_sessions = {}
+adsb_mcp_client = MCPClient(adsb_server_params, structured_output=False)
+adsb_mcp_tools = adsb_mcp_client.get_tools()
 
 
-def get_or_create_agent(
-    session_id: str, additional_tools: list = []
+model = OpenAIModel(
+    model_id="local",
+    api_base=config.INFERENCE_SERVER_URL,
+    api_key="dummy"
+)
+
+def create_agent(
+    additional_tools: list = [],
+    
 ) -> ToolCallingAgent:
     """Creates or retrieves an agent for a given session, injecting relevant tools."""
     if session_id not in _agent_sessions:
