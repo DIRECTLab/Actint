@@ -58,15 +58,10 @@ adsb_server_params = StdioServerParameters(
 adsb_mcp_client = MCPClient(adsb_server_params, structured_output=False)
 adsb_mcp_tools = adsb_mcp_client.get_tools()
 
-# model = TransformersModel(
-#     model_id=model_id,
-#     max_new_tokens=config.MAX_NEW_TOKENS,
-# )
-
 
 model = OpenAIModel(
     model_id="local",
-    api_base=config.LLAMA_BACKEND_SOCKET,
+    api_base=config.INFERENCE_SERVER_URL,
     api_key="dummy"
 )
 
