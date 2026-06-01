@@ -5,6 +5,7 @@ import uvicorn
 from backend.config import config
 from backend.transport.connection import sio, app
 import sys
+import asyncio
 
 connections = {}
 
@@ -54,7 +55,7 @@ async def handle_get_heatmap(sid):
     from backend.data_processing.heatmap import fetch_heatmap
 
     try:
-        points = fetch_heatmap()
+        points = await asyncio.to_thread(fetch_heatmap)
 
         await sio.emit(
             "set_heatmap",

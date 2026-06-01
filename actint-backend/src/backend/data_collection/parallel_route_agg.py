@@ -1179,132 +1179,130 @@ def merge_worker_tables(conn, num_workers):
 
         # -------------------------
         # HEATMAP MERGE
-        # -------------------------
-        heatmap_union = " UNION ALL ".join(
-            f"SELECT h3_index, lat_center, lon_center, traversal_count, contains_airport "
-            f"FROM route_heatmap_bins_{i}"
-            for i in range(num_workers)
-        )
+        # # -------------------------
+        # log(f"starting heatmap merge")
+        # heatmap_union = " UNION ALL ".join(
+        #     f"SELECT h3_index, lat_center, lon_center, traversal_count, contains_airport "
+        #     f"FROM route_heatmap_bins_{i}"
+        #     for i in range(num_workers)
+        # )
 
-        cur.execute(f"""
-            INSERT INTO route_heatmap_bins (h3_index, lat_center, lon_center, traversal_count, contains_airport)
-            SELECT 
-                h3_index,
-                MIN(lat_center) AS lat_center,
-                MIN(lon_center) AS lon_center,
-                SUM(traversal_count) AS traversal_count,
-                BOOL_OR(contains_airport) AS contains_airport
-            FROM ({heatmap_union}) AS all_bins
-            GROUP BY h3_index
-            ON CONFLICT (h3_index)
-            DO UPDATE SET
-                traversal_count = route_heatmap_bins.traversal_count + EXCLUDED.traversal_count,
-                contains_airport = route_heatmap_bins.contains_airport OR EXCLUDED.contains_airport;
-        """)
-        conn.commit()
+        # cur.execute(f"""
+        #     INSERT INTO route_heatmap_bins (h3_index, lat_center, lon_center, traversal_count, contains_airport)
+        #     SELECT 
+        #         h3_index,
+        #         MIN(lat_center) AS lat_center,
+        #         MIN(lon_center) AS lon_center,
+        #         SUM(traversal_count) AS traversal_count,
+        #         BOOL_OR(contains_airport) AS contains_airport
+        #     FROM ({heatmap_union}) AS all_bins
+        #     GROUP BY h3_index
+        #     ON CONFLICT (h3_index)
+        #     DO UPDATE SET
+        #         traversal_count = route_heatmap_bins.traversal_count + EXCLUDED.traversal_count,
+        #         contains_airport = route_heatmap_bins.contains_airport OR EXCLUDED.contains_airport;
+        # """)
+        # conn.commit()
 
+        # for i in range(num_workers):
+        #     cur.execute(f"DROP TABLE IF EXISTS route_heatmap_bins_{i} CASCADE;")
+
+        # conn.commit()
+        # log(f"finished heatmap merge")
         # -------------------------
         # SEGMENTS MERGE
         # -------------------------
-        segments_union = " UNION ALL ".join(
-            f"SELECT start_bin, end_bin, transition_count "
-            f"FROM route_segments_{i}"
-            for i in range(num_workers)
-        )
+        for i in range(num_workers):
 
-        cur.execute(f"""
-            INSERT INTO route_segments (start_bin, end_bin, transition_count)
-            SELECT
-                start_bin,
-                end_bin,
-                SUM(transition_count)
-            FROM ({segments_union}) AS all_segments
-            GROUP BY start_bin, end_bin
-            ON CONFLICT (start_bin, end_bin)
-            DO UPDATE SET
-                transition_count =
-                    route_segments.transition_count + EXCLUDED.transition_count;
-        """)
+            log(f"merging segment worker {i}")
+
+            cur.execute(f"""
+                INSERT INTO route_segments (
+                    start_bin,
+                    end_bin,
+                    transition_count
+                )
+                SELECT
+                    start_bin,
+                    end_bin,
+                    transition_count
+                FROM route_segments_{i}
+
+                ON CONFLICT (start_bin, end_bin)
+                DO UPDATE SET
+                    transition_count =
+                        route_segments.transition_count
+                        + EXCLUDED.transition_count
+            """)
+
+            conn.commit()
+     
+        for i in range(num_workers):
+            cur.execute(f"DROP TABLE IF EXISTS route_segments_{i} CASCADE;")
         conn.commit()
+
+        log(f"finished route segment merge")
 
         # -------------------------
         # STATS MERGE
         # -------------------------
-        stats_union = " UNION ALL ".join(
-            f"""
-            SELECT 
-                start_bin,
-                end_bin,
-                aircraft_type,
-                altitude_band,
-                gnd_speed_sum,
-                gnd_speed_count,
-                vert_rate_sum,
-                vert_rate_count,
-                ias_sum,
-                ias_count,
-                heading_sin_sum,
-                heading_cos_sum,
-                heading_count
-            FROM route_segment_stats_{i}
-            """
-            for i in range(num_workers)
-        )
-
-        cur.execute(f"""
-            INSERT INTO route_segment_stats (
-                start_bin,
-                end_bin,
-                aircraft_type,
-                altitude_band,
-                gnd_speed_sum,
-                gnd_speed_count,
-                vert_rate_sum,
-                vert_rate_count,
-                ias_sum,
-                ias_count,
-                heading_sin_sum,
-                heading_cos_sum,
-                heading_count
-            )
-            SELECT
-                start_bin,
-                end_bin,
-                aircraft_type,
-                altitude_band,
-                SUM(gnd_speed_sum),
-                SUM(gnd_speed_count),
-                SUM(vert_rate_sum),
-                SUM(vert_rate_count),
-                SUM(ias_sum),
-                SUM(ias_count),
-                SUM(heading_sin_sum),
-                SUM(heading_cos_sum),
-                SUM(heading_count)
-            FROM ({stats_union}) AS all_stats
-            GROUP BY start_bin, end_bin, aircraft_type, altitude_band
-            ON CONFLICT (start_bin, end_bin, aircraft_type, altitude_band)
-            DO UPDATE SET
-                gnd_speed_sum = route_segment_stats.gnd_speed_sum + EXCLUDED.gnd_speed_sum,
-                gnd_speed_count = route_segment_stats.gnd_speed_count + EXCLUDED.gnd_speed_count,
-                vert_rate_sum = route_segment_stats.vert_rate_sum + EXCLUDED.vert_rate_sum,
-                vert_rate_count = route_segment_stats.vert_rate_count + EXCLUDED.vert_rate_count,
-                ias_sum = route_segment_stats.ias_sum + EXCLUDED.ias_sum,
-                ias_count = route_segment_stats.ias_count + EXCLUDED.ias_count,
-                heading_sin_sum = route_segment_stats.heading_sin_sum + EXCLUDED.heading_sin_sum,
-                heading_cos_sum = route_segment_stats.heading_cos_sum + EXCLUDED.heading_cos_sum,
-                heading_count = route_segment_stats.heading_count + EXCLUDED.heading_count;
-        """)
-
-        conn.commit()
+        log(f"starting route stats merge")
 
         for i in range(num_workers):
 
-            cur.execute(f"DROP TABLE IF EXISTS route_heatmap_bins_{i} CASCADE;")
-            cur.execute(f"DROP TABLE IF EXISTS route_segments_{i} CASCADE;")
+            log(f"merging stats worker {i}")
+
+            cur.execute(f"""
+                INSERT INTO route_segment_stats (
+                    start_bin,
+                    end_bin,
+                    aircraft_type,
+                    altitude_band,
+                    gnd_speed_sum,
+                    gnd_speed_count,
+                    vert_rate_sum,
+                    vert_rate_count,
+                    ias_sum,
+                    ias_count,
+                    heading_sin_sum,
+                    heading_cos_sum,
+                    heading_count
+                )
+                SELECT
+                    start_bin,
+                    end_bin,
+                    aircraft_type,
+                    altitude_band,
+                    gnd_speed_sum,
+                    gnd_speed_count,
+                    vert_rate_sum,
+                    vert_rate_count,
+                    ias_sum,
+                    ias_count,
+                    heading_sin_sum,
+                    heading_cos_sum,
+                    heading_count
+                FROM route_segment_stats_{i}
+                ON CONFLICT (start_bin, end_bin, aircraft_type, altitude_band) DO UPDATE SET
+                    gnd_speed_sum = route_segment_stats.gnd_speed_sum + EXCLUDED.gnd_speed_sum,
+                    gnd_speed_count = route_segment_stats.gnd_speed_count + EXCLUDED.gnd_speed_count,
+                    vert_rate_sum = route_segment_stats.vert_rate_sum + EXCLUDED.vert_rate_sum,
+                    vert_rate_count = route_segment_stats.vert_rate_count + EXCLUDED.vert_rate_count,
+                    ias_sum = route_segment_stats.ias_sum + EXCLUDED.ias_sum,
+                    ias_count = route_segment_stats.ias_count + EXCLUDED.ias_count,
+                    heading_sin_sum = route_segment_stats.heading_sin_sum + EXCLUDED.heading_sin_sum,
+                    heading_cos_sum = route_segment_stats.heading_cos_sum + EXCLUDED.heading_cos_sum,
+                    heading_count = route_segment_stats.heading_count + EXCLUDED.heading_count;
+            """)
+
+            conn.commit()
+
+        for i in range(num_workers):
             cur.execute(f"DROP TABLE IF EXISTS route_segment_stats_{i} CASCADE;")
+        conn.commit()
 
     conn.commit()
+    log(f"finished route stats merge")
 
     log(f"finished final merge")
 
@@ -1407,4 +1405,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    with get_conn() as conn:
+        merge_worker_tables(conn, 6)
+    #main()

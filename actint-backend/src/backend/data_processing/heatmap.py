@@ -7,7 +7,7 @@ def fetch_heatmap():
         with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
             cur.execute("""
                 SELECT lat_center, lon_center, traversal_count
-                FROM heatmap_h3_res6_routes
+                FROM route_heatmap_bins
             """)
             rows = cur.fetchall()
 
@@ -20,7 +20,7 @@ def fetch_heatmap():
     if max_val <= 0:
         return []
 
-    NOISE_FLOOR = 200/max_val #if a bin has less than n planes ignore it
+    NOISE_FLOOR = 10/max_val #if a bin has less than n planes ignore it
     NOISE_CEILING = 0.75 #trying to get rid of hot spots for visualization
 
     points = []
