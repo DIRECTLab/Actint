@@ -16,8 +16,9 @@ by file path.
 
 ## Setup
 
+### 1. Create Conda Environment
 Create a Python 3.12 environment and install the backend package in
-editable mode from the repository root:
+editable mode from the root folder of the project (`Actint/`):
 
 ```bash
 conda create -n actint python=3.12 -y
@@ -25,65 +26,65 @@ conda activate actint
 pip install -e ./actint-backend
 ```
 
-After installation, run backend modules using package-style execution. For
-example:
+### 2. Setup `.env` Files
+
+Create a `actint-backend/.env` file based on `actint-backend/.env.example`.
+
+Also, create a `frontend/.env` file based on `frontend/.env.example`.
+
+### 3. Start Backend
+
+Start the local inference server by running `start-inference.sh`:
 
 ```bash
-python -m backend.benchmarking.benchmark_agents --run-all-benchmarks
-python -m backend.agent.agent
+actint-backend/start-inference.sh
 ```
 
-To run the websocket / LLM backend server:
+Then, in another terminal, start the websocket server:
 
 ```bash
-python -m backend.transport.web_socket
+python -m backend.transport.start_web_socket
 ```
 
-You can also launch the ASGI app directly with Uvicorn:
-
-```bash
-uvicorn backend.transport.web_socket:app --host 0.0.0.0 --port 3050
-```
-
-If you want to launch the Phoenix telemetry server:
+#### Phoenix Telemetry Server (Optional)
+If you want to launch the Phoenix telemetry server to see agent logs more easily:
 
 ```bash
 python -m phoenix.server.main serve
 ```
 
-### Backend-specific docs
+Then go to http://localhost:6006/ in your browser.
 
-For backend-specific install and usage details, see `backend/README.md`.
-
-## Frontend
-
-The frontend is a separate Next.js app in `frontend/`.
-
+### 4. Start Frontend
+Setup the frontend React app by going to `frontend/` and `npm install`:
 ```bash
 cd frontend
-npm install
+npm install --save
+```
+
+Then to launch the app run:
+```bash
 npm run dev
 ```
 
-The backend and frontend are intentionally separated: the backend package
-lives under `backend/` and is installed independently, while the frontend
-is managed by its own Node.js toolchain.
+### Backend-Specific docs
 
-## How to Run Things
+For backend-specific install and usage details, see [actint-backend/README.md](actint-backend/README.md).
 
-To experiment with the backend without the frontend:
+## How to Run Without Frontend
 
-- Run backend modules with `python -m backend...`
-- Run the websocket / LLM backend with
-  `python -m backend.transport.web_socket`
-- Use `python -m phoenix.server.main serve` if you need Phoenix telemetry
+You can use the app through a terminal interface using the `backend.terminal` module.
 
-To run the frontend interface:
-
-- Start it from `frontend/` with `npm run dev`
+See instructions here: [terminal.md](actint-backend/src/backend/terminal.md)
 
 ## Notes
 
+- You can run other backend modules using package-style execution. For
+example:
+  ```bash
+  python -m backend.benchmarking.benchmark_agents --run-all-benchmarks
+  python -m backend.agent.agent
+  ```
 - Install the backend package before running modules so Python can resolve
   imports from the `backend` package correctly.
 - Do not run backend modules by file path, for example:

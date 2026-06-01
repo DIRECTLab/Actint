@@ -68,13 +68,13 @@ python -m backend.agent.agent
 To run the websocket / LLM backend server:
 
 ```bash
-python -m backend.transport.web_socket
+python -m backend.transport.start_web_socket
 ```
 
 If needed, you can also run the ASGI app with Uvicorn:
 
 ```bash
-uvicorn backend.transport.web_socket:app --host 0.0.0.0 --port 3050
+uvicorn backend.transport.start_web_socket:app --host 0.0.0.0 --port 3050
 ```
 
 ## Example Import

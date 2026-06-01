@@ -1,7 +1,7 @@
 # backend/agent/agent.py
 import os
 import asyncio
-from smolagents import ToolCallingAgent, TransformersModel, MCPClient, AgentMaxStepsError, ActionStep, TaskStep, OpenAIModel
+from smolagents import ToolCallingAgent, MCPClient, AgentMaxStepsError, ActionStep, TaskStep, OpenAIModel
 from mcp import StdioServerParameters
 import sys
 from pathlib import Path
@@ -21,7 +21,7 @@ def is_port_in_use(port: int) -> bool:
 
 
 if is_port_in_use(4317):
-    register(project_name="Map_Actint")
+    register(project_name="Actint")
     SmolagentsInstrumentor().instrument()
 else:
     print(
@@ -29,7 +29,7 @@ else:
         file=sys.stderr
     )
 
-model_id = config.MODEL_ID
+model_id = config.MODEL_ID or ""
 print("\033[0;34mModel ID: \033[1;34m" + model_id + "\033[0m")
 
 if config.CONDA_PREFIX:
@@ -58,15 +58,10 @@ adsb_server_params = StdioServerParameters(
 adsb_mcp_client = MCPClient(adsb_server_params, structured_output=False)
 adsb_mcp_tools = adsb_mcp_client.get_tools()
 
-# model = TransformersModel(
-#     model_id=model_id,
-#     max_new_tokens=config.MAX_NEW_TOKENS,
-# )
-
 
 model = OpenAIModel(
     model_id="local",
-    api_base=config.LLAMA_BACKEND_SOCKET,
+    api_base=config.INFERENCE_SERVER_URL,
     api_key="dummy"
 )
 

@@ -15,8 +15,8 @@
 - Agent:
   - `python -m backend.agent.agent`
 - Websocket server:
-  - `python -m backend.transport.web_socket`
-  - or: `uvicorn backend.transport.web_socket:app --host 0.0.0.0 --port 3050`
+  - `python -m backend.transport.start_web_socket`
+  - or: `uvicorn backend.transport.start_web_socket:app --host 0.0.0.0 --port 3050`
 - Benchmarks:
   - `python -m backend.benchmarking.benchmark_agents --run-all-benchmarks`
 
