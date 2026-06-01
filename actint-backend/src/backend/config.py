@@ -17,8 +17,8 @@ class Config:
 
     ADSB_DB_NAME: str | None = getenv("ADSB_DB_NAME", None)
     AIS_DB_NAME: str | None = getenv("AIS_DB_NAME", None)
-    SUS_VESSELS_DB_NAME: str | None = getenv("SUS_VESSELS_DB_NAME")
-    REPORTS_DB_NAME: str | None = getenv("REPORTS_DB_NAME")
+    FISHY_VESSELS_DB_NAME: str | None = getenv("FISHY_VESSELS_DB_NAME")
+    FISHY_REPORTS_DB_NAME: str | None = getenv("FISHY_REPORTS_DB_NAME")
     
     # LLM Model Configuration (Hugging Face model ID and generation parameters)
     

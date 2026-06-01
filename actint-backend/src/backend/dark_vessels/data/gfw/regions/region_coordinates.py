@@ -133,4 +133,6 @@ class ShipRegions:
                 return region
 
         # Fallback — remaining ocean-faring coordinates default to pacific
-        return "Failed to identify vessel region"
+        return "Failed_region_identification"
+    
+region_evaluator = ShipRegions()

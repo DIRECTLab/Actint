@@ -96,8 +96,14 @@ VESSEL_TYPE_LABELS = {
 class ActivityIntelligenceClassifier:
 
     def __init__(self):
+
+    # This decides between using XGBoost, LGBMWrapper, and RandomForestClassifier which are all similar python packages for making decisoin trees. It will pick depending on what is on your computer.
         self.activity_clf   = make_activity_classifier(n_classes=len(ACTIVITY_LABELS))
+
+    # almost the exact same thing, but it has a couple different parameters for the 
         self.vessel_clf     = make_type_classifier(n_classes=len(VESSEL_TYPE_LABELS))
+
+        # This encodes strings/labels as numbers and has a couple methods that can classify labels, count the number of each label and inverse classify them (get the label from the number.)
         self.activity_enc   = LabelEncoder()
         self.vessel_enc     = LabelEncoder()
         self._trained       = False
@@ -106,20 +112,28 @@ class ActivityIntelligenceClassifier:
     # Training
     # ------------------------------------------------------------------
 
+    # This basically adds the vessel features matched with the vessels and the activity features matched with the true activity.
     def fit(self, feat_df: pd.DataFrame) -> "ActivityIntelligenceClassifier":
         """Train on feature DataFrame (must include true_activity and vessel_type_key)."""
         feat_df = feat_df.dropna(subset=["true_activity", "vessel_type_key"])
 
         # Activity model
+
+        #selects all the activity vessels for everything with a true activity, and then it selects all the true activities. 
+
         act_mask = feat_df["true_activity"].isin(ACTIVITY_LABELS)
         X_act = feat_df.loc[act_mask, ACTIVITY_FEATURES].fillna(0).values
         y_act = feat_df.loc[act_mask, "true_activity"].values
         if len(X_act) > 0:
+
+            # This is what actually is doing the training. Adds the labels and features to the model.
             self.activity_clf.fit(X_act, y_act)
             # Keep LabelEncoder in sync for evaluate()
             self.activity_enc.fit(y_act)
 
         # Vessel type model
+
+        # selects the vessel type features and vessel type values for all the vessles.
         vt_mask = feat_df["vessel_type_key"].isin(VESSEL_TYPE_LABELS)
         X_vt = feat_df.loc[vt_mask, VESSEL_TYPE_FEATURES].fillna(0).values
         y_vt = feat_df.loc[vt_mask, "vessel_type_key"].values
@@ -159,9 +173,10 @@ class ActivityIntelligenceClassifier:
                 results[f"prob_{cls}"] = act_prob[:, i]
 
         # Risk scores
-        results["dark_vessel_risk"]      = self._dark_risk(feat_df)
-        results["iuu_fishing_risk"]      = self._iuu_risk(feat_df, results)
-        results["sts_evasion_risk"]      = self._sts_risk(feat_df, results)
+        results["dark_vessel_risk"]      = self._dark_risk(feat_df)             # The risk of going dark, this is not computed using AI, it is just math.
+        results["iuu_fishing_risk"]      = self._iuu_risk(feat_df, results)     # These other two are calculated in similar ways. They use the activity identified 
+        results["sts_evasion_risk"]      = self._sts_risk(feat_df, results)     # by the AI model and then use those to determine if they could beillegally fishing or if they havea high probability of going dark and whatever.
+                                                                                # STS is ship to ship risk (or rendesvous risk)
         results["overall_anomaly_score"] = results[
             ["dark_vessel_risk", "iuu_fishing_risk", "sts_evasion_risk"]
         ].max(axis=1)

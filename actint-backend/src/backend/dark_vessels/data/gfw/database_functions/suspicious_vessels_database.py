@@ -1,29 +1,13 @@
 import json
 
-from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_position_history_helper, query_static_data_helper
+from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_position_history_helper, query_static_data_helper, get_all_latest_detections_helper
 from backend.config import config
 import psycopg
-from backend.dark_vessels.src.regions import REGIONS
+from backend.dark_vessels.data.gfw.regions.region_coordinates import region_evaluator
 from backend.dark_vessels.data.gfw.ship_types import AIS_COUNTRY_CODES, AIS_VESSEL_TYPE_CODES
-import pandas as pd
 
 
-def get_suspicious_tables():
-    conn = connect_to_suspicious_db()
-    cursor = conn.cursor()
-    # Get all region tables
-
-    cursor.execute("""
-        SELECT table_name FROM information_schema.tables
-        WHERE table_schema = 'public'
-    """)
-    tables = cursor.fetchall()
-    conn.close()
-    return [table[0] for table in tables]
-    
-
-
-def connect_to_suspicious_db():
+def _connect_to_suspicious_db():
     try:
         # Read environment variables
         db_config = {
@@ -47,29 +31,35 @@ def connect_to_suspicious_db():
         print(e)
 
 
+def _get_suspicious_tables():
+    conn = _connect_to_suspicious_db()
+    cursor = conn.cursor()
+    # Get all region tables
+
+    cursor.execute("""
+        SELECT table_name FROM information_schema.tables
+        WHERE table_schema = 'public'
+    """)
+    tables = cursor.fetchall()
+    conn.close()
+    return [table[0] for table in tables]
+\
+
 def get_ais_in_region(region: str):
     
-    latest_locations = get_all_vessels_latest_location()
-    bounding_box = REGIONS[region]["bbox"]
-    lon_min = bounding_box[0]
-    lat_min = bounding_box[1]
-    lon_max = bounding_box[2]
-    lat_max = bounding_box[3]
-
-    mmsis_in_region = []
-    for location in latest_locations:
-        lat = location['lat']; lon = location['lon']
-        if lat and lon:
-            if lat > lat_min and lat < lat_max and lon > lon_min and lon < lon_max:
-                mmsis_in_region.append(location['mmsi'])
-
+    latest_locations = get_all_latest_detections_helper()
     vessels_in_region_data = []
-    for mmsi in mmsis_in_region:
-        static_data = query_static_data_helper({"mmsi": mmsi})
-
-        dynamic_data = get_vessel_position_history_helper(mmsi)
-        vessels_in_region_data.append({"static_data": static_data, "dynamic_data": dynamic_data})
-
+    for vessel in latest_locations:
+        lat = vessel['lat']
+        lon = vessel['lon']
+        vessel_region = region_evaluator.evaluate_region(lat, lon)
+        if vessel_region == region:
+            static_data = query_static_data_helper({'mmsi': vessel['mmsi']})
+            position_history = get_vessel_position_history_helper(vessel['mmsi'])
+            vessels_in_region_data.append({
+                "static_data": static_data,
+                "dynamic_data": position_history
+            })
     return vessels_in_region_data
 
 
@@ -111,8 +101,10 @@ def prepare_data_for_ML(data):
 
         return prepared_ship_data
 
-def edit_create_sus_vessels(static_data, latest_detection, region, reasons_sus):
-    conn = connect_to_suspicious_db()
+
+def edit_create_sus_vessels(static_data, latest_detection, reasons_sus):
+    region = region_evaluator.evaluate_region(latest_detection['lat'], latest_detection['lon'])
+    conn = _connect_to_suspicious_db()
     cursor = conn.cursor()
     cursor.execute(f"""
         CREATE TABLE IF NOT EXISTS {region} (
@@ -136,10 +128,8 @@ def edit_create_sus_vessels(static_data, latest_detection, region, reasons_sus):
             first_seen TIMESTAMP
         )
     """)
-
     cursor.execute(f"SELECT * FROM {region} WHERE mmsi = %s", (static_data['mmsi'],))
     results = cursor.fetchone()
-
     if results:
         # Edit the existing entry
         cursor.execute(f"""
@@ -215,10 +205,10 @@ def edit_create_sus_vessels(static_data, latest_detection, region, reasons_sus):
 
 
 def remove_suspicious_vessel(mmsi: int):
-    conn = connect_to_suspicious_db()
+    conn = _connect_to_suspicious_db()
     cursor = conn.cursor()
 
-    tables = get_suspicious_tables()
+    tables = _get_suspicious_tables()
     for (table,) in tables:
         cursor.execute(f"DELETE FROM {table} WHERE mmsi = %s", (mmsi,))
 
@@ -236,7 +226,6 @@ if __name__ == "__main__":
     latest_detection = get_vessel_latest_location_helper(209641000)
 
     # edit_create_sus_vessels(static_data, latest_detection, "Pacific_Ocean", "illegal fishing")
-    print(get_suspicious_tables())
     
 
 
