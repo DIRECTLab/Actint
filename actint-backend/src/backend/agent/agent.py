@@ -59,6 +59,8 @@ adsb_mcp_client = MCPClient(adsb_server_params, structured_output=False)
 adsb_mcp_tools = adsb_mcp_client.get_tools()
 
 
+print(f"""\033[1;32mConnecting to remote inference server {config.INFERENCE_SERVER_URL}\033[0m""", file=sys.stderr)
+
 model = OpenAIModel(
     model_id="local",
     api_base=config.INFERENCE_SERVER_URL,
