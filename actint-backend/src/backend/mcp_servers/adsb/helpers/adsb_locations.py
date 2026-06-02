@@ -10,13 +10,15 @@ All public helpers open/close their own DB connections by default (like AIS).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from backend.mcp_servers.adsb.helpers.basic_tools import normalize_icao
 from backend.mcp_servers.utils.distance_calculation import haversine_distance_nm
 
 from backend.data_processing.query_database import DatabaseConnectionTypes, get_conn
+
+_DEFAULT_LOOKBACK_MONTHS = 6  # change to 1 when live data is flowing
 
 
 @dataclass
@@ -76,7 +78,8 @@ def get_vehicle_locations(
 ) -> list[AircraftPosition]:
     """Get recent ADS-B positions for an aircraft.
 
-    Returns a list sorted newest-first.
+    Always applies a time lower-bound so Postgres can prune partitions
+    on the partitioned adsb_positions table.
     """
 
     icao_n = normalize_icao(icao)
@@ -88,20 +91,34 @@ def get_vehicle_locations(
     if limit > 5000:
         limit = 5000
 
-    sql = (
-        "SELECT "
-        + ", ".join(_POSITION_COLUMNS)
-        + " FROM adsb_positions "
-        "WHERE icao = %s "
-        "AND (%s IS NULL OR timestamp >= %s) "
-        "AND (%s IS NULL OR timestamp <= %s) "
-        "ORDER BY timestamp DESC "
-        "LIMIT %s;"
+    from datetime import timezone
+
+    effective_start = start_time or (
+        datetime.now(tz=timezone.utc) - timedelta(days=30 * lookback_months)
+    )
+
+    params: list[Any] = [icao_n, effective_start]
+
+    end_clause = ""
+    if end_time:
+        end_clause = " AND timestamp <= %s"
+        params.append(end_time)
+
+    params.append(limit)
+
+    query = (
+        "SELECT " + ", ".join(_POSITION_COLUMNS) +
+        " FROM adsb_positions"
+        " WHERE icao = %s"
+        " AND timestamp >= %s"
+        + end_clause +
+        " ORDER BY timestamp DESC"
+        " LIMIT %s;"
     )
 
     with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (icao_n, start_time, start_time, end_time, end_time, limit))
+            cur.execute(query, params)
             colnames = [d.name for d in cur.description]
             rows = [dict(zip(colnames, r)) for r in cur.fetchall()]
 
@@ -125,28 +142,28 @@ def get_track_summary(icao: str, lookback_hours: float = 6.0) -> dict:
     if lookback_hours <= 0:
         lookback_hours = 6.0
 
-    sql = """
+    query = """
         SELECT
-            MIN(timestamp) AS start_time,
-            MAX(timestamp) AS end_time,
-            COUNT(*) AS points,
-            MIN(altitude) AS min_altitude,
-            MAX(altitude) AS max_altitude,
-            MIN(lat) AS min_lat,
-            MAX(lat) AS max_lat,
-            MIN(lon) AS min_lon,
-            MAX(lon) AS max_lon,
+            MIN(timestamp)    AS start_time,
+            MAX(timestamp)    AS end_time,
+            COUNT(*)          AS points,
+            MIN(altitude)     AS min_altitude,
+            MAX(altitude)     AS max_altitude,
+            MIN(lat)          AS min_lat,
+            MAX(lat)          AS max_lat,
+            MIN(lon)          AS min_lon,
+            MAX(lon)          AS max_lon,
             AVG(ground_speed) AS avg_ground_speed
         FROM adsb_positions
         WHERE icao = %s
-          AND timestamp >= NOW() - (%s || ' hours')::interval;
+          AND timestamp >= NOW() - make_interval(hours => %s);
     """
 
     with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (icao_n, lookback_hours))
-            row = cur.fetchone()
+            cur.execute(query, (icao_n, lookback_hours))
             colnames = [d.name for d in cur.description]
+            row = cur.fetchone()
 
     result = dict(zip(colnames, row)) if row else {}
     result["icao"] = icao_n

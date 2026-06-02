@@ -50,13 +50,21 @@ from backend.mcp_servers.adsb.helpers.basic_tools import (
     count_rows,
     describe_table,
     execute_readonly_query,
-    get_conn,
     list_tables,
+)
+from backend.data_processing.query_database import (
+    DatabaseConnectionTypes,
+    get_conn as _get_raw_conn,
 )
 from backend.mcp_servers.adsb.helpers.icao_to_reg_country import icao_to_country
 
 
 mcp = FastMCP("ADSB Aircraft Intelligence", "0.1.0")
+
+
+def _get_conn():
+    """Always returns a connection to the ADSB database."""
+    return _get_raw_conn(DatabaseConnectionTypes.ADSB)
 
 
 def _json_default(obj: Any):
@@ -336,7 +344,7 @@ def list_adsb_tables() -> str:
     """List public tables in the ADS-B Postgres database."""
 
     try:
-        with get_conn() as conn:
+        with _get_conn() as conn:
             tables = list_tables(conn)
         return _dumps({"table_count": len(tables), "tables": tables})
     except Exception as e:
@@ -348,7 +356,7 @@ def describe_adsb_table(table_name: str) -> str:
     """Describe a Postgres table (columns, types, nullable)."""
 
     try:
-        with get_conn() as conn:
+        with _get_conn() as conn:
             columns = describe_table(conn, table_name)
         return _dumps({"table": table_name, "columns": columns})
     except Exception as e:
@@ -360,7 +368,7 @@ def count_adsb_rows(table_name: str) -> str:
     """Count rows in a table."""
 
     try:
-        with get_conn() as conn:
+        with _get_conn() as conn:
             n = count_rows(conn, table_name)
         return _dumps({"table": table_name, "row_count": n})
     except Exception as e:
@@ -389,7 +397,7 @@ def query_adsb_database(sql_query: str, params_json: str | None = None, max_rows
                 return _dumps({"error": "params_json must be a JSON array"})
             params = parsed
 
-        with get_conn() as conn:
+        with _get_conn() as conn:
             rows = execute_readonly_query(conn, sql_query, params=params, max_rows=max_rows_i)
 
         columns = sorted({k for r in rows for k in r.keys()})
@@ -411,4 +419,19 @@ def query_adsb_database(sql_query: str, params_json: str | None = None, max_rows
 
 
 if __name__ == "__main__":
+    import sys
+
+    try:
+        with _get_conn() as conn:
+            with conn.cursor() as cur:
+                # SELECT 1 just validates the connection — never touches adsb_positions
+                cur.execute("SELECT 1;")
+        print("[ADSB MCP] DB connection OK.", file=sys.stderr)
+    except Exception as e:
+        print(
+            f"[ADSB MCP] STARTUP FAILED — DB connection error: {e}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     mcp.run()
