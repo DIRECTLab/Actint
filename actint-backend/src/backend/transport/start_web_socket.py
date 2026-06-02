@@ -1,6 +1,8 @@
 from datetime import datetime
 import asyncio
 
+import argparse
+
 from backend.agent.agent import create_agent, query_agent_instance
 import uvicorn
 from backend.config import config
@@ -65,4 +67,14 @@ async def handle_agent_query(sid, data):
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=config.WEB_SOCKET_PORT)
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-p",
+        "--port",
+        type=int,
+        default=config.WEB_SOCKET_PORT,
+        help="Port to run the server on",
+    )
+    args = parser.parse_args()
+
+    uvicorn.run(app, host="0.0.0.0", port=args.port)
