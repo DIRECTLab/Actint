@@ -44,6 +44,17 @@ export default function Trajectory({ lat, lon, degree, distance_nm }: props) {
 
 const geod = Geodesic.WGS84;
 
+interface DirectResult {
+  lat1: number;
+  lon1: number;
+  azi1: number;
+  s12: number;
+  a12: number;
+  lat2: number;
+  lon2: number;
+  azi2: number;
+}
+
 function projectPoint(
   lat: number,
   lon: number,
@@ -53,14 +64,15 @@ function projectPoint(
   // Convert nautical miles to meters
   const distanceMeters = distanceNm * 1852;
 
+  // Use type assertion to tell TypeScript the result contains lat2 and lon2
   const result = geod.Direct(
     lat,
     lon,
     bearing,
     distanceMeters
-  );
-  return [result.lat2, result.lon2]
-  
+  ) as unknown as DirectResult;
+
+  return [result.lat2, result.lon2];
 }
 
 function generateLinePoints(
