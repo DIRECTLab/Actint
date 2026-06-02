@@ -50,7 +50,7 @@ def stream_segments(conn):
 
         cur.execute("""
             SELECT start_bin, end_bin, transition_count
-            FROM route_segments_0
+            FROM route_segments
         """)
 
         while True:
@@ -71,6 +71,7 @@ def get_connected_neighbors(cell, conn):
     """
 
     pot_neighbors = h3.grid_ring(cell, 1)
+    #print(f"potential neighbors: {pot_neighbors}")
     neighbors = []
     neigh_count = 0
 
@@ -84,7 +85,7 @@ def get_connected_neighbors(cell, conn):
                 FROM route_segments
                 WHERE start_bin = %s
                 AND end_bin = %s
-            """, (cell, int_pot_neigh))
+            """, (int(cell,16), int_pot_neigh))
 
             row = cur.fetchone()
 
@@ -95,7 +96,102 @@ def get_connected_neighbors(cell, conn):
     return neighbors, neigh_count
 
 
-        
+
+def get_neighbor_chain(start_cell, conn):
+    """
+    Returns an ordered chain of connected cells.
+
+    Assumes:
+    - interior chain nodes have exactly 2 neighbors
+    - endpoints have exactly 1 neighbor
+    - branching nodes (>2 neighbors) are invalid
+    """
+
+    def walk_direction(current, previous):
+        """
+        Walk in one direction along the chain.
+
+        Args:
+            current: current cell
+            previous: cell we came from
+        Returns:
+            Ordered list of cells in this direction.
+        """
+
+        result = []
+
+        while True:
+
+            neighbors, count = get_connected_neighbors(current, conn)
+
+            # Invalid topology
+            if count == 0 or count > 2:
+                break
+
+            # Add current cell
+            result.append(current)
+
+            # Endpoint reached
+            if count == 1:
+                break
+
+            # Continue forward
+            next_cells = [
+                n for n in neighbors
+                if n != previous
+            ]
+
+            # Chain broken or loop detected
+            if len(next_cells) != 1:
+                break
+
+            next_cell = next_cells[0]
+
+            previous = current
+            current = next_cell
+
+        return result
+
+    # Get start node neighbors
+    neighbors, count = get_connected_neighbors(start_cell, conn)
+
+    # Isolated node
+    if count == 0:
+        return [start_cell]
+
+    # Invalid branching start
+    if count > 2:
+        return None
+
+    # Start is endpoint
+    if count == 1:
+        forward = walk_direction(neighbors[0], start_cell)
+        return [start_cell] + forward
+
+    # Start is middle node (count == 2)
+    left = walk_direction(neighbors[0], start_cell)
+    right = walk_direction(neighbors[1], start_cell)
+
+    return (
+        list(reversed(left))
+        + [start_cell]
+        + right
+    )
+
+
+def chain_to_latlon(chain):
+
+    result = []
+
+    for item in chain:
+
+        coord = h3.cell_to_latlng(item)
+        result.append(coord)
+        #print(f"{coord[0]:.6f}, {coord[1]:.6f}")
+
+    return result
+
+
 
 CIRC_VAR = 0.8 # value 0-1: 1 means all headings are perfectly aligned 0 means completely inconsistent
 NOISE_FLOOR = 5
@@ -133,7 +229,31 @@ def main():
                 #print(f"Removing: {start_bin},{end_bin} with R = {R} and count = {trans_count}")
                 None
             
-           
+
+def testing_chains():
+
+     with get_conn() as conn:
+
+        #get stream of transitions
+        for start_bin, end_bin, trans_count in stream_segments(conn):
+
+            #print(f"start_bin: {start_bin}")
+            start_cell = str(hex(start_bin))
+            #print(f"start cell: {start_cell}")
+            neighbors, count = get_connected_neighbors(start_cell, conn)
+
+            if count == 2:
+                chain = get_neighbor_chain(start_cell, conn)
+                coords = chain_to_latlon(chain)
+
+                if(len(coords) > 3):
+                    print(f"chain: {chain}")
+                    print(f"final coords:")
+                    for coord in coords:
+                        print(f"{coord[0]:.6f}, {coord[1]:.6f}")
+
+
+
 
 def testing_rdp():
     # input points given as (lon, lat) -> convert to (lat, lon)
@@ -198,6 +318,6 @@ def testing_rdp():
 
 
 if __name__ == "__main__":
-    testing_rdp()
+    testing_chains()
 
 

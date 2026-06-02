@@ -1123,6 +1123,15 @@ def merge_worker_tables(conn, num_workers):
     log(f"starting final merge")
     with conn.cursor() as cur:
 
+        #set timeouts to avoid TCP prunning
+        cur.execute("SET statement_timeout = 0;")
+        cur.execute("SET idle_in_transaction_session_timeout = 0;")
+        cur.execute("SET tcp_keepalives_idle = 60;")      # start probing after 60s idle
+        cur.execute("SET tcp_keepalives_interval = 10;")  # retry every 10s
+        cur.execute("SET tcp_keepalives_count = 5;")      # give up after 5 failed probes
+        cur.execute("SET work_mem = '256MB';")
+        conn.commit()
+        
         #create main tables
 
         cur.execute("""
@@ -1212,36 +1221,36 @@ def merge_worker_tables(conn, num_workers):
         # -------------------------
         # SEGMENTS MERGE
         # -------------------------
-        for i in range(num_workers):
+        # for i in range(num_workers):
 
-            log(f"merging segment worker {i}")
+        #     log(f"merging segment worker {i}")
 
-            cur.execute(f"""
-                INSERT INTO route_segments (
-                    start_bin,
-                    end_bin,
-                    transition_count
-                )
-                SELECT
-                    start_bin,
-                    end_bin,
-                    transition_count
-                FROM route_segments_{i}
+        #     cur.execute(f"""
+        #         INSERT INTO route_segments (
+        #             start_bin,
+        #             end_bin,
+        #             transition_count
+        #         )
+        #         SELECT
+        #             start_bin,
+        #             end_bin,
+        #             transition_count
+        #         FROM route_segments_{i}
 
-                ON CONFLICT (start_bin, end_bin)
-                DO UPDATE SET
-                    transition_count =
-                        route_segments.transition_count
-                        + EXCLUDED.transition_count
-            """)
+        #         ON CONFLICT (start_bin, end_bin)
+        #         DO UPDATE SET
+        #             transition_count =
+        #                 route_segments.transition_count
+        #                 + EXCLUDED.transition_count
+        #     """)
 
-            conn.commit()
+        #     conn.commit()
      
-        for i in range(num_workers):
-            cur.execute(f"DROP TABLE IF EXISTS route_segments_{i} CASCADE;")
-        conn.commit()
+        # for i in range(num_workers):
+        #     cur.execute(f"DROP TABLE IF EXISTS route_segments_{i} CASCADE;")
+        # conn.commit()
 
-        log(f"finished route segment merge")
+        # log(f"finished route segment merge")
 
         # -------------------------
         # STATS MERGE
@@ -1254,34 +1263,18 @@ def merge_worker_tables(conn, num_workers):
 
             cur.execute(f"""
                 INSERT INTO route_segment_stats (
-                    start_bin,
-                    end_bin,
-                    aircraft_type,
-                    altitude_band,
-                    gnd_speed_sum,
-                    gnd_speed_count,
-                    vert_rate_sum,
-                    vert_rate_count,
-                    ias_sum,
-                    ias_count,
-                    heading_sin_sum,
-                    heading_cos_sum,
-                    heading_count
+                    start_bin,end_bin,aircraft_type,altitude_band,
+                    gnd_speed_sum, gnd_speed_count,
+                    vert_rate_sum, vert_rate_count,
+                    ias_sum, ias_count,
+                    heading_sin_sum, heading_cos_sum, heading_count
                 )
                 SELECT
-                    start_bin,
-                    end_bin,
-                    aircraft_type,
-                    altitude_band,
-                    gnd_speed_sum,
-                    gnd_speed_count,
-                    vert_rate_sum,
-                    vert_rate_count,
-                    ias_sum,
-                    ias_count,
-                    heading_sin_sum,
-                    heading_cos_sum,
-                    heading_count
+                    start_bin, end_bin, aircraft_type, altitude_band,
+                    gnd_speed_sum, gnd_speed_count,
+                    vert_rate_sum, vert_rate_count,
+                    ias_sum, ias_count,
+                    heading_sin_sum, heading_cos_sum, heading_count
                 FROM route_segment_stats_{i}
                 ON CONFLICT (start_bin, end_bin, aircraft_type, altitude_band) DO UPDATE SET
                     gnd_speed_sum = route_segment_stats.gnd_speed_sum + EXCLUDED.gnd_speed_sum,
@@ -1403,8 +1396,27 @@ def main():
     #db_writer.join()
 
 
+def test_sql(conn):
+
+    with conn.cursor() as cur:
+        for setting in [
+                "statement_timeout",
+                "idle_in_transaction_session_timeout", 
+                "tcp_keepalives_idle",
+                "tcp_keepalives_interval",
+                "tcp_keepalives_count",
+                "work_mem",
+                "max_parallel_workers_per_gather",
+                "maintenance_work_mem",
+            ]:
+                cur.execute(f"SHOW {setting};")
+                val = cur.fetchone()[0]
+                log(f"{setting} = {val}")
+
 
 if __name__ == "__main__":
+    #test_sql()
+    
     with get_conn() as conn:
         merge_worker_tables(conn, 6)
-    #main()
+    # #main()
