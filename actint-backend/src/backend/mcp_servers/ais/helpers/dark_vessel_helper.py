@@ -1,5 +1,6 @@
 from backend.data_processing.query_database import get_conn, DatabaseConnectionTypes
-from colorama import Fore, Style
+from backend.mcp_servers.utils.distance_calculation import haversine_distance_nm
+#from colorama import Fore, Style #for debugging prints
 
 
 def query_region(region):
@@ -30,10 +31,17 @@ def get_fishy_vessel_locations(region):
     """Get the most recent locations of vessels in a region marked as suspicious based on dark vessel analysis."""
     conn = get_conn(DatabaseConnectionTypes.FISHY_VESSELS)
     cursor = conn.cursor()
-    cursor.execute("SELECT mmsi, lat, lon FROM sampletable WHERE region = %s;", (region,))
+    cursor.execute("SELECT * FROM sampletable WHERE region = %s;", (region,))
     results = cursor.fetchall()
     conn.close()
-    return dict(zip([key[0] for key in cursor.description], results))
+
+    columns = [col[0] for col in cursor.description]
+    detections = [
+        dict(zip(columns, row))
+        for row in results
+    ]
+
+    return detections
 
 
 def find_fishy_clusters(mmsi: str, number_ships: str, region: str) -> str:
@@ -47,10 +55,6 @@ def find_fishy_clusters(mmsi: str, number_ships: str, region: str) -> str:
     primary_lat = primary_ship_location[2]  #TODO: Make it so these don't need to be hardcoded
     primary_lon = primary_ship_location[3]
     distances = []
-
-    #debugging prints
-    #print(Fore.YELLOW + "We made it this far" + Fore.RESET)
-    #print(Fore.LIGHTBLUE_EX + "Detections: " + str(detections) + Fore.RESET)
 
     for detection in detections:
         if detection['mmsi'] == mmsi:
@@ -76,6 +80,7 @@ def find_fishy_clusters(mmsi: str, number_ships: str, region: str) -> str:
     for ship in nearest_ships:
         # determine if the vessel is a fishy vessel
         data = ship["data"]
+
         time_str = data["basedatetime"].strftime("%H:%M:%S") \
             if hasattr(data["basedatetime"], "strftime") \
             else str(data["basedatetime"])
@@ -127,35 +132,53 @@ def run_tests():
     """Run tests for the functions in this file."""
     failed = False
 
+    print("\nRunning tests for dark_vessel_helper.py...\n")
+
     if len(query_region("brazil_eez")) == 0:
-        print(Fore.LIGHTRED_EX + "query_region test failed: No vessels found in region." + Fore.RESET)
+        #print(Fore.LIGHTRED_EX) # uncomment for colour coded terminal output
+        print("query_region test failed: No vessels found in region.")
+        #print (Fore.RESET) # uncomment for colour coded terminal output
         failed = True
     else:
-        print(Fore.LIGHTGREEN_EX + "query_region test passed." + Fore.RESET)
+        #print(Fore.LIGHTGREEN_EX)
+        print("query_region test passed.")
+        #print(Fore.RESET)
 
     if len(query_vessel("steve")) == 0:
-        print(Fore.LIGHTRED_EX + "query_vessel test failed: No vessel with name steve found." + Fore.RESET)
+        #print(Fore.LIGHTRED_EX)
+        print("query_vessel test failed: No vessel with name steve found.")
+        #print(Fore.RESET)
         failed = True
     else:
-        print(Fore.LIGHTGREEN_EX + "query_vessel test passed." + Fore.RESET)
+        #print(Fore.LIGHTGREEN_EX)
+        print("query_vessel test passed.")
+        #print(Fore.RESET)
 
     # get fishy vessel locations
     if len(get_fishy_vessel_locations("brazil_eez")) == 0:
-        print(Fore.LIGHTRED_EX + "get_fishy_vessel_locations test failed: No vessels found in region." + Fore.RESET)
+        #print(Fore.LIGHTRED_EX)
+        print("get_fishy_vessel_locations test failed: No vessels found in region.")
+        #print(Fore.RESET)
         failed = True
     else: 
-        print(Fore.LIGHTGREEN_EX + "get_fishy_vessel_locations test passed." + Fore.RESET)
+        #print(Fore.LIGHTGREEN_EX)
+        print("get_fishy_vessel_locations test passed.")
+        #print(Fore.RESET)
 
     # find fishy clusters
     if len(find_fishy_clusters("9", "5", "brazil_eez")) == 0:
-        print(Fore.LIGHTRED_EX + "find_fishy_clusters test failed: No clusters found." + Fore.RESET)
+        #print(Fore.LIGHTRED_EX)
+        print("find_fishy_clusters test failed: No clusters found.")
+        #print(Fore.RESET)
         failed = True
     else:
-        print(Fore.LIGHTGREEN_EX + "find_fishy_clusters test passed." + Fore.RESET)
+        #print(Fore.LIGHTGREEN_EX)
+        print("find_fishy_clusters test passed.")
+        #print(Fore.RESET)
 
     #TODO: write test for get fishy vessel trajectories
 
     if not failed:
-        print("All tests passed.")
+        print("\nAll tests passed.\n")
 
 run_tests()
