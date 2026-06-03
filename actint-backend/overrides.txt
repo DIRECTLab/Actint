@@ -1,1 +1,1 @@
-smolagents[mcp,transformers,telemetry,toolkit] @ /mnt/smolagents
+smolagents[mcp,telemetry,toolkit] @ /mnt/smolagents
