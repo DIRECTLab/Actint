@@ -82,17 +82,17 @@ class DrawVesselTrajectoryTool(Tool):
         self.sid = sid
         self.sio = sio_instance
 
-    def forward(self, lat, lon, degree, distance_nm) -> str:
+    def forward(self, lat, lon, heading, distance_nm) -> str:
         lat= float(lat)
         lon = float(lon)
         future = asyncio.run_coroutine_threadsafe(
             draw_vessel_trajectory(
-                self.sid, lat=lat, lon=lon, degree=degree, distance_nm=distance_nm,
+                self.sid, lat=lat, lon=lon, heading=heading, distance_nm=distance_nm,
             ),
             get_event_loop(),
         )
         future.result()
-        return (f"Trajectory added to map with position Lat: {lat}, Lon: {lon}, with course {degree} and distance {distance_nm}")
+        return (f"Trajectory added to map with position Lat: {lat}, Lon: {lon}, with course {heading} and distance {distance_nm}")
 
 class DrawRectangleTool(Tool):
     name = "draw_rectangle"
