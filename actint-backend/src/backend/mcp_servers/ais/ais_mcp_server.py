@@ -40,7 +40,7 @@ def _resolve_sqlite_path() -> Path:
 from backend.mcp_servers.ais.helpers.dark_vessel_helper import (
     query_region,
     query_vessel,
-    get_fishy_vessel_locations,
+    get_fishy_vessel_locations_helper,
     find_fishy_clusters,
     get_fishy_vessel_trajectories,
 )
