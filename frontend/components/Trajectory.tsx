@@ -1,21 +1,21 @@
 import { Geodesic } from "geographiclib";
 import { Polyline, Rectangle, Circle } from 'react-leaflet'
-const DEGREE_THRESHOLD = 15
+const HEADING_THRESHOLD = 15
 
 
 type props = {
     lat: number,
     lon: number,
-    degree: number,
+    heading: number,
     distance_nm: number,
 }
 
-export default function Trajectory({ lat, lon, degree, distance_nm }: props) {
-    console.log(lat, lon, degree, distance_nm)
+export default function Trajectory({ lat, lon, heading, distance_nm }: props) {
+    console.log(lat, lon, heading, distance_nm)
     return  (
       <>
         <Polyline
-            positions={generateLinePoints(lat, lon, Number(degree) - DEGREE_THRESHOLD, distance_nm)}
+            positions={generateLinePoints(lat, lon, Number(heading) - HEADING_THRESHOLD, distance_nm)}
             pathOptions={{
                 color: "blue",
                 weight: 5
@@ -23,7 +23,7 @@ export default function Trajectory({ lat, lon, degree, distance_nm }: props) {
         />
 
         <Polyline
-            positions={generateLinePoints(lat, lon, Number(degree) + DEGREE_THRESHOLD, distance_nm)}
+            positions={generateLinePoints(lat, lon, Number(heading) + HEADING_THRESHOLD, distance_nm)}
             pathOptions={{
                 color: "blue",
                 weight: 5
@@ -44,6 +44,17 @@ export default function Trajectory({ lat, lon, degree, distance_nm }: props) {
 
 const geod = Geodesic.WGS84;
 
+interface DirectResult {
+  lat1: number;
+  lon1: number;
+  azi1: number;
+  s12: number;
+  a12: number;
+  lat2: number;
+  lon2: number;
+  azi2: number;
+}
+
 function projectPoint(
   lat: number,
   lon: number,
@@ -53,14 +64,15 @@ function projectPoint(
   // Convert nautical miles to meters
   const distanceMeters = distanceNm * 1852;
 
+  // Use type assertion to tell TypeScript the result contains lat2 and lon2
   const result = geod.Direct(
     lat,
     lon,
     bearing,
     distanceMeters
-  );
-  return [result.lat2, result.lon2]
-  
+  ) as unknown as DirectResult;
+
+  return [result.lat2, result.lon2];
 }
 
 function generateLinePoints(
