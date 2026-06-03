@@ -1,0 +1,1 @@
+smolagents[mcp,telemetry,toolkit] @ /mnt/smolagents

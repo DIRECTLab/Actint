@@ -68,11 +68,11 @@ class AddMarkerTool(Tool):
 
 class DrawVesselTrajectoryTool(Tool):
     name = "draw_vessel_trajectory"
-    description = "Draws the trajectory of a vessel given its position and direction. Draws a specified number of nautical miles out."
+    description = "Draws the trajectory of a vessel given its position and heading. Draws a specified number of nautical miles out."
     inputs = {
         "lat": {"type": "string", "description": "Latitude of marker"},
         "lon": {"type": "string", "description": "Longitude of marker"},
-        "degree": {"type": "string", "description": "Degree of vessel course"},
+        "heading": {"type": "string", "description": "The heading of the vessel in degrees"},
         "distance_nm": {"type": "string", "description": "How far to draw the vessel trajectory in nautical miles"},
     }
     output_type = "string"

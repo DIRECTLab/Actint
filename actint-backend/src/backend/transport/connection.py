@@ -1,4 +1,4 @@
 import socketio
 
 sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins='*')
-app = socketio.ASGIApp(sio)
+app = socketio.ASGIApp(sio, socketio_path="socket.io")
