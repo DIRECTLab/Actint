@@ -1,5 +1,6 @@
 from backend.data_processing.query_database import get_conn, DatabaseConnectionTypes
 from backend.mcp_servers.utils.distance_calculation import haversine_distance_nm
+from backend.dark_vessels.dark_vessel_analysis import run_analysis
 #from colorama import Fore, Style #for debugging prints
 
 
@@ -124,6 +125,22 @@ def get_fishy_vessel_trajectories(region):
         # get trajectory using ship_going tools
 
     pass
+
+
+def get_fishy_hotspots_helper(region):
+    """Identify areas within a region that have a high density of fishy vessels."""
+    # make a list of fishy vessel locations in the region
+    # for each list entry
+        # determine if at least x vessels have been detected within y distance of that location in the past z time
+    # return list of areas that have a high density of fishy vessels
+    pass
+
+
+def re_evaluate_region(region):
+    """Re-run region analysis for fishy vessels."""
+    # visualise can be changed to true if we want the llm to also generate visualisations
+    run_analysis(region, visualise=False)    
+    return
 
 
 def run_tests():
