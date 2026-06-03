@@ -30,7 +30,6 @@ else:
         file=sys.stderr
     )
 
-
 def check_openai_health(api_key="dummy") -> str:
     url = f"{config.INFERENCE_SERVER_URL}/models"
     headers = {"Authorization": f"Bearer {api_key}"}
@@ -72,6 +71,9 @@ adsb_server_params = StdioServerParameters(
 adsb_mcp_client = MCPClient(adsb_server_params, structured_output=False)
 adsb_mcp_tools = adsb_mcp_client.get_tools()
 
+
+print(f"""\033[1;33mChecking connection to llm inference server {config.INFERENCE_SERVER_URL}\033[0m""", file=sys.stderr)
+print(check_openai_health(), file=sys.stderr)
 
 model = OpenAIModel(
     model_id="local",
