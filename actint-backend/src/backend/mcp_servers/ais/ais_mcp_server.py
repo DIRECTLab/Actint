@@ -42,7 +42,6 @@ from backend.mcp_servers.ais.helpers.dark_vessel_helper import (
     query_vessel,
     get_fishy_vessel_locations,
     find_fishy_clusters,
-    re_evaluate_region,
     get_fishy_vessel_trajectories,
 )
 from backend.mcp_servers.ais.helpers.ship_context import (
