@@ -256,13 +256,3 @@ def count_rows(conn, table_name: str) -> int:
     with conn.cursor() as cur:
         cur.execute(q)
         return int(cur.fetchone()[0])
-
-
-
-if __name__ == "__main__":
-    print("testing")
-
-    conn = get_conn(DatabaseConnectionTypes.ADSB)
-    test = get_last_seen_time(conn, '4baad9')
-    print(f"value: {test}")
-    

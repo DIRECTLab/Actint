@@ -93,11 +93,13 @@ def get_vehicle_locations(
 
     from datetime import timezone
 
+    lookback_months = 6
+
     effective_start = start_time or (
         datetime.now(tz=timezone.utc) - timedelta(days=30 * lookback_months)
     )
 
-    params: list[Any] = [icao_n, effective_start]
+    params = [icao_n, effective_start]
 
     end_clause = ""
     if end_time:
