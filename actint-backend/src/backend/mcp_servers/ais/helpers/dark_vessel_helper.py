@@ -31,7 +31,7 @@ def get_fishy_vessel_locations_helper(region):
     """Get the most recent locations of vessels in a region marked as suspicious based on dark vessel analysis."""
     conn = get_conn(DatabaseConnectionTypes.FISHY_VESSELS)
     cursor = conn.cursor()
-    cursor.execute("SELECT name, mmsi, lat, lon FROM sampletable WHERE region = %s;", (region,))
+    cursor.execute("SELECT * FROM sampletable WHERE region = %s;", (region,))
     results = cursor.fetchall()
     conn.close()
 
@@ -89,8 +89,6 @@ def find_fishy_clusters(mmsi: str, number_ships: str, region: str) -> str:
             f"{ship['distance']:<13.3f} | "
             f"{data['lat']:<10.5f} | "
             f"{data['lon']:<11.5f} | "
-            f"{data['sog']:<5.1f} | "
-            f"{data['cog']:<5.1f} | "
             f"{time_str}\n"
         )
     return output

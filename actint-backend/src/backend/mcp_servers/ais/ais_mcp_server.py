@@ -209,9 +209,14 @@ def get_fishy_vessel_locations(region: str):
 @mcp.tool()
 def detect_fishy_clusters(region: str):
     """Detect clusters of vessels in a region that may indicate suspicious activity."""
-    clusters = find_fishy_clusters(region)
-    # turn this into something agent-readable
-    return clusters
+    # we might get rid of this tool and just use the summarise function instead. we'll see which the llm works better with?
+    cluster_size = 5
+    vessel_locations = get_fishy_vessel_locations_helper(region)
+    clusters = []
+    for detection in vessel_locations:
+        clusters.append(find_fishy_clusters(detection['mmsi'], str(cluster_size), region))
+    print(Fore.LIGHTBLUE_EX + f"Found {len(clusters)} clusters of fishy vessels in region {region}." + Fore.RESET)
+    return f"Found {len(clusters)} clusters of fishy vessels in region {region}."
 
 
 @mcp.tool()
