@@ -4,9 +4,8 @@ keep transitions that have a circular variance close to 1 (consistent heading) o
 now we have good cells
 remove redundant info
     if a cell has two neighbors only and the transitions are clean between them both ways list the middle cell for removal and update cell references
-
-
 """
+
 from backend.mcp_servers.adsb.helpers.adsb_locations import get_conn
 from backend.mcp_servers.utils.distance_calculation import rdp
 import h3
@@ -65,7 +64,7 @@ def stream_segments(conn):
 
 
 
-def get_connected_neighbors(cell, conn): 
+def get_connected_neighbors(conn, cell: str, outbound: bool): 
     """
     returns a list of neighbors connected to this cell and the number of connections
     """
@@ -79,13 +78,15 @@ def get_connected_neighbors(cell, conn):
 
         int_pot_neigh =  int(pot_neighbor, 16)
 
+        vars = (int(cell,16), int_pot_neigh) if outbound else (int_pot_neigh, int(cell,16))
+
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT *
                 FROM route_segments
                 WHERE start_bin = %s
                 AND end_bin = %s
-            """, (int(cell,16), int_pot_neigh))
+            """, vars)
 
             row = cur.fetchone()
 
@@ -98,85 +99,84 @@ def get_connected_neighbors(cell, conn):
 
 
 def get_neighbor_chain(start_cell, conn):
-    """
-    Returns an ordered chain of connected cells.
 
-    Assumes:
-    - interior chain nodes have exactly 2 neighbors
-    - endpoints have exactly 1 neighbor
-    - branching nodes (>2 neighbors) are invalid
-    """
-
-    def walk_direction(current, previous):
+    def walk(current, previous, forward):
         """
-        Walk in one direction along the chain.
-
-        Args:
-            current: current cell
-            previous: cell we came from
-        Returns:
-            Ordered list of cells in this direction.
+        direction=True  -> outbound walk
+        direction=False -> inbound walk
         """
 
         result = []
+        visited = set()
 
         while True:
 
-            neighbors, count = get_connected_neighbors(current, conn)
-
-            # Invalid topology
-            if count == 0 or count > 2:
+            if current in visited:
                 break
 
-            # Add current cell
+            visited.add(current)
+
+            out_neighbors, out_count = get_connected_neighbors(conn, current, outbound=True)
+            print(f"chain start cell: {current}")
+            print(f"out_neighs: {out_neighbors}, {out_count}")
+            in_neighbors, in_count = get_connected_neighbors(conn, current, outbound=False)
+            print(f"in_neighs: {in_neighbors}, {in_count}")
+
+            unique_neighbors = set(out_neighbors + in_neighbors)
+
+            # endpoint
+            if out_count != 1 or in_count != 1 or len(unique_neighbors) != 2:
+                break
+
+            if forward:
+                if previous not in in_neighbors:
+                    break
+                next_cell = out_neighbors[0]
+
+            else:
+                if previous not in out_neighbors:
+                    break
+                next_cell = in_neighbors[0]
+
             result.append(current)
-
-            # Endpoint reached
-            if count == 1:
-                break
-
-            # Continue forward
-            next_cells = [
-                n for n in neighbors
-                if n != previous
-            ]
-
-            # Chain broken or loop detected
-            if len(next_cells) != 1:
-                break
-
-            next_cell = next_cells[0]
 
             previous = current
             current = next_cell
 
         return result
 
-    # Get start node neighbors
-    neighbors, count = get_connected_neighbors(start_cell, conn)
+    # start node classification
+    out_neighbors, out_count = get_connected_neighbors(conn, start_cell, outbound=True)
+    in_neighbors, in_count = get_connected_neighbors(conn, start_cell, outbound=False)
 
-    # Isolated node
-    if count == 0:
+    # isolated
+    if out_count + in_count == 0:
         return [start_cell]
 
-    # Invalid branching start
-    if count > 2:
+    # invalid branching start
+    if (out_count != 1 or in_count != 1 or len(set(out_neighbors + in_neighbors)) != 2):
         return None
 
-    # Start is endpoint
-    if count == 1:
-        forward = walk_direction(neighbors[0], start_cell)
-        return [start_cell] + forward
+    print(f"execute backward pass")
+    backward = walk(
+        current=in_neighbors[0],
+        previous=start_cell,
+        forward=False
+    )
 
-    # Start is middle node (count == 2)
-    left = walk_direction(neighbors[0], start_cell)
-    right = walk_direction(neighbors[1], start_cell)
+    print(f"execute forward pass")
+    forward = walk(
+        current=out_neighbors[0],
+        previous=start_cell,
+        forward=True
+    )
 
     return (
-        list(reversed(left))
+        list(reversed(backward))
         + [start_cell]
-        + right
+        + forward
     )
+
 
 
 def chain_to_latlon(chain):
@@ -192,6 +192,13 @@ def chain_to_latlon(chain):
     return result
 
 
+def get_complex_chain(cell):
+    """
+    find a complex chain of cells that make up a route (multiple connections to multiple lanes not strictly 2 conns)
+    """
+
+    #
+
 
 CIRC_VAR = 0.8 # value 0-1: 1 means all headings are perfectly aligned 0 means completely inconsistent
 NOISE_FLOOR = 5
@@ -205,11 +212,22 @@ def main():
 
             #start by simplifying the routes as much as possible (rdp and surrounded to one)
 
-            #if connected_neighbors > 2:
+            #print(f"start_bin: {start_bin}")
+            start_cell = str(hex(start_bin))
+            #print(f"start cell: {start_cell}")
+            neighbors, count = get_connected_neighbors(start_cell, conn)
+
+            if count > 2:
+                None
                 #this is an intersection
-            #elif connected_neighbors == 2:
+            elif count == 2:
                 #this is prime for RDP simplification
-            #else: (1 or 0 connected)
+                chain = get_neighbor_chain(start_cell, conn)
+                coords = chain_to_latlon(chain)
+                simplified_coords = rdp(coords, 0.001)
+
+            else: #(1 or 0 connected)
+                None
                 #end of the line or an island 
             
             #if connected_neighbors == 6:
@@ -232,27 +250,28 @@ def main():
 
 def testing_chains():
 
-     with get_conn() as conn:
+    with get_conn() as conn:
 
         #get stream of transitions
-        for start_bin, end_bin, trans_count in stream_segments(conn):
+        #for start_bin, end_bin, trans_count in stream_segments(conn):
 
             #print(f"start_bin: {start_bin}")
-            start_cell = str(hex(start_bin))
-            #print(f"start cell: {start_cell}")
-            neighbors, count = get_connected_neighbors(start_cell, conn)
+            start_cell = h3.int_to_str(0x87485da99ffffff)
+            print(f"start cell: {start_cell}")
+            out_neighbors, out_count = get_connected_neighbors(conn, start_cell, outbound=True)
+            print(f"out_neighs: {out_neighbors}, {out_count}")
+            in_neighbors, in_count = get_connected_neighbors(conn, start_cell, outbound=False)
+            print(f"in_neighs: {in_neighbors}, {in_count}")
 
-            if count == 2:
+            if out_count == 1 and in_count == 1:
                 chain = get_neighbor_chain(start_cell, conn)
                 coords = chain_to_latlon(chain)
 
-                if(len(coords) > 3):
-                    print(f"chain: {chain}")
-                    print(f"final coords:")
-                    for coord in coords:
-                        print(f"{coord[0]:.6f}, {coord[1]:.6f}")
-
-
+                #if(len(coords) > 15):
+                print(f"chain: {chain}")
+                print(f"final coords:")
+                for coord in coords:
+                    print(f"{coord[0]:.6f}, {coord[1]:.6f}")
 
 
 def testing_rdp():
