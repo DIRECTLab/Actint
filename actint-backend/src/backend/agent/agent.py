@@ -37,7 +37,7 @@ def check_openai_health(api_key="dummy") -> str:
     try:
         response = requests.get(url, headers=headers, timeout=5)
         if response.status_code == 200:
-            return "\033[1;32mAPI is operational and the connection is healthy and serving the following models:\033[0m " + ", ".join([model['id'] for model in response.json().get('data', [])])
+            return "\033[1;32mAPI is operational and the connection is healthy and serving the following models:\033[0m " + "\n- ".join([model['id'] for model in response.json().get('data', [])])
         else:
             return f"\033[31mAPI returned error code: {response.status_code}\033[0m"
     except requests.exceptions.RequestException as e:
@@ -74,7 +74,7 @@ adsb_mcp_client = MCPClient(adsb_server_params, structured_output=False)
 adsb_mcp_tools = adsb_mcp_client.get_tools()
 
 
-print(f"""\033[1;32mConnecting to remote inference server {config.INFERENCE_SERVER_URL}\033[0m""", file=sys.stderr)
+print(f"""\033[1;33mChecking connection to llm inference server {config.INFERENCE_SERVER_URL}\033[0m""", file=sys.stderr)
 print(check_openai_health(), file=sys.stderr)
 
 model = OpenAIModel(
