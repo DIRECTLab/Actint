@@ -181,10 +181,13 @@ def evaluate_vessel_fishiness(vessel_name: str):
 @mcp.tool()
 def get_fishy_vessel_locations(region: str):
     """Get the most recent locations of vessels in a region marked as suspicious and their tradjectories."""
+    result = get_fishy_vessel_locations_helper(region)
     # get info about vessels in the region
     # strip down the info to names and lat/lon
     # return that info in a format that is easy for the llm to use
-    pass
+    for detection in result:
+        print(Fore.LIGHTBLUE_EX + str(detection) + Fore.RESET)
+    return result
 
 
 @mcp.tool()
