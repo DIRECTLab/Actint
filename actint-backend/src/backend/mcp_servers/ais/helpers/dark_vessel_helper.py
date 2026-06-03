@@ -18,7 +18,7 @@ def query_vessel(name):
     """See if a specific vessel is in the list of fishy vessels"""
     conn = get_conn(DatabaseConnectionTypes.FISHY_VESSELS)
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM sampletable WHERE name = %s;", (name,))
+    cursor.execute("SELECT mmsi, dark_risk_score, anomaly_flags FROM sampletable WHERE name = %s;", (name,))
     results = cursor.fetchall()
     conn.close()
     if len(results) == 0:

@@ -189,9 +189,9 @@ def summarise_dark_vessels() -> str:
 @mcp.tool()
 def evaluate_vessel_fishiness(vessel_name: str):
     """Look for a vessel in the fishy vessels database and return if a vessel is fishy and why."""
-    query_vessel(vessel_name)
-    # turn the result of that query into something helpful for the llm
-    pass
+    result = query_vessel(vessel_name)
+    result = f"Vessel {vessel_name} has a dark risk score of {result[0][1]} and the following anomaly flags: {result[0][2]}"
+    return result
 
 
 @mcp.tool()
