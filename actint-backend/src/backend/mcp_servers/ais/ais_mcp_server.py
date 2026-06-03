@@ -212,14 +212,9 @@ def summarise_insecure_areas():
 @mcp.tool()
 def re_evaluate_region(region):
     """Re-run region analysis for fishy vessels."""
-    # run region analysis
+    
     return f"Region {region} has been re-evaluated for fishy vessels."
 
-
-@mcp.tool()
-def evaluate_model_performance():
-    """Evaluate the performance of the fishy vessel detection model using functions from the fishy_vessels repository"""
-    pass
 
 # ============================================================================
 # Health & Info Endpoints
