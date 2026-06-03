@@ -31,7 +31,7 @@ def get_fishy_vessel_locations_helper(region):
     """Get the most recent locations of vessels in a region marked as suspicious based on dark vessel analysis."""
     conn = get_conn(DatabaseConnectionTypes.FISHY_VESSELS)
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM sampletable WHERE region = %s;", (region,))
+    cursor.execute("SELECT name, mmsi, lat, lon FROM sampletable WHERE region = %s;", (region,))
     results = cursor.fetchall()
     conn.close()
 
