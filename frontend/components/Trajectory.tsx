@@ -1,21 +1,21 @@
 import { Geodesic } from "geographiclib";
 import { Polyline, Rectangle, Circle } from 'react-leaflet'
-const DEGREE_THRESHOLD = 15
+const HEADING_THRESHOLD = 15
 
 
 type props = {
     lat: number,
     lon: number,
-    degree: number,
+    heading: number,
     distance_nm: number,
 }
 
-export default function Trajectory({ lat, lon, degree, distance_nm }: props) {
-    console.log(lat, lon, degree, distance_nm)
+export default function Trajectory({ lat, lon, heading, distance_nm }: props) {
+    console.log(lat, lon, heading, distance_nm)
     return  (
       <>
         <Polyline
-            positions={generateLinePoints(lat, lon, Number(degree) - DEGREE_THRESHOLD, distance_nm)}
+            positions={generateLinePoints(lat, lon, Number(heading) - HEADING_THRESHOLD, distance_nm)}
             pathOptions={{
                 color: "blue",
                 weight: 5
@@ -23,7 +23,7 @@ export default function Trajectory({ lat, lon, degree, distance_nm }: props) {
         />
 
         <Polyline
-            positions={generateLinePoints(lat, lon, Number(degree) + DEGREE_THRESHOLD, distance_nm)}
+            positions={generateLinePoints(lat, lon, Number(heading) + HEADING_THRESHOLD, distance_nm)}
             pathOptions={{
                 color: "blue",
                 weight: 5
