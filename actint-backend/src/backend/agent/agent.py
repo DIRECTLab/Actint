@@ -31,19 +31,6 @@ else:
         file=sys.stderr
     )
 
-def check_openai_health(api_key="dummy") -> str:
-    url = f"{config.INFERENCE_SERVER_URL}/models"
-    headers = {"Authorization": f"Bearer {api_key}"}
-    
-    try:
-        response = requests.get(url, headers=headers, timeout=5)
-        if response.status_code == 200:
-            return "\033[1;32mAPI is operational and the connection is healthy and serving the following models:\033[0m " + "\n- ".join([model['id'] for model in response.json().get('data', [])])
-        else:
-            return f"\033[31mAPI returned error code: {response.status_code}\033[0m"
-    except requests.exceptions.RequestException as e:
-        return f"\033[31mNetwork/Connection failure: {str(e)}\033[0m"
-
 
 model_id = config.MODEL_ID or ""
 print("\033[0;34mModel ID: \033[1;34m" + model_id + "\033[0m")
@@ -64,16 +51,12 @@ ais_mcp_client = MCPClient(ais_server_params, structured_output=False)
 ais_mcp_tools = ais_mcp_client.get_tools()
 
 
-# adsb_server_params = StdioServerParameters(
-#     command=python_path,
-#     args=[adsb_mcp_server.__file__],
-#     env=os.environ.copy(),
-#     cwd=os.getcwd()
-# )
-
 _agent_sessions = {}
 
-def get_or_create_agent(session_id: str, additional_tools: list = []) -> ToolCallingAgent:
+
+def get_or_create_agent(
+    session_id: str, additional_tools: list = []
+) -> ToolCallingAgent:
     """Creates or retrieves an agent for a given session, injecting relevant tools."""
     if session_id not in _agent_sessions:
         # Base tools that all agents get (e.g., MCP server tools)
