@@ -41,6 +41,7 @@ from backend.mcp_servers.ais.helpers.dark_vessel_helper import (
     find_fishy_clusters,
     get_fishy_vessel_trajectories,
     get_fishy_hotspots_helper,
+    re_evaluate_region_helper,
 )
 from backend.mcp_servers.ais.helpers.ship_context import (
     get_vessel_general_information_helper,
@@ -138,14 +139,15 @@ def summarise_insecure_areas(region: str):
 @mcp.tool()
 def re_evaluate_region(region):
     """Re-run region analysis for fishy vessels."""
-    
+    re_evaluate_region_helper(region)
     return f"Region {region} has been re-evaluated for fishy vessels."
     
 
 @mcp.tool()
-def run_dark_vessel_startup() -> str:
+def run_dark_vessel_startup(region: str) -> str:
     """Run the dark vessel startup script to analyze dark vessel patterns."""
-    dark_vessel_startup.run()
+    re_evaluate_region(region)
+    return "Dark vessel analysis has been re-run"
 
 
 @mcp.tool()
@@ -517,7 +519,7 @@ def run_dark_vessel_tests():
     # print("get_fishy_vessel_locations: ", get_fishy_vessel_locations("brazil_eez"))
     # print("detect_fishy_clusters: ", detect_fishy_clusters("brazil_eez"))
     print("summarise_insecure_areas: ", summarise_insecure_areas("brazil_eez"))
-    # print("re_evaluate_region: ", re_evaluate_region("brazil_eez"))
+    print("re_evaluate_region: ", re_evaluate_region("brazil_eez"))
 
 
 if __name__ == "__main__":
