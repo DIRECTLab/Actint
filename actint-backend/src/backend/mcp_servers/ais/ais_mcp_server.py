@@ -13,6 +13,7 @@ Tools provided:
 - Destination prediction based on vessel heading
 """
 
+from colorama import Fore, Style #TODO: Remove this before pushing
 from pathlib import Path
 from backend.mcp_servers.ais.helpers.area_context import get_future_intersections_in_area_helper
 from fastmcp import FastMCP
@@ -92,54 +93,65 @@ mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 
 @mcp.tool()
 def summarise_fishy_vessels_in_region(region: str):
-    """Get a summary of vessels in a region marked as suspicious based on dark vessel analysis."""
-    #TODO: Make sure this tool returns something useful for the llm
-    query_region(region)
-    pass
+    """Get a number of vessels in a region marked as fishy and information about clusters of fishy vessels."""
+
+    cluster_size = 5 #TODO: Figure out what this should actually be
+    vessel_locations = get_fishy_vessel_locations_helper(region)
+    number_of_vessels = len(vessel_locations)
+    cluster_info = detect_fishy_clusters(region)
+
+    result = f"Region {region} has {number_of_vessels} vessels marked as suspicious." + cluster_info
+    return result
 
 
 @mcp.tool()
 def evaluate_vessel_fishiness(vessel_name: str):
     """Look for a vessel in the fishy vessels database and return if a vessel is fishy and why."""
-    query_vessel(vessel_name)
-    # turn the result of that query into something helpful for the llm
-    pass
+    result = query_vessel(vessel_name)
+    result = f"Vessel {vessel_name} has a dark risk score of {result[0][1]} and the following anomaly flags: {result[0][2]}"
+    return result
 
 
 @mcp.tool()
 def get_fishy_vessel_locations(region: str):
     """Get the most recent locations of vessels in a region marked as suspicious and their tradjectories."""
+    result = get_fishy_vessel_locations_helper(region)
     # get info about vessels in the region
     # strip down the info to names and lat/lon
     # return that info in a format that is easy for the llm to use
-    pass
+    for detection in result:
+        print(Fore.LIGHTBLUE_EX + str(detection) + Fore.RESET)
+    return result
 
 
 @mcp.tool()
 def detect_fishy_clusters(region: str):
     """Detect clusters of vessels in a region that may indicate suspicious activity."""
-    clusters = find_fishy_clusters(region)
-    # turn this into something agent-readable
-    return clusters
+    # we might get rid of this tool and just use the summarise function instead. we'll see which the llm works better with?
+    cluster_size = 5
+    vessel_locations = get_fishy_vessel_locations_helper(region)
+    clusters = []
+    for detection in vessel_locations:
+        clusters.append(find_fishy_clusters(detection['mmsi'], str(cluster_size), region))
+    print(Fore.LIGHTBLUE_EX + f"Found {len(clusters)} clusters of fishy vessels in region {region}." + Fore.RESET)
+    return f"Found {len(clusters)} clusters of fishy vessels in region {region}."
 
 
 @mcp.tool()
 def summarise_insecure_areas():
     """Give an analysis on what areas experience the most fishy vessel presence."""
-    pass
+    # find fishy clusters
+    # find areas where fishy vessels are often detected
+    # return agent-readable summary
+    return "This tool is still being developed."
 
 
 @mcp.tool()
 def re_evaluate_region(region):
     """Re-run region analysis for fishy vessels."""
-    # run region analysis
+    
     return f"Region {region} has been re-evaluated for fishy vessels."
 
-
-@mcp.tool()
-def evaluate_model_performance():
-    """Evaluate the performance of the fishy vessel detection model using functions from the fishy_vessels repository"""
-    pass
 
 # ============================================================================
 # Health & Info Endpoints
@@ -283,7 +295,7 @@ def get_vessel_general_information(mmsi: str) -> str:
     """Get information about a vessel. This includes the name, time and most rescent location, heading, cargo, course and speed overground, ect.
     
     Args: 
-        mmsi (str): Maritime Mobile Service Identity number of the vessel
+        mmsi (int): Maritime Mobile Service Identity number of the vessel
         
     Returns: 
         str: Informatioon about the vessel
@@ -487,9 +499,18 @@ def get_vessels_in_area(lat: str, lon: str, radius_nm: str):
         return "Error:\n" + str(e)
 
 
+def run_dark_vessel_tests():
+    # print("summarise_fishy_vessels_in_region: " + summarise_fishy_vessels_in_region("brazil_eez"))
+    # print("evaluate_vessel_fishiness: ", evaluate_vessel_fishiness("jane"))
+    # print("get_fishy_vessel_locations: ", get_fishy_vessel_locations("brazil_eez"))
+    # print("detect_fishy_clusters: ", detect_fishy_clusters("brazil_eez"))
+    print("summarise_insecure_areas: ", summarise_insecure_areas())
+    # print("re_evaluate_region: ", re_evaluate_region("brazil_eez"))
+
 # ============================================================================
 # Server Entry Point
 # ============================================================================
 
 if __name__ == "__main__":
-    mcp.run()
+    # mcp.run() # TODO: Uncomment before pushing
+    run_dark_vessel_tests() #TODO: Remove before pushing

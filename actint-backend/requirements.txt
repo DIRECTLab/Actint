@@ -39,11 +39,10 @@ huggingface_hub[mcp]
 #sockets for LLM streaming and data transfer
 python-socketio>=5.15
 
+rapidfuzz>=3.14
+
 # Mario's pipelines
 folium
 seaborn
 scikit-learn
 shapely<=2.1.2
-#gymnasium - uncomment if we are actually going to use train_rl_agent.py
-
-rapidfuzz>=3.14
