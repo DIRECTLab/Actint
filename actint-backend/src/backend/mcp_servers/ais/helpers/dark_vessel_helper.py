@@ -124,16 +124,23 @@ def get_fishy_vessel_trajectories(region):
     # for each vessel
         # get trajectory using ship_going tools
 
-    pass
+    return "this tool (namely, its helper function) is still being developed"
 
 
 def get_fishy_hotspots_helper(region):
     """Identify areas within a region that have a high density of fishy vessels."""
-    # make a list of fishy vessel locations in the region
-    # for each list entry
-        # determine if at least x vessels have been detected within y distance of that location in the past z time
+    detections = get_fishy_vessel_locations_helper(region)
+    for detection in detections:
+        # figure out their trajectory
+        # figure out if that trajectory intercepts any previously detected trajectories
+            # if so, save that point
+        # for each interception point
+            # count how many interception points are surrounding the point within a certain radius
+            # if that number exceeds n
+                # add that point to the list of hotspots
+        pass
     # return list of areas that have a high density of fishy vessels
-    pass
+    return hotspots
 
 
 def re_evaluate_region(region):
