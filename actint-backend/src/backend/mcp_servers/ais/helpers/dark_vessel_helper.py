@@ -130,6 +130,7 @@ def get_fishy_vessel_trajectories(region):
 def get_fishy_hotspots_helper(region):
     """Identify areas within a region that have a high density of fishy vessels."""
     detections = get_fishy_vessel_locations_helper(region)
+    hotspots = "this helper is still being developed"
     for detection in detections:
         # figure out their trajectory
         # figure out if that trajectory intercepts any previously detected trajectories
@@ -143,7 +144,7 @@ def get_fishy_hotspots_helper(region):
     return hotspots
 
 
-def re_evaluate_region(region):
+def re_evaluate_region_helper(region):
     """Re-run region analysis for fishy vessels."""
     # visualise can be changed to true if we want the llm to also generate visualisations
     run_analysis(region, visualise=False)    
