@@ -41,6 +41,7 @@ from backend.mcp_servers.ais.helpers.dark_vessel_helper import (
     get_fishy_vessel_locations_helper,
     find_fishy_clusters,
     get_fishy_vessel_trajectories,
+    get_fishy_hotspots_helper,
 )
 from backend.mcp_servers.ais.helpers.ship_context import (
     get_vessel_general_information_helper,
@@ -76,26 +77,6 @@ mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 #         return get_vessels_last_seen_helper()
 #     except Exception as e:
 #         return "Error:\n" + str(e)
-
-
-# ============================================================================
-# Vessel Information
-# ============================================================================
-
-
-""" This isn't very good, there is too much output, there are too many ships"""
-
-# @mcp.tool()
-# def get_vessels_last_seen():
-#     try: 
-#         return get_vessels_last_seen_helper()
-#     except Exception as e:
-#         return "Error:\n" + str(e)
-
-
-# ============================================================================
-# Vessel Information
-# ============================================================================
 
 
 # ============================================================================
@@ -149,12 +130,10 @@ def detect_fishy_clusters(region: str):
 
 
 @mcp.tool()
-def summarise_insecure_areas():
+def summarise_insecure_areas(region: str):
     """Give an analysis on what areas experience the most fishy vessel presence."""
-    # find fishy clusters
-    # find areas where fishy vessels are often detected
-    # return agent-readable summary
-    return "This tool is still being developed."
+    result = get_fishy_hotspots_helper(region)
+    return result
 
 
 @mcp.tool()
@@ -168,6 +147,7 @@ def re_evaluate_region(region):
 def run_dark_vessel_startup() -> str:
     """Run the dark vessel startup script to analyze dark vessel patterns."""
     dark_vessel_startup.run()
+
 
 @mcp.tool()
 def summarise_dark_vessels() -> str:
@@ -554,7 +534,7 @@ def run_dark_vessel_tests():
     # print("evaluate_vessel_fishiness: ", evaluate_vessel_fishiness("jane"))
     # print("get_fishy_vessel_locations: ", get_fishy_vessel_locations("brazil_eez"))
     # print("detect_fishy_clusters: ", detect_fishy_clusters("brazil_eez"))
-    print("summarise_insecure_areas: ", summarise_insecure_areas())
+    print("summarise_insecure_areas: ", summarise_insecure_areas("brazil_eez"))
     # print("re_evaluate_region: ", re_evaluate_region("brazil_eez"))
 
 
