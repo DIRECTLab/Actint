@@ -28,12 +28,6 @@ else:
         "Phoenix telemetry server is not running on localhost:4317. Skipping instrumentation.",
         file=sys.stderr
     )
-<<<<<<< HEAD
-
-model_id = config.MODEL_ID
-print("Model ID: " + model_id)
-=======
->>>>>>> d8efec1 (Alex/web socket fix (#3))
 
 model_id = config.MODEL_ID
 print("Model ID: " + model_id)
@@ -58,11 +52,6 @@ model = TransformersModel(
     max_new_tokens=config.MAX_NEW_TOKENS,
 )
 
-<<<<<<< HEAD
-_agent_sessions = {}
-
-=======
->>>>>>> d8efec1 (Alex/web socket fix (#3))
 _agent_sessions = {}
 
 
