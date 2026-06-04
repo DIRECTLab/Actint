@@ -1,22 +1,9 @@
-from dataclasses import dataclass
-import os
-
 from dotenv import load_dotenv
+from os import getenv
+from dataclasses import dataclass
 
+# Searches for .env in progressively higher directories until it finds it
 load_dotenv()
-
-
-def env_str(name: str, default: str | None = None) -> str | None:
-    value = os.getenv(name)
-    return default if value is None or value == "" else value
-
-
-def env_int(name: str, default: int | None = None) -> int | None:
-    value = os.getenv(name)
-    if value is None or value == "":
-        return default
-    return int(value)
-
 
 @dataclass(frozen=True)
 class Config:
@@ -25,8 +12,6 @@ class Config:
     # DB Config
     DB_USER: str | None = getenv("DB_USER", None)
     DB_PASS: str | None = getenv("DB_PASS", None)
-    # DB_PORT is set to None if undefined, and errors if set to something that
-    # can't be converted to an int
     DB_PORT: int | None = int(getenv("DB_PORT", None)) if getenv("DB_PORT") else None
     DB_HOST: str | None = getenv("DB_HOST", None)
 
@@ -36,7 +21,20 @@ class Config:
     FISHY_REPORTS_DB_NAME: str | None = getenv("FISHY_REPORTS_DB_NAME")
     
     # LLM Model Configuration (Hugging Face model ID and generation parameters)
-    MODEL_ID: str = getenv("MODEL_ID", "Qwen/Qwen3.5-2B")
-    MAX_NEW_TOKENS: int = int(getenv("MAX_NEW_TOKENS", "4096"))
+    
+    LLAMA_BACKEND_SOCKET: str = "http://127.0.0.1:8000/v1"
+    MAX_AGENT_STEPS: int = 20
+
+
+
+    # Edit and run the following command to start the local llamacpp LLM openAI server
+"""
+    ./llama-server \
+     -m /scratch/username/chat_gpt/gpt-oss-120b-UD-Q8_K_XL-00001-of-00002.gguf # or enter the file path of where your model is located. \
+     -c 131072 # This is the maximum context size \
+     --host 0.0.0.0 # The address where your server is hosted\
+     --port 8000 # Port number \
+     -n 600 # Maximum new tokens to generate, this way it will not get stuck doing something that will infinitely generate tokens.
+"""
     
 config = Config()

@@ -20,14 +20,12 @@ import os
 from pathlib import Path
 from backend.mcp_servers.ais.helpers.area_context import get_future_intersections_in_area_helper
 from fastmcp import FastMCP
-from backend.mcp_servers.ais import dark_vessel_startup
 
 # Database path
 DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
 DB_DIR = DATA_DIR / "db"
 SQLITE_PATH = DB_DIR / "ais.db"
 
-#dark_vessel_startup.run()
 
 def _resolve_sqlite_path() -> Path:
     """Resolve SQLite path, allowing benchmark overrides via env var."""
@@ -184,52 +182,6 @@ def summarise_dark_vessels() -> str:
         return json.dumps(summary, indent=2)
     except Exception as e:
         return json.dumps({"error": str(e)})
-
-
-@mcp.tool()
-def evaluate_vessel_fishiness(vessel_name: str):
-    """Look for a vessel in the fishy vessels database and return if a vessel is fishy and why."""
-    result = query_vessel(vessel_name)
-    result = f"Vessel {vessel_name} has a dark risk score of {result[0][1]} and the following anomaly flags: {result[0][2]}"
-    return result
-
-
-@mcp.tool()
-def get_fishy_vessel_locations(region: str):
-    """Get the most recent locations of vessels in a region marked as suspicious and their tradjectories."""
-    result = get_fishy_vessel_locations_helper(region)
-    # get info about vessels in the region
-    # strip down the info to names and lat/lon
-    # return that info in a format that is easy for the llm to use
-    for detection in result:
-        print(Fore.LIGHTBLUE_EX + str(detection) + Fore.RESET)
-    return result
-
-
-@mcp.tool()
-def detect_fishy_clusters(region: str):
-    """Detect clusters of vessels in a region that may indicate suspicious activity."""
-    # we might get rid of this tool and just use the summarise function instead. we'll see which the llm works better with?
-    cluster_size = 5
-    vessel_locations = get_fishy_vessel_locations_helper(region)
-    clusters = []
-    for detection in vessel_locations:
-        clusters.append(find_fishy_clusters(detection['mmsi'], str(cluster_size), region))
-    print(Fore.LIGHTBLUE_EX + f"Found {len(clusters)} clusters of fishy vessels in region {region}." + Fore.RESET)
-    return f"Found {len(clusters)} clusters of fishy vessels in region {region}."
-
-
-@mcp.tool()
-def summarise_insecure_areas():
-    """Give an analysis on what areas experience the most fishy vessel presence."""
-    pass
-
-
-@mcp.tool()
-def re_evaluate_region(region):
-    """Re-run region analysis for fishy vessels."""
-    
-    return f"Region {region} has been re-evaluated for fishy vessels."
 
 
 # ============================================================================
