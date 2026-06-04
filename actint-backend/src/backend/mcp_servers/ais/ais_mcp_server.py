@@ -151,20 +151,6 @@ def summarise_dark_vessels() -> str:
         return json.dumps({"error": str(e)})
 
 
-@mcp.tool()
-def evaluate_vessel_risk() -> str:
-    """Evaluate risk level of vessels based on dark behavior patterns."""
-    try:
-        # Placeholder implementation - replace with actual logic
-        risk_evaluation = {
-            "high_risk_vessels": 10,
-            "medium_risk_vessels": 20,
-            "low_risk_vessels": 12,
-        }
-        return json.dumps(risk_evaluation, indent=2)
-    except Exception as e:
-        return json.dumps({"error": str(e)})
-
 # ============================================================================
 # Health & Info Endpoints
 # ============================================================================
