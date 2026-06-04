@@ -76,7 +76,7 @@ mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 
 
 # ============================================================================
-# Dark Vessel Detection Tools
+# Fishy Vessel Analysis Tools
 # ============================================================================
 
 @mcp.tool()
