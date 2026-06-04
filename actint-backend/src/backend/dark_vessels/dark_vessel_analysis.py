@@ -19,13 +19,13 @@ def build_model():
     end_time = time.time()
     print(f"Model building time: {end_time - start_time:.2f} seconds")
 
-def run_analysis(visualise=False, all=False):
+def run_analysis(region="brazil_eez", visualise=False, all=False):
     print("Running dark vessel analysis...")
     start_time = time.time()
     if all:
         dark_vessels.main(visualise=visualise)
     else:
-        dark_vessels.run_region("brazil_eez", visualise=visualise)
+        dark_vessels.run_region(region, visualise=visualise)
     end_time = time.time()
     print(f"Dark vessel analysis time: {end_time - start_time:.2f} seconds")
 
