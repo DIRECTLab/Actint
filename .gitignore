@@ -234,7 +234,7 @@ results/
 *.out
 
 #Mario human-readable output
-actint-backend/src/backend/mario_tools/outputs/
+actint-backend/src/backend/dark_vessels/outputs/
 outputs/
 
 

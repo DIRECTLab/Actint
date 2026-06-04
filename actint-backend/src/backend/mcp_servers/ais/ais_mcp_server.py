@@ -80,7 +80,7 @@ mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 
 
 # ============================================================================
-# Dark Vessel Detection Tools
+# Fishy Vessel Analysis Tools
 # ============================================================================
 
 @mcp.tool()
@@ -141,28 +141,6 @@ def re_evaluate_region(region):
     """Re-run region analysis for fishy vessels."""
     re_evaluate_region_helper(region)
     return f"Region {region} has been re-evaluated for fishy vessels."
-    
-
-@mcp.tool()
-def run_dark_vessel_startup(region: str) -> str:
-    """Run the dark vessel startup script to analyze dark vessel patterns."""
-    re_evaluate_region(region)
-    return "Dark vessel analysis has been re-run"
-
-
-@mcp.tool()
-def summarise_dark_vessels() -> str:
-    """Summarise information about dark vessels in the database."""
-    try:
-        # Placeholder implementation - replace with actual logic
-        summary = {
-            "total_dark_vessels": 42,
-            "recent_dark_vessels": 5,
-            "regions_with_dark_vessels": ["Gulf of Aden", "Strait of Malacca"],
-        }
-        return json.dumps(summary, indent=2)
-    except Exception as e:
-        return json.dumps({"error": str(e)})
 
 
 # ============================================================================
