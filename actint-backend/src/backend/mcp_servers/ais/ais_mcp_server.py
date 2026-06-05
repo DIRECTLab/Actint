@@ -13,7 +13,6 @@ Tools provided:
 - Destination prediction based on vessel heading
 """
 
-from colorama import Fore, Style #TODO: Remove this before pushing
 import json
 import sqlite3
 import os
@@ -86,8 +85,7 @@ mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 @mcp.tool()
 def summarise_fishy_vessels_in_region(region: str):
     """Get a number of vessels in a region marked as fishy and information about clusters of fishy vessels."""
-
-    cluster_size = 5 #TODO: Figure out what this should actually be
+    cluster_size = 5 # Can be adjusted based on more realistic use cases if needed
     vessel_locations = get_fishy_vessel_locations_helper(region)
     number_of_vessels = len(vessel_locations)
     cluster_info = detect_fishy_clusters(region)
@@ -108,9 +106,6 @@ def evaluate_vessel_fishiness(vessel_name: str):
 def get_fishy_vessel_locations(region: str):
     """Get the most recent locations of vessels in a region marked as suspicious and their tradjectories."""
     result = get_fishy_vessel_locations_helper(region)
-    # get info about vessels in the region
-    # strip down the info to names and lat/lon
-    # return that info in a format that is easy for the llm to use
     for detection in result:
         print(Fore.LIGHTBLUE_EX + str(detection) + Fore.RESET)
     return result
@@ -127,13 +122,6 @@ def detect_fishy_clusters(region: str):
         clusters.append(find_fishy_clusters(detection['mmsi'], str(cluster_size), region))
     print(Fore.LIGHTBLUE_EX + f"Found {len(clusters)} clusters of fishy vessels in region {region}." + Fore.RESET)
     return f"Found {len(clusters)} clusters of fishy vessels in region {region}."
-
-
-@mcp.tool()
-def summarise_insecure_areas(region: str):
-    """Give an analysis on what areas experience the most fishy vessel presence."""
-    result = get_fishy_hotspots_helper(region)
-    return result
 
 
 @mcp.tool()
@@ -491,15 +479,5 @@ def get_vessels_in_area(lat: str, lon: str, radius_nm: str):
 # Server Entry Point
 # ============================================================================
 
-def run_dark_vessel_tests():
-    # print("summarise_fishy_vessels_in_region: " + summarise_fishy_vessels_in_region("brazil_eez"))
-    # print("evaluate_vessel_fishiness: ", evaluate_vessel_fishiness("jane"))
-    # print("get_fishy_vessel_locations: ", get_fishy_vessel_locations("brazil_eez"))
-    # print("detect_fishy_clusters: ", detect_fishy_clusters("brazil_eez"))
-    print("summarise_insecure_areas: ", summarise_insecure_areas("brazil_eez"))
-    print("re_evaluate_region: ", re_evaluate_region("brazil_eez"))
-
-
 if __name__ == "__main__":
-    # mcp.run() # TODO: Uncomment before pushing
-    run_dark_vessel_tests() #TODO: Remove before pushing
+    mcp.run()

@@ -4,14 +4,50 @@ from backend.dark_vessels.dark_vessel_analysis import run_analysis
 #from colorama import Fore, Style #for debugging prints
 
 
+'''
+Currently this file can be run independently to test helper functions
+
+Future development should involve a function for finding suspected dark activity hotspots and getting fishy trajectories
+Pseudocode: 
+
+    def get_fishy_hotspots_helper(region):
+        """Identify areas within a region that have a high density of fishy vessels."""
+        # detections = get_fishy_vessel_locations_helper(region)
+        # hotspots = []
+        # for detection in detections:
+            # figure out their trajectory
+            # figure out if that trajectory intercepts any previously detected trajectories
+                # if so, save that point
+            # for each interception point
+                # count how many interception points are surrounding the point within a certain radius
+                # if that number exceeds n
+                    # add that point to the list of hotspots
+        # return list of areas that have a high density of fishy vessels
+        # return hotspots
+
+
+    def get_fishy_vessel_trajectories(region):
+        """Use the ship_going tools to figure out where each fishy vessel in a region is likely headed"""
+        # vessels = get_fishy_vessel_locations_helper(region)
+        # trajectories = []
+        # for each vessel
+            # get trajectory using ship_going tools
+        # return trajectories
+
+'''
+
+
 def query_region(region):
-    #TODO: Add a check to make sure the region is a region we have data for
     """Return the list of fishy vessels in a region"""
     conn = get_conn(DatabaseConnectionTypes.FISHY_VESSELS)
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM sampletable;")
     results = cursor.fetchall()
     conn.close()
+
+    if results is None or len(results) == 0:
+        return (f"No suspicious vessels found in region {region}.")
+
     return results
 
 
@@ -53,7 +89,7 @@ def find_fishy_clusters(mmsi: str, number_ships: str, region: str) -> str:
     if mmsi not in mmsis:
         raise ValueError("MMSI not in vessels")
     primary_ship_location = get_vessel_latest_location_helper(mmsi)
-    primary_lat = primary_ship_location[2]  #TODO: Make it so these don't need to be hardcoded
+    primary_lat = primary_ship_location[2]  # Assuming lat is the 3rd column in the result
     primary_lon = primary_ship_location[3]
     distances = []
 
@@ -116,34 +152,6 @@ def get_vessel_latest_location_helper(mmsi: int) -> dict | None:
     return result
 
 
-def get_fishy_vessel_trajectories(region):
-    """Use the ship_going tools to figure out where each fishy vessel in a region is likely headed"""
-
-    vessels = get_fishy_vessel_locations_helper(region)
-
-    # for each vessel
-        # get trajectory using ship_going tools
-
-    return "this tool (namely, its helper function) is still being developed"
-
-
-def get_fishy_hotspots_helper(region):
-    """Identify areas within a region that have a high density of fishy vessels."""
-    detections = get_fishy_vessel_locations_helper(region)
-    hotspots = "this helper is still being developed"
-    for detection in detections:
-        # figure out their trajectory
-        # figure out if that trajectory intercepts any previously detected trajectories
-            # if so, save that point
-        # for each interception point
-            # count how many interception points are surrounding the point within a certain radius
-            # if that number exceeds n
-                # add that point to the list of hotspots
-        pass
-    # return list of areas that have a high density of fishy vessels
-    return hotspots
-
-
 def re_evaluate_region_helper(region):
     """Re-run region analysis for fishy vessels."""
     # visualise can be changed to true if we want the llm to also generate visualisations
@@ -198,8 +206,6 @@ def run_tests():
         #print(Fore.LIGHTGREEN_EX)
         print("find_fishy_clusters test passed.")
         #print(Fore.RESET)
-
-    #TODO: write test for get fishy vessel trajectories
 
     if not failed:
         print("\nAll tests passed.\n")
