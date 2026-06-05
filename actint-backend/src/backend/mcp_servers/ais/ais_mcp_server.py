@@ -38,8 +38,6 @@ from backend.mcp_servers.ais.helpers.dark_vessel_helper import (
     query_vessel,
     get_fishy_vessel_locations_helper,
     find_fishy_clusters,
-    get_fishy_vessel_trajectories,
-    get_fishy_hotspots_helper,
     re_evaluate_region_helper,
 )
 from backend.mcp_servers.ais.helpers.ship_context import (
@@ -90,25 +88,24 @@ def summarise_fishy_vessels_in_region(region: str):
     number_of_vessels = len(vessel_locations)
     cluster_info = detect_fishy_clusters(region)
 
-    result = f"Region {region} has {number_of_vessels} vessels marked as suspicious." + cluster_info
-    return result
+    return json.dumps({
+        "number_of_fishy_vessels": number_of_vessels,
+        "cluster_info": cluster_info
+    }, indent=2)
 
 
 @mcp.tool()
 def evaluate_vessel_fishiness(vessel_name: str):
     """Look for a vessel in the fishy vessels database and return if a vessel is fishy and why."""
     result = query_vessel(vessel_name)
-    result = f"Vessel {vessel_name} has a dark risk score of {result[0][1]} and the following anomaly flags: {result[0][2]}"
-    return result
+    return json.dumps({"vessel fishiness": result}, indent=2)
 
 
 @mcp.tool()
 def get_fishy_vessel_locations(region: str):
     """Get the most recent locations of vessels in a region marked as suspicious and their tradjectories."""
     result = get_fishy_vessel_locations_helper(region)
-    for detection in result:
-        print(Fore.LIGHTBLUE_EX + str(detection) + Fore.RESET)
-    return result
+    return json.dumps({"vessel_locations": result}, indent=2)
 
 
 @mcp.tool()
@@ -120,15 +117,14 @@ def detect_fishy_clusters(region: str):
     clusters = []
     for detection in vessel_locations:
         clusters.append(find_fishy_clusters(detection['mmsi'], str(cluster_size), region))
-    print(Fore.LIGHTBLUE_EX + f"Found {len(clusters)} clusters of fishy vessels in region {region}." + Fore.RESET)
-    return f"Found {len(clusters)} clusters of fishy vessels in region {region}."
+    return json.dumps({"clusters": clusters}, indent=2)
 
 
 @mcp.tool()
 def re_evaluate_region(region):
     """Re-run region analysis for fishy vessels."""
     re_evaluate_region_helper(region)
-    return f"Region {region} has been re-evaluated for fishy vessels."
+    return json.dumps({"message": f"Region {region} has been re-evaluated for fishy vessels."}, indent=2)
 
 
 # ============================================================================
