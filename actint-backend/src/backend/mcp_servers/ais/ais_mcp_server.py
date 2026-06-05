@@ -166,36 +166,36 @@ def summarise_dark_vessels() -> str:
 #     except Exception as e:
 #         return "Error:\n" + str(e)
 
-@mcp.tool()
-def get_vessel_current_position(mmsi: int | str) -> str:
-    """Get the most recent position of a vessel.
+# @mcp.tool()
+# def get_vessel_current_position(mmsi: int | str) -> str:
+#     """Get the most recent position of a vessel.
     
-    Args:
-        mmsi (int): Maritime Mobile Service Identity number of the vessel
+#     Args:
+#         mmsi (int): Maritime Mobile Service Identity number of the vessel
     
-    Returns:
-        str: JSON object with current position, speed, heading, and timestamp
-    """
-    try:
-        mmsi = int(mmsi)
-        locations = get_vehicle_locations(mmsi)
-        if locations:
-            loc = locations[0]  # Most recent
-            result = {
-                "mmsi": loc.mmsi,
-                "vessel_name": loc.vessel_name,
-                "timestamp": loc.timestamp,
-                "latitude": loc.lat,
-                "longitude": loc.lon,
-                "speed_over_ground": loc.sog,
-                "course_over_ground": loc.cog,
-                "heading": loc.heading,
-            }
-            return json.dumps(result, indent=2)
-        else:
-            return json.dumps({"error": "No positions found for this vessel"})
-    except Exception as e:
-        return json.dumps({"error": str(e)})
+#     Returns:
+#         str: JSON object with current position, speed, heading, and timestamp
+#     """
+#     try:
+#         mmsi = int(mmsi)
+#         locations = get_vehicle_locations(mmsi)
+#         if locations:
+#             loc = locations[0]  # Most recent
+#             result = {
+#                 "mmsi": loc.mmsi,
+#                 "vessel_name": loc.vessel_name,
+#                 "timestamp": loc.timestamp,
+#                 "latitude": loc.lat,
+#                 "longitude": loc.lon,
+#                 "speed_over_ground": loc.sog,
+#                 "course_over_ground": loc.cog,
+#                 "heading": loc.heading,
+#             }
+#             return json.dumps(result, indent=2)
+#         else:
+#             return json.dumps({"error": "No positions found for this vessel"})
+#     except Exception as e:
+#         return json.dumps({"error": str(e)})
 
 
 @mcp.tool()

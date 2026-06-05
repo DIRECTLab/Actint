@@ -1,13 +1,14 @@
 # backend/agent/agent.py
 import os
 import asyncio
-from smolagents import ToolCallingAgent, TransformersModel, MCPClient, AgentMaxStepsError
+from smolagents import ToolCallingAgent, MCPClient, AgentMaxStepsError, ActionStep, TaskStep, OpenAIModel
 from mcp import StdioServerParameters
 import sys
 from pathlib import Path
 
 from backend.config import config
 from backend.mcp_servers.ais import ais_mcp_server
+from backend.mcp_servers.adsb import adsb_mcp_server
 from backend.event_loop_registry import set_event_loop
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
@@ -26,7 +27,7 @@ if is_port_in_use(4317):
     SmolagentsInstrumentor().instrument()
 else:
     print(
-        "Phoenix telemetry server is not running on localhost:4317. Skipping instrumentation.",
+        "\x1b[33mPhoenix telemetry server is not running on localhost:4317. Skipping instrumentation.\033[0m",
         file=sys.stderr
     )
 
@@ -51,7 +52,7 @@ if config.CONDA_PREFIX:
 else:
     python_path = sys.executable
 
-server_params = StdioServerParameters(
+ais_server_params = StdioServerParameters(
     command=python_path,
     args=[ais_mcp_server.__file__],
     env=os.environ.copy(),
@@ -68,28 +69,65 @@ adsb_server_params = StdioServerParameters(
     cwd=os.getcwd()
 )
 
-_agent_sessions = {}
+adsb_mcp_client = MCPClient(adsb_server_params, structured_output=False)
+adsb_mcp_tools = adsb_mcp_client.get_tools()
 
 _agent_sessions = {}
 
-def get_or_create_agent(session_id: str, additional_tools: list = []) -> ToolCallingAgent:
-    """Creates or retrieves an agent for a given session, injecting relevant tools."""
-    if session_id not in _agent_sessions:
-        # Base tools that all agents get (e.g., MCP server tools)
-        tools = ais_mcp_tools.copy()
-        
-        # Inject context-specific tools (like UI tools or terminal tools)
-        if additional_tools:
-            tools.extend(additional_tools)
-            
-        _agent_sessions[session_id] = ToolCallingAgent(tools=tools, model=model)
-        
-    return _agent_sessions[session_id]
+print(f"""\033[1;33mChecking connection to llm inference server {config.INFERENCE_SERVER_URL}\033[0m""", file=sys.stderr)
+print(check_openai_health(), file=sys.stderr)
 
-async def query_agent(query: str, session_id: str, additional_tools: list = None):
-    """Entry point for both web and terminal to query their respective agent."""
-    agent = get_or_create_agent(session_id, additional_tools)
-    return agent.run(query, reset=False)
+model = OpenAIModel(
+    model_id="local",
+    api_base=config.INFERENCE_SERVER_URL,
+    api_key="dummy"
+)
+
+def create_agent(
+    additional_tools: list = [],
+    
+) -> ToolCallingAgent:
+    """Creates an agent, injecting relevant tools."""
+    tools = []
+    tools += ais_mcp_tools
+    tools += adsb_mcp_tools
+    managed_agents = []
+    if additional_tools:
+        tools.extend(additional_tools)
+        # map_agent = ToolCallingAgent(
+        #     tools=additional_tools,
+        #     model=model,
+        #     max_steps=10,
+        #     name="map_ui_agent",
+        #     description="Can show things to the user on a map. Can move, zoom, and draw basic shapes on the map."
+        # )
+        # managed_agents.append(map_agent)
+    return ToolCallingAgent(tools=tools, model=model, managed_agents=managed_agents)
+
+async def query_agent_instance(
+    agent: ToolCallingAgent,
+    query: str,
+) -> str:
+    """Entry point for both web and terminal to query an agent instance."""
+
+def summarize_last_turn(instructions: str, agent: ToolCallingAgent):
+    summarization_tools = []  # Define any tools specific to summarization if needed
+
+    try:
+        result = await loop.run_in_executor(
+            None, lambda: agent.run(query, reset=False)
+        )
+
+        return result
+    except AgentMaxStepsError:
+        print(f"Agent hit max steps.", file=sys.stderr)
+        return "Agent failed to respond: maximum steps exceeded."
+    except Exception as e:
+        print(f"Agent error: {e}", file=sys.stderr)
+        return f"Agent encountered an error: {str(e)}"
+    
+
+#======================================Summarization Agent==================================#
 
 def summarize_last_turn(instructions: str, agent: ToolCallingAgent):
     summarization_tools = []  # Define any tools specific to summarization if needed
