@@ -74,11 +74,11 @@ def _dumps(payload: Any) -> str:
 # ============================================================================
 
 
-@mcp.tool()
-def say_hello() -> str:
-    """Simple tool to test connectivity and responsiveness of the MCP server."""
+# @mcp.tool()
+# def say_hello() -> str:
+#     """Simple tool to test connectivity and responsiveness of the MCP server."""
 
-    return "Hello! The ADS-B Aircraft Intelligence MCP server is up and running."
+#     return "Hello! The ADS-B Aircraft Intelligence MCP server is up and running."
 
 
 # ============================================================================
