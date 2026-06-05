@@ -1,40 +1,46 @@
-from dotenv import load_dotenv
-from os import getenv
 from dataclasses import dataclass
+import os
 
-# Searches for .env in progressively higher directories until it finds it
+from dotenv import load_dotenv
+
 load_dotenv()
+
+
+def env_str(name: str, default: str | None = None) -> str | None:
+    value = os.getenv(name)
+    return default if value is None or value == "" else value
+
+
+def env_int(name: str, default: int | None = None) -> int | None:
+    value = os.getenv(name)
+    if value is None or value == "":
+        return default
+    return int(value)
+
 
 @dataclass(frozen=True)
 class Config:
-    CONDA_PREFIX: str | None = getenv("CONDA_PREFIX", None)
-    WEB_SOCKET_PORT: int = int(getenv("WEB_SOCKET_PORT", "3050"))
-    # DB Config
-    DB_USER: str | None = getenv("DB_USER", None)
-    DB_PASS: str | None = getenv("DB_PASS", None)
-    DB_PORT: int | None = int(getenv("DB_PORT", None)) if getenv("DB_PORT") else None
-    DB_HOST: str | None = getenv("DB_HOST", None)
+    CONDA_PREFIX: str | None = env_str("CONDA_PREFIX")
 
-    ADSB_DB_NAME: str | None = getenv("ADSB_DB_NAME", None)
-    AIS_DB_NAME: str | None = getenv("AIS_DB_NAME", None)
-    FISHY_VESSELS_DB_NAME: str | None = getenv("FISHY_VESSELS_DB_NAME")
-    FISHY_REPORTS_DB_NAME: str | None = getenv("FISHY_REPORTS_DB_NAME")
-    
-    # LLM Model Configuration (Hugging Face model ID and generation parameters)
-    
-    LLAMA_BACKEND_SOCKET: str = "http://127.0.0.1:8000/v1"
-    MAX_AGENT_STEPS: int = 20
+    WEB_SOCKET_PORT: int | None = env_int("WEB_SOCKET_PORT", 3050)
+
+    DB_HOST: str | None = env_str("DB_HOST")
+    ADSB_DB_NAME: str | None = env_str("ADSB_DB_NAME")
+    AIS_DB_NAME: str | None = env_str("AIS_DB_NAME")
+    FISHY_VESSELS_DB_NAME: str | None = env_str("FISHY_VESSELS_DB_NAME")
+    FISHY_REPORTS_DB_NAME: str | None = env_str("FISHY_REPORTS_DB_NAME")
+    DB_USER: str | None = env_str("DB_USER")
+    DB_PASS: str | None = env_str("DB_PASS")
+    DB_PORT: int | None = env_int("DB_PORT")
+
+    MODEL_ID: str | None = env_str("MODEL_ID")
+    MAX_NEW_TOKENS: int | None = env_int("MAX_NEW_TOKENS", 2048)
+
+    MAX_AGENT_STEPS: int | None = env_int("MAX_AGENT_STEPS", 20)
+
+    INFERENCE_SERVER_PORT: int | None = env_int("INFERENCE_SERVER_PORT", 8000)
+    INFERENCE_SERVER_HOST: str | None = env_str("INFERENCE_SERVER_HOST", "127.0.0.1")
+    INFERENCE_SERVER_URL: str = f"http://{INFERENCE_SERVER_HOST}:{INFERENCE_SERVER_PORT}/v1"
 
 
-
-    # Edit and run the following command to start the local llamacpp LLM openAI server
-"""
-    ./llama-server \
-     -m /scratch/username/chat_gpt/gpt-oss-120b-UD-Q8_K_XL-00001-of-00002.gguf # or enter the file path of where your model is located. \
-     -c 131072 # This is the maximum context size \
-     --host 0.0.0.0 # The address where your server is hosted\
-     --port 8000 # Port number \
-     -n 600 # Maximum new tokens to generate, this way it will not get stuck doing something that will infinitely generate tokens.
-"""
-    
 config = Config()
