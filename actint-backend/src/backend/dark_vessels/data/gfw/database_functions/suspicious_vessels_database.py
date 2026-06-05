@@ -43,19 +43,25 @@ def _get_suspicious_tables():
     tables = cursor.fetchall()
     conn.close()
     return [table[0] for table in tables]
-\
+
 
 def get_ais_in_region(region: str):
     
     latest_locations = get_all_latest_detections_helper()
     vessels_in_region_data = []
     for vessel in latest_locations:
+        # print(vessel)
         lat = vessel['lat']
         lon = vessel['lon']
+        if lat is None or lon is None:
+            continue
         vessel_region = region_evaluator.evaluate_region(lat, lon)
         if vessel_region == region:
             static_data = query_static_data_helper({'mmsi': vessel['mmsi']})
+            
             position_history = get_vessel_position_history_helper(vessel['mmsi'])
+            position_history = [p for p in position_history if p['lat'] is not None and p['lon'] is not None]
+
             vessels_in_region_data.append({
                 "static_data": static_data,
                 "dynamic_data": position_history
@@ -67,7 +73,6 @@ def get_ais_in_region(region: str):
 
 def prepare_data_for_ML(data):
     """This will be the function that converts the AIS data from the database into AIS data that we can feed into the ML machine. We will needd to somehow define a true_activity"""
-    # print(data)
     prepared_ship_data = []
     for ship in data:
         static_data = ship["static_data"][0]
@@ -76,7 +81,7 @@ def prepare_data_for_ML(data):
 
         ship_detection_objects = []
         for detection in dynamic_data:
-            ship_detection_objects.append({
+            object = {
                 "mmsi": static_data['mmsi'],
                 "vessel_type_code": static_data["vesseltype"],
                 "vessel_type_key": AIS_VESSEL_TYPE_CODES.get(static_data["vesseltype"], "Unknown"),
@@ -96,7 +101,9 @@ def prepare_data_for_ML(data):
                 "true_activity": None,
                 "had_dark_period": None,
                 # We will need to assign true_activity and had_dark_period based on the data we have
-            })
+            }
+            print(object)
+            ship_detection_objects.append(object)
         prepared_ship_data.extend(ship_detection_objects)
 
         return prepared_ship_data

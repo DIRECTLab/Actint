@@ -393,6 +393,7 @@ class DQNAgent:
 
     # ── Evaluation ────────────────────────────────────────────────────────────
 
+#just returns information about the training
     def evaluate(
         self,
         env:         AISActivityEnv,
