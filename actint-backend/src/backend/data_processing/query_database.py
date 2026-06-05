@@ -7,24 +7,29 @@ class DatabaseConnectionTypes(Enum):
     ADSB = 1
 
 def _database_configs(conn_type: DatabaseConnectionTypes) -> dict:
-    if conn_type == DatabaseConnectionTypes.AIS:
+    if config.DB_USING_SQLITE:
         return {
-            "host": config.DB_HOST,
-            "dbname": config.AIS_DB_NAME,
-            "user": config.DB_USER,
-            "password": config.DB_PASS,
-            "port": config.DB_PORT,
-        }
-    elif conn_type == DatabaseConnectionTypes.ADSB:
-        return {
-            "host": config.DB_HOST,
-            "dbname": config.ADSB_DB_NAME,
-            "user": config.DB_USER,
-            "password": config.DB_PASS,
-            "port": config.DB_PORT,
+            "path": config.DB_PATH
         }
     else:
-        raise ValueError(f"Unsupported connection type: {conn_type}")
+        if conn_type == DatabaseConnectionTypes.AIS:
+            return {
+                "host": config.DB_HOST,
+                "dbname": config.AIS_DB_NAME,
+                "user": config.DB_USER,
+                "password": config.DB_PASS,
+                "port": config.DB_PORT,
+            }
+        elif conn_type == DatabaseConnectionTypes.ADSB:
+            return {
+                "host": config.DB_HOST,
+                "dbname": config.ADSB_DB_NAME,
+                "user": config.DB_USER,
+                "password": config.DB_PASS,
+                "port": config.DB_PORT,
+            }
+        else:
+            raise ValueError(f"Unsupported connection type: {conn_type}")
 
 def get_conn(conn_type: DatabaseConnectionTypes = DatabaseConnectionTypes.AIS):
     db_config = _database_configs(conn_type)
@@ -35,6 +40,10 @@ def get_conn(conn_type: DatabaseConnectionTypes = DatabaseConnectionTypes.AIS):
             raise ValueError(f"Missing environment variable: {key}")
 
     try:
+        if config.DB_USING_SQLITE:
+            import sqlite3
+            conn = sqlite3.connect(config.DB_PATH)
+            return conn
         conn = psycopg.connect(**db_config)
         return conn
     except psycopg.Error as e:
