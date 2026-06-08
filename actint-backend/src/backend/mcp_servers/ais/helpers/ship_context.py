@@ -51,27 +51,27 @@ def get_vessel_locations_helper(mmsi: str, page: str = '1') -> str:
     indexed_positions = positions[start_index:end_index]
 
     positions_prompt = (
-        "Idx | Latitude  | Longitude   | SOG (kt) | COG (deg) | Time\n"
-        "----+-----------+-------------+----------+-----------+----------\n"
+        "| Idx | Latitude  | Longitude   | SOG (kt) | COG (deg) | Time |\n"
+        "|-----|-----------|-------------|----------|-----------|------|\n"
     )
 
     for i, position in enumerate(indexed_positions, start=start_index + 1):
         time_str = position["basedatetime"].strftime("%H:%M:%S")
 
         positions_prompt += (
-            f"{i:>3} | "
+            f"| {i:>3} | "
             f"{position['lat']:>9.5f} | "
             f"{position['lon']:>11.5f} | "
             f"{position['sog']:>8.1f} | "
             f"{position['cog']:>9.1f} | "
-            f"{time_str}\n"
+            f"{time_str} |\n"
         )
 
         prompt = (
-        f"Vessel positions ({start_index + 1}-{end_index + 1})\n\n"
-        f"{positions_prompt}\n"
-        f"To retrieve the next 8 positions:\n"
-        f"  get_vessel_locations({mmsi}, {page + 1})"
+            f"Vessel positions ({start_index + 1}-{end_index + 1})\n\n"
+            f"{positions_prompt}\n"
+            f"If you need to retrieve the next 8 positions, use:\n"
+            f"get_vessel_locations(mmsi=\"{mmsi}\", page=\"{page + 1})\""
         )
 
     return prompt
@@ -80,8 +80,8 @@ def get_vessel_locations_helper(mmsi: str, page: str = '1') -> str:
 def get_vessels_last_seen_helper():
     detections = get_all_latest_detections_helper()
     prompt = (
-        "MMSI       | Latitude | Longitude | SOG | COG  | Time \n"
-        "-----------+----------+-----------+-----+------+----------\n"
+        "| MMSI     | Latitude | Longitude | SOG | COG  | Time |\n"
+        "|----------|----------|-----------|-----|------|------|\n"
     )
 
     for detection in detections:
@@ -94,15 +94,15 @@ def get_vessels_last_seen_helper():
         sog_str = f"{detection['sog']:4.1f}" if detection['sog'] is not None else "None"
         cog_str = f"{detection['cog']:5.1f}" if detection['cog'] is not None else "None "
         prompt += (
-            f"{detection['mmsi']:<10} | "
+            f"| {detection['mmsi']:<10} | "
             f"{lat_str} | "
             f"{lon_str} | "
             f"{sog_str} | "
             f"{cog_str} | "
-            f"{time_str}\n"
+            f"{time_str} |\n"
         )
 
-    prompt += ("\nTo get even more information on any of these ships, run get_vessel_general_information() with the correct mmsi")
+    prompt += ("\nTo get even more information on any of these ships, use the get_vessel_general_information tool with the correct mmsi")
 
     return prompt
 
@@ -137,7 +137,7 @@ def get_nearest_ships_helper(mmsi: str, number_ships: str) -> str:
     output = (
         f"The {number_ships} closest ships to {mmsi} are:\n\n"
         "MMSI       | Distance (nm) | Latitude   | Longitude   | SOG   | COG   | Time\n"
-        "-----------+---------------+------------+-------------+-------+-------+----------\n"
+        "-----------|---------------|------------|-------------|-------|-------|----------\n"
     )
 
     for ship in nearest_ships:
@@ -173,8 +173,8 @@ def get_vessels_in_area_helper(lat: str, lon: str, distance_nm: str):
 
     prompt = (
         f"Results for vesstles within {distance_nm} of {lat}, {lon}\n\n"
-        "MMSI       | Latitude | Longitude | SOG | COG  | Time \n"
-        "-----------+----------+-----------+-----+------+----------\n"
+        "| MMSI       | Latitude | Longitude | SOG | COG  | Time |\n"
+        "|------------|----------|-----------|-----|------|------|\n"
     )
 
     for detection in vessels_in_area:
@@ -186,17 +186,17 @@ def get_vessels_in_area_helper(lat: str, lon: str, distance_nm: str):
         sog_str = f"{detection['sog']:4.1f}" if detection['sog'] is not None else "None"
         cog_str = f"{detection['cog']:5.1f}" if detection['cog'] is not None else "None "
         prompt += (
-            f"{detection['mmsi']:<10} | "
+            f"| {detection['mmsi']:<10} | "
             f"{lat_str} | "
             f"{lon_str} | "
             f"{sog_str} | "
             f"{cog_str} | "
-            f"{time_str}\n"
+            f"{time_str} |\n"
         )
     prompt += ("\nList of MMSIs with latitude or longitude as None:\n")
     for baka in sussy_bakas:
         prompt += str(baka['mmsi'])
-    prompt += ("\n\nTo get even more information on any of these ships, run get_vessel_general_information() with the correct mmsi")
+    prompt += ("\n\nTo get even more information on any of these ships, use the get_vessel_general_information tool with the correct mmsi")
 
     prompt += str(len(vessels_in_area))
     return prompt

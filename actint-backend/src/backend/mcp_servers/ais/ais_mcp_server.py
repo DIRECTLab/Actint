@@ -32,6 +32,8 @@ from backend.mcp_servers.ais.helpers.similartiy import (
     get_similar_fleet_names,
 )
 from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_mmsi_helper
+
+from backend.mcp_servers.ais.helpers.area_context import get_future_intersections_in_area_helper
 # from backend.data_processing.query_database import query_vessels
 
 
@@ -124,7 +126,7 @@ If this was a very minor typo, please proceed with the most accurate option, oth
     return general_information
 
 
-@mcp.tool() # I need to make this so that it doesn't give me a buttload of locations that caused autistic siezures with the AI
+@mcp.tool()
 def get_vessel_locations(mmsi: str, page: str) -> str:
     """Get all recorded positions for a specific vessel identified by MMSI.
     
@@ -223,6 +225,8 @@ If this was a very minor typo, please proceed with the most accurate option, oth
     except Exception as e:
         return "Error: " + str(e)
 
+# Future vessel_anomoly_and_activity_report(mmsi:str) -> str:
+
 
 @mcp.tool()
 def get_fleets_information():
@@ -261,6 +265,23 @@ def get_vessels_in_fleet(fleet_name: str) -> str:
 Could not find vessel information for fleet {fleet_name}.
 """
 
+@mcp.tool()
+def get_future_intersections_in_area(lat: str, lon: str, radius_nm: str) -> str:
+    """Calculate potential intersections of vessels within a specified area and time window.
+    
+    Args:
+        lat (str): Latitude of the center point
+        lon (str): Longitude of the center point
+        radius_nm (str): Radius in nautical miles to define the area
+    
+    Returns:
+        str: List of potential vessel intersections with details (vessel names, estimated time to intersection, etc.)
+    """
+    try:
+        return get_future_intersections_in_area_helper(lat, lon, radius_nm)
+    except Exception as e:
+        return "Error:\n" + str(e)
+
 
 # ============================================================================
 # Tools: Geographic Queries
@@ -273,7 +294,7 @@ def get_vessels_in_area(lat: str, lon: str, radius_nm: str):
     Args:
         lat: Latitude of the point
         lon: Longitude of the point
-    
+        radius_nm: Radius in nautical miles
     Returns: 
         str: List of MMSIs in within the radius of the point
     """
