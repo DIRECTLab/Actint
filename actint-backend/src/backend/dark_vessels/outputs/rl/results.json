@@ -1,0 +1,49 @@
+{
+  "rf_baseline": {
+    "accuracy": 0.9956268221574344,
+    "macro_f1": 0.9503328416011146,
+    "hv_f1": 0.8631553631553631,
+    "per_class_f1": {
+      "anchored": 1.0,
+      "bunkering": 0.8571428571428571,
+      "fishing": 1.0,
+      "loiter": 0.9793103448275862,
+      "patrol_sweep": 1.0,
+      "sts": 0.9545454545454546,
+      "survey": 0.9859154929577465,
+      "transit": 0.998303647158609,
+      "transshipment": 0.7777777777777778
+    }
+  },
+  "dqn_final": {
+    "accuracy": 0.9349369085173501,
+    "hv_recall": 0.8776978417266187,
+    "per_class_acc": {
+      "transit": 0.9575358851674641,
+      "sts": 1.0,
+      "fishing": 0.982078853046595,
+      "transshipment": 0.42424242424242425,
+      "bunkering": 0.74,
+      "survey": 0.3,
+      "anchored": 1.0,
+      "loiter": 0.5694444444444444
+    },
+    "n_steps": 2536,
+    "mean_return": 30.725
+  },
+  "total_steps": 500000,
+  "n_actions": 11,
+  "label_list": [
+    "anchored",
+    "bunkering",
+    "dredging",
+    "fishing",
+    "loiter",
+    "patrol_sweep",
+    "port",
+    "sts",
+    "survey",
+    "transit",
+    "transshipment"
+  ]
+}
