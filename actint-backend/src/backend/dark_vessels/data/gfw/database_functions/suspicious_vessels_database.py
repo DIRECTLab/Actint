@@ -4,7 +4,7 @@ from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_position_his
 from backend.config import config
 import psycopg
 from backend.dark_vessels.data.gfw.regions.region_coordinates import region_evaluator
-from backend.dark_vessels.data.gfw.ship_types import AIS_COUNTRY_CODES, AIS_VESSEL_TYPE_CODES
+from backend.data_processing.ship_types import AIS_COUNTRY_CODES, AIS_VESSEL_TYPE_CODES
 
 
 def _connect_to_suspicious_db():
