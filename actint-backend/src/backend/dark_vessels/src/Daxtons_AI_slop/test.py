@@ -158,6 +158,8 @@ class AISDecoder(nn.Module):
         out = self.project(out)
 
         return out
+    
+    
 
 
 class AISAutoencoder(nn.Module):

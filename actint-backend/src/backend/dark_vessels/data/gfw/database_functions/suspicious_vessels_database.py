@@ -12,7 +12,7 @@ def _connect_to_suspicious_db():
         # Read environment variables
         db_config = {
             "host": config.DB_HOST,
-            "dbname": config.SUS_VESSELS_DB_NAME,
+            "dbname": config.FISHY_VESSELS_DB_NAME,
             "user": config.DB_USER,
             "password": config.DB_PASS,
             "port": config.DB_PORT,
