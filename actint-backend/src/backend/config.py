@@ -1,24 +1,42 @@
-from dotenv import load_dotenv
-from os import getenv
 from dataclasses import dataclass
+import os
 
-# Searches for .env in progressively higher directories until it finds it
+from dotenv import load_dotenv
+
 load_dotenv()
+
+
+def env_str(name: str, default: str | None = None) -> str | None:
+    value = os.getenv(name)
+    return default if value is None or value == "" else value
+
+
+def env_int(name: str, default: int | None = None) -> int | None:
+    value = os.getenv(name)
+    if value is None or value == "":
+        return default
+    return int(value)
+
 
 @dataclass(frozen=True)
 class Config:
-    CONDA_PREFIX: str | None = getenv("CONDA_PREFIX", None)
-    WEB_SOCKET_PORT: int = int(getenv("WEB_SOCKET_PORT", "3050"))
-    # DB Config
-    DB_HOST: str | None = getenv("DB_HOST", None)
-    ADSB_DB_NAME: str | None = getenv("ADSB_DB_NAME", None)
-    AIS_DB_NAME: str | None = getenv("AIS_DB_NAME", None)
-    DB_USER: str | None = getenv("DB_USER", None)
-    DB_PASS: str | None = getenv("DB_PASS", None)
-    DB_PORT: int | None = int(getenv("DB_PORT", None)) if getenv("DB_PORT") else None
-    # LLM Model Configuration (Hugging Face model ID and generation parameters)
-    MODEL_ID: str = getenv("MODEL_ID", "Qwen/Qwen3.5-9B")
-    MAX_NEW_TOKENS: int = int(getenv("MAX_NEW_TOKENS", "4096"))
-    MAX_AGENT_STEPS: int = 20
-    
+    CONDA_PREFIX: str | None = env_str("CONDA_PREFIX")
+
+    WEB_SOCKET_PORT: int | None = env_int("WEB_SOCKET_PORT", 3050)
+
+    DB_HOST: str | None = env_str("DB_HOST")
+    ADSB_DB_NAME: str | None = env_str("ADSB_DB_NAME")
+    AIS_DB_NAME: str | None = env_str("AIS_DB_NAME")
+    DB_USER: str | None = env_str("DB_USER")
+    DB_PASS: str | None = env_str("DB_PASS")
+    DB_PORT: int | None = env_int("DB_PORT")
+    MODEL_ID: str | None = env_str("MODEL_ID")
+
+    MAX_AGENT_STEPS: int | None = env_int("MAX_AGENT_STEPS", 20)
+
+    INFERENCE_SERVER_PORT: int | None = env_int("INFERENCE_SERVER_PORT", 8000)
+    INFERENCE_SERVER_HOST: str | None = env_str("INFERENCE_SERVER_HOST", "127.0.0.1")
+    INFERENCE_SERVER_URL: str = f"http://{INFERENCE_SERVER_HOST}:{INFERENCE_SERVER_PORT}/v1"
+
+
 config = Config()

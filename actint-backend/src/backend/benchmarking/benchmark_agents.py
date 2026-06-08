@@ -25,7 +25,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover - environment safeguard
 		"PyYAML is required for benchmarking config loading. Install with: pip install pyyaml"
 	) from exc
 from mcp import StdioServerParameters
-from smolagents import MCPClient, ToolCallingAgent, TransformersModel
+from smolagents import MCPClient, ToolCallingAgent, OpenAIModel
 
 from backend.mcp_servers.ais import ais_mcp_server
 
@@ -1092,7 +1092,12 @@ def run_benchmarks(config: dict[str, Any], only_agent: str | None, only_benchmar
 
 				register(project_name="actint")
 				SmolagentsInstrumentor().instrument()
-				model = TransformersModel(model_id=model_id, **model_kwargs)
+				model = OpenAIModel(
+					model_id="local",
+					api_base="http://127.0.0.1:8000/v1",
+					api_key="dummy"
+				)
+
 
 				agent_kwargs: dict[str, Any] = {
 					"tools": tools,

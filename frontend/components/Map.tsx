@@ -5,7 +5,7 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { useEffect } from 'react'
 import { Map as LeafletMap } from 'leaflet'; // Import the type
-import { create_map_functions } from '@/functions/web_socket_functions'
+import { create_map_functions, remove_map_functions } from '@/functions/web_socket_functions'
 import { useRef, useState } from 'react'
 
 'use client'
@@ -45,9 +45,26 @@ export default function Map({ vehiclesPreviousPositions, vehicleCurrentPositions
       });
     }
   };
+
+
+  const aiObjectsRef = useRef(AI_objects);
+
+
   useEffect(() => {
-    create_map_functions({handleManualMove, setAI_objects});
-  })
+    aiObjectsRef.current = AI_objects;
+  }, [AI_objects]);
+
+  useEffect(() => {
+      create_map_functions({
+        handleManualMove, 
+        aiObjectsRef,
+        setAI_objects
+      });
+
+      return () => {
+        remove_map_functions()
+      };
+    }, []);
   
   return (
     <div style={{ height: '100%', width: '100%', background: '#000'}}>

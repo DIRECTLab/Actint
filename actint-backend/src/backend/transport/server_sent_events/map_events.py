@@ -16,6 +16,21 @@ async def set_map_position(lat, lon, zoom, sid=None):
 
 
 
+async def add_marker(sid, lat, lon, popup_description):
+    await sio.emit("add_marker", {
+        "lat": lat,
+        "lon": lon,
+        "popup": popup_description
+    }, to=sid)
+
+async def draw_vessel_trajectory(sid, lat, lon, heading, distance_nm, color="blue"): #I need to add the ability for the AI to choose a color
+    await sio.emit("draw_vessel_trajectory", {
+        "lat": lat,
+        "lon": lon,
+        "heading": heading,
+        "distance_nm": distance_nm,
+    }, to=sid)
+
 async def draw_rectangle(sid, lat1, lon1, lat2, lon2, color="blue"):
     await sio.emit("draw_rectangle", {
         "lat1": lat1,
@@ -23,8 +38,7 @@ async def draw_rectangle(sid, lat1, lon1, lat2, lon2, color="blue"):
         "lat2": lat2,
         "lon2": lon2,
         "color": color,
-    }, to=sid) #This will need to have to=sid added back later after the tool can be accessed by the LLM
-
+    }, to=sid) 
 
 async def draw_circle(sid, radius, center_lat, center_lon, color="blue"):
     await sio.emit("draw_circle", {
@@ -32,11 +46,30 @@ async def draw_circle(sid, radius, center_lat, center_lon, color="blue"):
         "lat": center_lat,
         "lon": center_lon,
         "color": color,
-    }, to=sid) #This will need to have to=sid added back later after the tool can be accessed by the LLM
-
+    }, to=sid) 
 
 async def draw_line(sid, points,  color="blue"):
     await sio.emit("draw_line", {
         "points": points,
         "color": color,
-    }, to=sid) #This will need to have to=sid added back later after the tool can be accessed by the LLM
+    }, to=sid)
+
+async def draw_polygon(sid, points, color="blue"):
+    await sio.emit("draw_polygon", {
+        "points": points,
+        "color": color
+    }, to=sid)
+
+async def delete_object(sid, object_number):
+    await sio.emit("delete_object", {
+        "object_number": int(object_number)
+    }, to=sid)  
+
+
+async def get_map_info(sid):
+    map_info = await sio.call("get_map_information", {}, to=sid, timeout=8)
+    if map_info:
+        print(map_info)
+        return map_info
+    else:
+        raise TimeoutError("Failed to fetch the map information in time")

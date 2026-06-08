@@ -1,7 +1,7 @@
 # backend/agent/agent.py
 import os
 import asyncio
-from smolagents import ToolCallingAgent, TransformersModel, MCPClient, AgentMaxStepsError, ActionStep, TaskStep
+from smolagents import ToolCallingAgent, MCPClient, AgentMaxStepsError, ActionStep, TaskStep, OpenAIModel
 from mcp import StdioServerParameters
 import sys
 from pathlib import Path
@@ -13,6 +13,7 @@ from backend.event_loop_registry import set_event_loop
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor
 import socket
+import requests
 
 
 def is_port_in_use(port: int) -> bool:
@@ -21,7 +22,7 @@ def is_port_in_use(port: int) -> bool:
 
 
 if is_port_in_use(4317):
-    register(project_name="Map_Actint")
+    register(project_name="Actint")
     SmolagentsInstrumentor().instrument()
 else:
     print(
@@ -29,7 +30,21 @@ else:
         file=sys.stderr
     )
 
-model_id = config.MODEL_ID
+def check_openai_health(api_key="dummy") -> str:
+    url = f"{config.INFERENCE_SERVER_URL}/models"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    
+    try:
+        response = requests.get(url, headers=headers, timeout=5)
+        if response.status_code == 200:
+            return "\033[1;32mAPI is operational and the connection is healthy and serving the following models:\033[0m " + "\n- ".join([model['id'] for model in response.json().get('data', [])])
+        else:
+            return f"\033[31mAPI returned error code: {response.status_code}\033[0m"
+    except requests.exceptions.RequestException as e:
+        return f"\033[31mNetwork/Connection failure: {str(e)}\033[0m"
+
+
+model_id = config.MODEL_ID or ""
 print("\033[0;34mModel ID: \033[1;34m" + model_id + "\033[0m")
 
 if config.CONDA_PREFIX:
@@ -58,13 +73,19 @@ adsb_server_params = StdioServerParameters(
 adsb_mcp_client = MCPClient(adsb_server_params, structured_output=False)
 adsb_mcp_tools = adsb_mcp_client.get_tools()
 
-model = TransformersModel(
-    model_id=model_id,
-    max_new_tokens=config.MAX_NEW_TOKENS,
+
+print(f"""\033[1;33mChecking connection to llm inference server {config.INFERENCE_SERVER_URL}\033[0m""", file=sys.stderr)
+print(check_openai_health(), file=sys.stderr)
+
+model = OpenAIModel(
+    model_id="local",
+    api_base=config.INFERENCE_SERVER_URL,
+    api_key="dummy"
 )
 
 def create_agent(
-    additional_tools: list = []
+    additional_tools: list = [],
+    
 ) -> ToolCallingAgent:
     """Creates an agent, injecting relevant tools."""
     tools = []
@@ -96,6 +117,7 @@ async def query_agent_instance(
         result = await loop.run_in_executor(
             None, lambda: agent.run(query, reset=False)
         )
+
         return result
     except AgentMaxStepsError:
         print(f"Agent hit max steps.", file=sys.stderr)
@@ -103,6 +125,7 @@ async def query_agent_instance(
     except Exception as e:
         print(f"Agent error: {e}", file=sys.stderr)
         return f"Agent encountered an error: {str(e)}"
+    
 
 #======================================Summarization Agent==================================#
 

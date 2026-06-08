@@ -8,7 +8,6 @@ import { vehicles_current_positions, vehicles_previous_positions } from "@/types
 
 
 // ********************************************** Components *********************************************//
-import SimSettings from '../components/sim_settings(deprecated)';
 import { Chat } from '../components/chat';
 import dynamic from "next/dynamic";
 
@@ -23,7 +22,6 @@ import { SimulationSettingsTyp } from '@/types/simulationSettings'
 
 
 // ********************************************** Functions **********************************************//
-import { create_map_functions } from '@/functions/web_socket_functions';
 
 // ********************************************** Defaults ***********************************************//
 import DEFAULT_SIM_SETTIINGS from "@/defaults/sim_settings_defauluts";
