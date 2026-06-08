@@ -124,16 +124,16 @@ If this was a very minor typo, please proceed with the most accurate option, oth
     return general_information
 
 
-@mcp.tool() # I need to make this so that it doesn't give me a buttload of locations that caused autistic siezures with the AI
+@mcp.tool()
 def get_vessel_locations(mmsi: str, page: str) -> str:
-    """Get all recorded positions for a specific vessel identified by MMSI.
+    """Get recorded positions for a specific vessel identified by MMSI. Data is broken up into pages to avoid returning too much information.
     
     Args:
         mmsi (str): Maritime Mobile Service Identity number of the vessel
-        page (str): Page number of detections. Start with '1'.
+        page (str): Page number of positions. Start with '1'.
     
     Returns:
-        A list of detections
+        A list of vessel positions.
     """
     print("started")
     try:

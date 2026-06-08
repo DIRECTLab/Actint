@@ -186,20 +186,31 @@ def find_nearest_navaids(
         radius_nm = 200.0
 
     lat_min, lat_max, lon_min, lon_max = bbox_from_radius_nm(lat, lon, float(radius_nm))
-    type_q = (navaid_type or "").strip() if navaid_type else None
+    type_q = (navaid_type or "").strip() or None
 
-    sql = """
-        SELECT id, ident, name, type, frequency_khz, latitude_deg, longitude_deg, iso_country, associated_airport
+    conditions = [
+        "latitude_deg BETWEEN %s AND %s",
+        "longitude_deg BETWEEN %s AND %s",
+    ]
+    params: list[Any] = [lat_min, lat_max, lon_min, lon_max]
+
+    if type_q:
+        conditions.append("type = %s")
+        params.append(type_q)
+
+    params.append(20000)
+
+    sql = f"""
+        SELECT id, ident, name, type, frequency_khz,
+               latitude_deg, longitude_deg, iso_country, associated_airport
         FROM avi_navaids
-        WHERE (%s IS NULL OR type = %s)
-          AND latitude_deg BETWEEN %s AND %s
-          AND longitude_deg BETWEEN %s AND %s
-        LIMIT 20000;
+        WHERE {" AND ".join(conditions)}
+        LIMIT %s;
     """
 
     with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (type_q, type_q, lat_min, lat_max, lon_min, lon_max))
+            cur.execute(sql, params)
             cols = [d.name for d in cur.description]
             rows = [dict(zip(cols, r)) for r in cur.fetchall()]
 

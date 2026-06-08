@@ -152,7 +152,7 @@ def reg_to_country_iso(conn, reg):
     
     query = """
         SELECT prefix, iso_country, notes
-        FROM reg_num_to_countries
+        FROM reg_num_to_country_iso
         WHERE %s LIKE prefix || '%%'
         ORDER BY LENGTH(prefix) DESC
         LIMIT 1;
@@ -161,7 +161,7 @@ def reg_to_country_iso(conn, reg):
     with conn.cursor() as cur:
         cur.execute(query, (reg,))
         row = cur.fetchone()
-        return row[1] if row else None
+    return row[1] if row else None
 
 
 
@@ -171,22 +171,19 @@ def country_iso_to_name(conn, iso):
 
 
 
-def get_last_location(conn, icao): #this is using past 6 months interval because we don't have live data. This will change to 1 month when we have live data
-
+def get_last_location(conn, icao: str, lookback_months: int = 6):
+    """Return the most recent position row for an aircraft."""
     query = """
         SELECT *
         FROM adsb_positions
         WHERE icao = %s
-            AND timestamp >= NOW() - INTERVAL '6 months'
+          AND timestamp >= NOW() - make_interval(months => %s)
         ORDER BY timestamp DESC
         LIMIT 1;
-
     """
-
     with conn.cursor() as cur:
-        cur.execute(query, (normalize_icao(icao),))
+        cur.execute(query, (normalize_icao(icao), lookback_months))
         row = cur.fetchone()
-
     return row
 
 
@@ -259,13 +256,3 @@ def count_rows(conn, table_name: str) -> int:
     with conn.cursor() as cur:
         cur.execute(q)
         return int(cur.fetchone()[0])
-
-
-
-if __name__ == "__main__":
-    print("testing")
-
-    conn = get_conn(DatabaseConnectionTypes.ADSB)
-    test = get_last_seen_time(conn, '4baad9')
-    print(f"value: {test}")
-    
