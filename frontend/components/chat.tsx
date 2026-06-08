@@ -82,7 +82,12 @@ export function Chat() {
         <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
         <MainContainer style={{ height: "100%" }}>
             <ChatContainer>
-            <MessageList>
+            <MessageList
+                typingIndicator={isTyping ? (
+                <TypingIndicator content="ChatBot is typing" />
+                ) : null
+                }
+            >
                 {messages.map((msg, idx) => (
                 <Message
                     key={idx}
@@ -95,7 +100,7 @@ export function Chat() {
                     }}
                 />
                 ))}
-                {isTyping && <TypingIndicator content="ChatBot is typing" />}
+                {/* {isTyping && <TypingIndicator content="ChatBot is typing" />} */}
             </MessageList>
             <MessageInput
                 placeholder={
