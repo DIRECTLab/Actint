@@ -46,11 +46,15 @@ def get_vessel_mmsi_helper(vessel_name: str) -> int:
         return result[0]
     raise ValueError("No Vessel with that name.")
 
-def get_vessel_position_history_helper(mmsi: int) -> list[dict]:
+def get_vessel_position_history_helper(mmsi: int, limit=None) -> list[dict]:
     """Get the position history of a vessel given its MMSI."""
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM ais_dynamic_data WHERE mmsi = %s ORDER BY basedatetime DESC;", (mmsi,))
+    if limit:
+        limit = int(limit)
+        cursor.execute("SELECT * FROM ais_dynamic_data WHERE mmsi = %s ORDER BY basedatetime DESC LIMIT %s;", (mmsi, limit))
+    else:
+        cursor.execute("SELECT * FROM ais_dynamic_data WHERE mmsi = %s ORDER BY basedatetime DESC;", (mmsi,))
     results = cursor.fetchall()
     conn.close()
 

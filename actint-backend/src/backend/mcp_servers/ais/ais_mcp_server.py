@@ -14,6 +14,7 @@ Tools provided:
 """
 
 from pathlib import Path
+from backend.mcp_servers.ais.helpers.area_context import get_future_intersections_in_area_helper
 from fastmcp import FastMCP
 # Import tool functions from parent package
 from backend.mcp_servers.ais.helpers.ship_context import (
@@ -261,6 +262,23 @@ def get_vessels_in_fleet(fleet_name: str) -> str:
 Could not find vessel information for fleet {fleet_name}.
 """
 
+
+@mcp.tool()
+def get_future_intersections_in_area(lat: str, lon: str, radius_nm: str) -> str:
+    """Calculate potential intersections of vessels within a specified area and time window.
+    
+    Args:
+        lat (str): Latitude of the center point
+        lon (str): Longitude of the center point
+        radius_nm (str): Radius in nautical miles to define the area
+    
+    Returns:
+        str: List of potential vessel intersections with details (vessel names, estimated time to intersection, etc.)
+    """
+    try:
+        return get_future_intersections_in_area_helper(lat, lon, radius_nm)
+    except Exception as e:
+        return "Error:\n" + str(e)
 
 # ============================================================================
 # Tools: Geographic Queries
