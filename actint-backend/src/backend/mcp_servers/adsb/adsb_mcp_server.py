@@ -220,19 +220,22 @@ def find_nearest_airports(
         latitude (str): Latitude in decimal degrees (e.g., "40.6413").
         longitude (str): Longitude in decimal degrees (e.g., "-73.7781").
         limit (str): Maximum number of airports to return. Default '5'.
-        max_distance_nm (str | None): Optional search radius cap in nautical miles.
+        max_distance_nm (str | None): Optional search radius cap in nautical miles. Omit or leave blank to search without a distance cap.
 
     Returns:
         A list of nearest airports ordered by distance.
     """
     try:
+        # Treat empty string, "null", "none" etc. as absent
+        _max_dist: float | None = None
+        if max_distance_nm and max_distance_nm.strip().lower() not in ("", "null", "none"):
+            _max_dist = float(max_distance_nm)
+
         airports = find_nearest_airport(
             float(latitude),
             float(longitude),
             limit=int(limit),
-            max_distance_nm=(
-                None if max_distance_nm is None else float(max_distance_nm)
-            ),
+            max_distance_nm=_max_dist,
         )
         return _dumps(airports)
     except Exception as e:
@@ -260,31 +263,41 @@ def get_airport(ident: str) -> str:
 
 @mcp.tool()
 def search_airports_tool(
-    name_contains: str | None = None,
-    iso_country: str | None = None,
-    iso_region: str | None = None,
-    municipality_contains: str | None = None,
+    name_contains: str | None = "",
+    iso_country: str | None = "",
+    iso_region: str | None = "",
+    municipality_contains: str | None = "",
     limit: str = "50",
 ) -> str:
-    """Search airports by name, country, region, or municipality. All text
-    filters are case-insensitive partial matches.
+    """Search airports by name, country, region, or municipality.
+    All text filters are optional case-insensitive partial matches.
+
+    iso_region must be the full hyphenated code (e.g. "US-UT", not "UT").
 
     Args:
-        name_contains (str | None): Partial airport name (e.g., "Heathrow").
-        iso_country (str | None): Two-letter ISO country code (e.g., "US", "GB").
-        iso_region (str | None): ISO region code (e.g., "US-NY").
-        municipality_contains (str | None): Partial city name (e.g., "London").
-        limit (str): Maximum number of results to return. Default '50'.
+        name_contains (str | None): Partial airport name.
+        iso_country (str | None): Two-letter ISO country code (e.g. "US").
+        iso_region (str | None): Full ISO region code (e.g. "US-UT").
+        municipality_contains (str | None): Partial city name.
+        limit (str): Maximum results to return. Default '50'.
 
     Returns:
-        A list of matching airports.
+        A list of matching airports ordered by score descending.
     """
+    def _empty_to_none(v: str | None) -> str | None:
+        if v is None:
+            return None
+        cleaned = v.strip().lower()
+        if not cleaned or cleaned in ("null", "none", "n/a"):
+            return None
+        return v.strip()
+
     try:
         results = search_airports(
-            name_contains=name_contains,
-            iso_country=iso_country,
-            iso_region=iso_region,
-            municipality_contains=municipality_contains,
+            name_contains=_empty_to_none(name_contains),
+            iso_country=_empty_to_none(iso_country),
+            iso_region=_empty_to_none(iso_region),
+            municipality_contains=_empty_to_none(municipality_contains),
             limit=int(limit),
         )
         return _dumps(results)
@@ -310,23 +323,42 @@ def get_airport_runways_tool(airport_ident: str) -> str:
 
 @mcp.tool()
 def get_airport_frequencies_tool(
-    airport_ident: str, freq_type: str | None = None
+    airport_ident: str, freq_type: str | None = ""
 ) -> str:
     """Get radio communication frequencies for an airport.
 
     Args:
         airport_ident (str): Airport ICAO or IATA identifier (e.g., "KJFK").
-        freq_type (str | None): Optional type filter (e.g., "ATIS", "TWR", "GND", "APP"). Omit for all.
+        freq_type (str | None): Optional type filter (e.g., "ATIS", "TWR",
+            "GND", "APP"). Leave blank or omit for all frequencies.
 
     Returns:
         A list of frequencies with type and MHz value.
     """
+    def _empty_to_none(v: str | None) -> str | None:
+        if not (v or "").strip():
+            return None
+        cleaned = v.strip().lower()
+        if cleaned in ("null", "none", "n/a"):
+            return None
+        return v.strip()
+
     try:
-        return _dumps(
-            get_airport_frequencies(
-                airport_ident=airport_ident, freq_type=freq_type
-            )
+        rows = get_airport_frequencies(
+            airport_ident=airport_ident,
+            freq_type=_empty_to_none(freq_type),
+            limit=50,  # hard cap — airports rarely have more than ~20
         )
+        # Return only the fields the agent actually needs
+        slim = [
+            {
+                "type": r["type"],
+                "description": r["description"],
+                "frequency_mhz": r["frequency_mhz"],
+            }
+            for r in rows
+        ]
+        return _dumps(slim)
     except Exception as e:
         return _dumps({"error": str(e)})
 

@@ -158,12 +158,17 @@ def get_track_summary(icao: str, lookback_hours: float = 6.0) -> dict:
             AVG(ground_speed) AS avg_ground_speed
         FROM adsb_positions
         WHERE icao = %s
-          AND timestamp >= NOW() - make_interval(hours => %s);
+        AND timestamp >= (
+            SELECT MAX(timestamp) - (%s * INTERVAL '1 hour')
+            FROM adsb_positions
+            WHERE icao = %s
+                AND timestamp >= NOW() - INTERVAL '6 months'
+        );
     """
 
     with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
-            cur.execute(query, (icao_n, lookback_hours))
+            cur.execute(query, (icao_n, lookback_hours, icao_n))
             colnames = [d.name for d in cur.description]
             row = cur.fetchone()
 
