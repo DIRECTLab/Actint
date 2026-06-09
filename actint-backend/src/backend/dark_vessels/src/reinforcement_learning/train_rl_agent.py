@@ -25,12 +25,12 @@ import matplotlib.pyplot as plt
 
 warnings.filterwarnings("ignore")
 
-from src.simulator   import simulate_region
-from src.features    import compute_segment_features
-from src.classifier  import ActivityIntelligenceClassifier, ACTIVITY_FEATURES, ACTIVITY_LABELS
-from src.rl_env      import (AISActivityEnv, RunningNormaliser,
+from backend.dark_vessels.src.simulation.simulator   import simulate_region
+from backend.dark_vessels.src.feature_extraction.features    import compute_segment_features
+from backend.dark_vessels.src.classifiers.classifier  import ActivityIntelligenceClassifier, ACTIVITY_FEATURES, ACTIVITY_LABELS
+from backend.dark_vessels.src.reinforcement_learning.rl_env      import (AISActivityEnv, RunningNormaliser,
                               LABEL_LIST, N_ACTIONS, IDX_TO_LABEL)
-from src.rl_agent    import DQNAgent
+from backend.dark_vessels.src.reinforcement_learning.rl_agent    import DQNAgent
 
 OUT_DIR = Path("outputs/rl")
 OUT_DIR.mkdir(parents=True, exist_ok=True)

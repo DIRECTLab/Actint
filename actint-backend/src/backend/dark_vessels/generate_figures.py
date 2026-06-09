@@ -63,8 +63,8 @@ warnings.filterwarnings("ignore")
 logging.disable(logging.WARNING)
 
 sys.path.insert(0, str(Path(__file__).parent))
-from src.tracking_scenarios import generate_all_scenarios, SCENARIO_LABELS
-from src.dark_period_predictor import DarkPeriodPredictor, VesselState
+from backend.dark_vessels.src.simulation.tracking_scenarios import generate_all_scenarios, SCENARIO_LABELS
+from backend.dark_vessels.src.anomaly_detection.dark_period_predictor import DarkPeriodPredictor, VesselState
 
 # ── Style ─────────────────────────────────────────────────────────────────────
 
@@ -815,7 +815,7 @@ def fig_c13_track_fragmentation(df):
 
 def fig_c14_bunkering_rendezvous(df):
     """C14 — Bunkering Rendezvous (Port Approach)."""
-    from src.features import haversine_nm
+    from backend.dark_vessels.src.feature_extraction.features import haversine_nm
 
     fig, (ax_map, ax_dist) = plt.subplots(1, 2, figsize=(12, 5))
     _style(fig, [ax_map, ax_dist])
@@ -1127,7 +1127,7 @@ def fig_a7_confidence_calibration():
 
 def fig_b1_gfw_effort():
     """GFW fishing effort density heatmap (Asia-Pacific region)."""
-    from src.geo_features import GeoFeatureAugmenter
+    from backend.dark_vessels.src.feature_extraction.geo_features import GeoFeatureAugmenter
 
     aug = GeoFeatureAugmenter(fetch_depth=False)
     grid = aug._gfw.effort
@@ -1464,7 +1464,7 @@ def run_all(series_filter=None):
     # ── D-series ──────────────────────────────────────────────────────────────
     if series_filter in (None, "D"):
         print("\nD-series: Complex Activity Types")
-        from src.simulator import simulate_region
+        from backend.dark_vessels.src.simulation.simulator import simulate_region
         region_df = simulate_region("brazil_eez")
         _save(fig_d1_new_activities_overview(region_df), "D1_new_activities_overview.png")
 

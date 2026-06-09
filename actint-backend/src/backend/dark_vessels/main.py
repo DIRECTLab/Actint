@@ -30,7 +30,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from backend.dark_vessels.src.simulation.simulator        import simulate_region
 from backend.dark_vessels.src.feature_extraction.features         import compute_vessel_features, compute_segment_features
 from backend.dark_vessels.src.classifiers.classifier       import ActivityIntelligenceClassifier
-from backend.dark_vessels.src.dark_vessel_detector import DarkVesselDetector
+from backend.dark_vessels.src.anomaly_detection.dark_vessel_detector import DarkVesselDetector
 from backend.dark_vessels.src.util.visualizer       import (
     build_region_map,
     plot_activity_distribution,
