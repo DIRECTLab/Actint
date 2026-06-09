@@ -103,7 +103,7 @@ def get_vehicle_locations(
 
     end_clause = ""
     if end_time:
-        end_clause = " AND timestamp <= %s"
+        end_clause = " AND timestamp <= {PH}"
         params.append(end_time)
 
     params.append(limit)
@@ -111,11 +111,11 @@ def get_vehicle_locations(
     query = (
         "SELECT " + ", ".join(_POSITION_COLUMNS) +
         " FROM adsb_positions"
-        " WHERE icao = %s"
-        " AND timestamp >= %s"
+        " WHERE icao = {PH}"
+        " AND timestamp >= {PH}"
         + end_clause +
         " ORDER BY timestamp DESC"
-        " LIMIT %s;"
+        " LIMIT {PH};"
     )
 
     with get_conn(DatabaseConnectionTypes.ADSB) as conn:
@@ -157,11 +157,11 @@ def get_track_summary(icao: str, lookback_hours: float = 6.0) -> dict:
             MAX(lon)          AS max_lon,
             AVG(ground_speed) AS avg_ground_speed
         FROM adsb_positions
-        WHERE icao = %s
+        WHERE icao = {PH}
         AND timestamp >= (
-            SELECT MAX(timestamp) - (%s * INTERVAL '1 hour')
+            SELECT MAX(timestamp) - ({PH} * INTERVAL '1 hour')
             FROM adsb_positions
-            WHERE icao = %s
+            WHERE icao = {PH}
                 AND timestamp >= NOW() - INTERVAL '6 months'
         );
     """

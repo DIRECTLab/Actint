@@ -48,34 +48,3 @@ def get_conn(conn_type: DatabaseConnectionTypes = DatabaseConnectionTypes.AIS):
         return conn
     except psycopg.Error as e:
         raise ConnectionError(f"Failed to connect to database: {e}") from e
-
-
-
-######################################### Functions for planes ##########################################
-
-def query_adsb_positions(searchQuery: dict, sort=False):
-    conn = get_conn(DatabaseConnectionTypes.ADSB)
-    cursor = conn.cursor()
-
-    prompt = "SELECT * FROM adsb_positions WHERE "
-    for key, value in searchQuery.items():
-        prompt += f"{key} = %s AND "
-    prompt = prompt[:-5] + ";"  # Remove trailing ' AND ' and add semicolon
-    
-    cursor.execute(prompt, tuple(searchQuery.values()))
-    results = cursor.fetchall()
-    conn.close()
-    if results and sort:
-        sorted_planes = sorted(
-            results,
-            key=lambda x: float(x[7]),
-            reverse=True
-        )
-        return sorted_planes
-
-    return results
-
-
-if (__name__ == "__main__"):
-    results = query_ais_positions({"MMSI": 368011000})
-    print(results)

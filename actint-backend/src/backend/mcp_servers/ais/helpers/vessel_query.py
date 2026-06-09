@@ -1,5 +1,8 @@
 from backend.data_processing.query_database import get_conn
 from backend.mcp_servers.utils.distance_calculation import haversine_distance_nm
+from backend.config import config
+
+PH = "?" if config.DB_USING_SQLITE else "%s"
 
 def get_all_vessel_names() -> list[str]:
     conn = get_conn()
@@ -39,7 +42,7 @@ def get_vessel_mmsi_helper(vessel_name: str) -> int:
     """Get the MMSI of a vessel given its name."""
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("SELECT mmsi FROM ais_static_data WHERE UPPER(vesselname) = UPPER(%s);", (vessel_name,))
+    cursor.execute(f"SELECT mmsi FROM ais_static_data WHERE UPPER(vesselname) = UPPER({PH});", (vessel_name,))
     result = cursor.fetchone()
     conn.close()
     if result:
@@ -52,9 +55,9 @@ def get_vessel_position_history_helper(mmsi: int, limit=15) -> list[dict]:
     cursor = conn.cursor()
     if limit:
         limit = int(limit)
-        cursor.execute("SELECT * FROM ais_dynamic_data WHERE mmsi = %s ORDER BY basedatetime DESC LIMIT %s;", (mmsi, limit))
+        cursor.execute(f"SELECT * FROM ais_dynamic_data WHERE mmsi = {PH} ORDER BY basedatetime DESC LIMIT {PH};", (mmsi, limit))
     else:
-        cursor.execute("SELECT * FROM ais_dynamic_data WHERE mmsi = %s ORDER BY basedatetime DESC;", (mmsi,))
+        cursor.execute(f"SELECT * FROM ais_dynamic_data WHERE mmsi = {PH} ORDER BY basedatetime DESC;", (mmsi,))
     results = cursor.fetchall()
     conn.close()
 
@@ -65,7 +68,7 @@ def get_vessel_latest_location_helper(mmsi: int) -> dict | None:
     """Get the latest known location of a vessel given its MMSI."""
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM ais_dynamic_data WHERE mmsi = %s ORDER BY basedatetime DESC LIMIT 1;", (mmsi,))
+    cursor.execute(f"SELECT * FROM ais_dynamic_data WHERE mmsi = {PH} ORDER BY basedatetime DESC LIMIT 1;", (mmsi,))
     result = cursor.fetchone()
     conn.close()
     
@@ -96,7 +99,7 @@ def query_static_data_helper(searchQuery: dict):
 
     prompt = "SELECT * FROM ais_static_data WHERE "
     for key, value in searchQuery.items():
-        prompt += f"{key} = %s AND "
+        prompt += f"{key} = {PH} AND "
     prompt = prompt[:-5] + ";"  # Remove trailing ' AND ' and add semicolon
     cursor.execute(prompt, tuple(searchQuery.values()))
     results = cursor.fetchall()
@@ -111,7 +114,7 @@ def query_dynamic_data_helper(searchQuery: dict, sort=False):
 
     prompt = "SELECT * FROM ais_dynamic_data WHERE "
     for key, value in searchQuery.items():
-        prompt += f"{key} = %s AND "
+        prompt += f"{key} = {PH} AND "
     prompt = prompt[:-5] + ";"  # Remove trailing ' AND ' and add semicolon 
 
     cursor.execute(prompt, tuple(searchQuery.values()))
@@ -131,7 +134,7 @@ def query_dynamic_data_helper(searchQuery: dict, sort=False):
 def evaluate_country_code(code: int):
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("SELECT country FROM mmsi_mid_country WHERE mid = %s;", (code,))
+    cursor.execute(f"SELECT country FROM mmsi_mid_country WHERE mid = {PH};", (code,))
     result = cursor.fetchone()
     conn.close()
     if result:
@@ -142,7 +145,7 @@ def evaluate_country_code(code: int):
 def evaluate_vessel_type(code: int):
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("SELECT vessel_type FROM vessel_type WHERE vessel_type_code = %s;", (code,))
+    cursor.execute(f"SELECT vessel_type FROM vessel_type WHERE vessel_type_code = {PH};", (code,))
     result = cursor.fetchone()
     conn.close()
     if result:

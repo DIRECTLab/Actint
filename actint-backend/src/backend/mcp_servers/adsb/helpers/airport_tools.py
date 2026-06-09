@@ -25,7 +25,9 @@ from backend.mcp_servers.adsb.helpers.adsb_locations import (
 from backend.mcp_servers.utils.distance_calculation import calculate_bearing, haversine_distance_nm
 
 from backend.data_processing.query_database import DatabaseConnectionTypes, get_conn
+from backend.config import config
 
+PH = "?" if config.DB_USING_SQLITE else "%s"
 
 def get_airport_by_ident(ident: str) -> Optional[dict[str, Any]]:
     ident_n = (ident or "").strip().upper()
@@ -42,7 +44,7 @@ def get_airport_by_ident(ident: str) -> Optional[dict[str, Any]]:
             gps_code, icao_code, iata_code, local_code,
             home_link, wikipedia_link, keywords, score, last_updated
         FROM airports
-        WHERE ident = %s
+        WHERE ident = {PH}
         LIMIT 1;
     """
 
@@ -75,16 +77,16 @@ def search_airports(
     params: list[Any] = []
 
     if name_pattern:
-        conditions.append("name ILIKE %s")
+        conditions.append("name ILIKE {PH}")
         params.append(name_pattern)
     if muni_pattern:
-        conditions.append("municipality ILIKE %s")
+        conditions.append("municipality ILIKE {PH}")
         params.append(muni_pattern)
     if iso_country:
-        conditions.append("iso_country = %s")
+        conditions.append("iso_country = {PH}")
         params.append(iso_country)
     if iso_region:
-        conditions.append("iso_region = %s")
+        conditions.append("iso_region = {PH}")
         params.append(iso_region)
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
@@ -101,7 +103,7 @@ def search_airports(
         FROM airports
         {where}
         ORDER BY score DESC NULLS LAST, name ASC
-        LIMIT %s;
+        LIMIT {PH};
     """
 
     with get_conn(DatabaseConnectionTypes.ADSB) as conn:
@@ -128,10 +130,10 @@ def get_airport_runways(
     params: list[Any] = []
 
     if ident_q:
-        conditions.append("airport_ident = %s")
+        conditions.append("airport_ident = {PH}")
         params.append(ident_q)
     if airport_ref is not None:
-        conditions.append("airport_ref = %s")
+        conditions.append("airport_ref = {PH}")
         params.append(airport_ref)
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
@@ -147,7 +149,7 @@ def get_airport_runways(
         FROM runways
         {where}
         ORDER BY length_ft DESC NULLS LAST
-        LIMIT %s;
+        LIMIT {PH};
     """
 
     with get_conn(DatabaseConnectionTypes.ADSB) as conn:
@@ -176,13 +178,13 @@ def get_airport_frequencies(
     params: list[Any] = []
 
     if ident_q:
-        conditions.append("airport_ident = %s")
+        conditions.append("airport_ident = {PH}")
         params.append(ident_q)
     if airport_ref is not None:
-        conditions.append("airport_ref = %s")
+        conditions.append("airport_ref = {PH}")
         params.append(airport_ref)
     if type_q:
-        conditions.append("type = %s")
+        conditions.append("type = {PH}")
         params.append(type_q)
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
@@ -193,7 +195,7 @@ def get_airport_frequencies(
         FROM airport_frequencies
         {where}
         ORDER BY type ASC, frequency_mhz ASC
-        LIMIT %s;
+        LIMIT {PH};
     """
 
     with get_conn(DatabaseConnectionTypes.ADSB) as conn:
@@ -230,8 +232,8 @@ def find_nearest_airport(
             iso_country, iso_region,
             municipality, iata_code, icao_code
         FROM airports
-        WHERE latitude_deg BETWEEN %s AND %s
-          AND longitude_deg BETWEEN %s AND %s
+        WHERE latitude_deg BETWEEN {PH} AND {PH}
+          AND longitude_deg BETWEEN {PH} AND {PH}
         LIMIT 5000;
     """
 
@@ -297,8 +299,8 @@ def get_possible_airport_destinations(
     sql = """
         SELECT id, ident, name, type, latitude_deg, longitude_deg, iso_country, iso_region, municipality
         FROM airports
-        WHERE latitude_deg BETWEEN %s AND %s
-          AND longitude_deg BETWEEN %s AND %s
+        WHERE latitude_deg BETWEEN {PH} AND {PH}
+          AND longitude_deg BETWEEN {PH} AND {PH}
         LIMIT 10000;
     """
 

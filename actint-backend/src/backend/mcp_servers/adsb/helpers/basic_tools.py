@@ -27,7 +27,9 @@ import math
 from typing import Any, Iterable, Optional
 
 from backend.data_processing.query_database import DatabaseConnectionTypes, get_conn
+from backend.config import config
 
+PH = "?" if config.DB_USING_SQLITE else "%s"
 
 def normalize_icao(icao: str) -> str:
     """Normalize ICAO hex strings for consistent DB lookup."""
@@ -56,7 +58,7 @@ def select_one(conn, table, select_col, where_col, where_val):
     query = sql.SQL("""
         SELECT {select_col}
         FROM {table}
-        WHERE {where_col} = %s
+        WHERE {where_col} = {PH}
         LIMIT 1;
     """).format(
         select_col=sql.Identifier(select_col),
@@ -82,7 +84,7 @@ def select_one_row(
     query = sql.SQL("""
         SELECT {columns}
         FROM {table}
-        WHERE {where_col} = %s
+        WHERE {where_col} = {PH}
         LIMIT 1;
     """).format(
         columns=sql.SQL(", ").join(map(sql.Identifier, columns)),
@@ -117,7 +119,7 @@ def select_many_rows(
     if where:
         parts = []
         for key, val in where.items():
-            parts.append(sql.SQL("{col} = %s").format(col=sql.Identifier(key)))
+            parts.append(sql.SQL("{col} = {PH}").format(col=sql.Identifier(key)))
             params.append(val)
         where_sql = sql.SQL(" AND ").join(parts)
 
@@ -132,7 +134,7 @@ def select_many_rows(
         columns=sql.SQL(", ").join(map(sql.Identifier, columns)),
         table=sql.Identifier(table),
         where=where_sql,
-    ) + order_sql + sql.SQL(" LIMIT %s")
+    ) + order_sql + sql.SQL(" LIMIT {PH}")
     params.append(limit)
 
     with conn.cursor(row_factory=dict_row) as cur:
@@ -153,7 +155,7 @@ def reg_to_country_iso(conn, reg):
     query = """
         SELECT prefix, iso_country, notes
         FROM reg_num_to_country_iso
-        WHERE %s LIKE prefix || '%%'
+        WHERE {PH} LIKE prefix || '%%'
         ORDER BY LENGTH(prefix) DESC
         LIMIT 1;
     """
@@ -176,8 +178,8 @@ def get_last_location(conn, icao: str, lookback_months: int = 6):
     query = """
         SELECT *
         FROM adsb_positions
-        WHERE icao = %s
-          AND timestamp >= NOW() - make_interval(months => %s)
+        WHERE icao = {PH}
+          AND timestamp >= NOW() - make_interval(months => {PH})
         ORDER BY timestamp DESC
         LIMIT 1;
     """
@@ -243,7 +245,7 @@ def describe_table(conn, table_name: str) -> list[dict[str, Any]]:
             """
             SELECT ordinal_position, column_name, data_type, is_nullable
             FROM information_schema.columns
-            WHERE table_schema = 'public' AND table_name = %s
+            WHERE table_schema = 'public' AND table_name = {PH}
             ORDER BY ordinal_position;
             """,
             (table_name,),
