@@ -49,12 +49,12 @@ from backend.dark_vessels.src.classifiers.partial_track_classifier import (
     PartialTrackClassifier, build_training_data, PARTIAL_FEATURES,
     UNIFIED_VESSEL_TYPES, ACTIVITY_LABELS,
 )
-from backend.dark_vessels.src.real_data_helpers.real_ais_loader import load_ais_file
-from backend.dark_vessels.src.util.regions import REGIONS
-from backend.dark_vessels.src.feature_extraction.geo_features import GeoFeatureAugmenter
-from backend.dark_vessels.src.anomaly_detection.rendezvous_detector import RendezvousDetector
-from backend.dark_vessels.src.anomaly_detection.dark_period_predictor import DarkPeriodPredictor, VesselState
-from backend.dark_vessels.src.anomaly_detection.vessel_baseline import VesselBaselineProfiler
+from src.real_ais_loader import load_ais_file
+from src.regions import REGIONS
+from src.geo_features import GeoFeatureAugmenter
+from src.rendezvous_detector import RendezvousDetector
+from src.dark_period_predictor import DarkPeriodPredictor, VesselState
+from src.vessel_baseline import VesselBaselineProfiler
 from backend.config import config
 
 out_dir = Path("outputs")
@@ -214,12 +214,12 @@ def run_region(region_key: str, n_fishing: int = 20, n_cargo: int = 12, visualis
     results_df.to_sql("predictions", engine, if_exists="replace", index=False)
     dark_df.to_sql("dark_analysis", engine, if_exists="replace", index=False)
 
-    # Charts
-    map_path = build_region_map(
-        raw_df, results_df, dark_df, region_key,
-        str(out_dir / "map.html")
-    )
-    print(f"      Interactive map: {map_path}")
+    # # Charts
+    # map_path = build_region_map(
+    #     raw_df, results_df, dark_df, region_key,
+    #     str(out_dir / "map.html")
+    # )
+    # print(f"      Interactive map: {map_path}")
 
     if visualise:
         plot_activity_distribution(

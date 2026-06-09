@@ -32,9 +32,6 @@ from backend.dark_vessels.src.reinforcement_learning.rl_env      import (AISActi
                               LABEL_LIST, N_ACTIONS, IDX_TO_LABEL)
 from backend.dark_vessels.src.reinforcement_learning.rl_agent    import DQNAgent
 
-OUT_DIR = Path("outputs/rl")
-OUT_DIR.mkdir(parents=True, exist_ok=True)
-
 BG    = "#0d1117"
 PANEL = "#161b22"
 GRID  = "#21262d"
