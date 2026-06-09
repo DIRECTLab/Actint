@@ -17,7 +17,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import cross_val_score
 from sklearn.metrics import classification_report, confusion_matrix
 from typing import Tuple
-from .gpu_utils import make_activity_classifier, make_type_classifier, BACKEND, compute_device
+from ..util.gpu_utils import make_activity_classifier, make_type_classifier, BACKEND, compute_device
 
 
 # ---------------------------------------------------------------------------

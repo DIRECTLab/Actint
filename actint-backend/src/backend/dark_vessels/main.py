@@ -18,43 +18,43 @@ from sqlalchemy import create_engine
 import pandas as pd
 import numpy as np
 
-OUTPUT_DIR = '~/Actint/actint-backend/src/backend/dark_vessels/'
+OUTPUT_DIR = Path(__file__).parent / "outputs"
 
 
 from backend.dark_vessels.src.simulation.simulator import simulate_region
-from backend.dark_vessels.src.sequence_classifier import SequenceClassifier
+from backend.dark_vessels.src.classifiers.sequence_classifier import SequenceClassifier
 from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_position_history_helper, get_all_mmsis
 
 # ── project imports ──────────────────────────────────────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
 from backend.dark_vessels.src.simulation.simulator        import simulate_region
 from backend.dark_vessels.src.feature_extraction.features         import compute_vessel_features, compute_segment_features
-from backend.dark_vessels.src.classifier       import ActivityIntelligenceClassifier
+from backend.dark_vessels.src.classifiers.classifier       import ActivityIntelligenceClassifier
 from backend.dark_vessels.src.dark_vessel_detector import DarkVesselDetector
-from backend.dark_vessels.src.visualizer       import (
+from backend.dark_vessels.src.util.visualizer       import (
     build_region_map,
     plot_activity_distribution,
     plot_confusion_matrix,
     plot_feature_importance,
     plot_speed_profiles,
 )
-from backend.dark_vessels.src.real_data_viz import (
+from backend.dark_vessels.src.real_data_helpers.real_data_viz import (
     build_real_fishing_map,
     plot_real_fleet_composition,
     plot_model_vs_reality,
     print_region_intelligence_report,
 )
-from backend.dark_vessels.src.real_ais_validator import validate_real_ais
-from backend.dark_vessels.src.partial_track_classifier import (
+from backend.dark_vessels.src.real_data_helpers.real_ais_validator import validate_real_ais
+from backend.dark_vessels.src.classifiers.partial_track_classifier import (
     PartialTrackClassifier, build_training_data, PARTIAL_FEATURES,
     UNIFIED_VESSEL_TYPES, ACTIVITY_LABELS,
 )
-from backend.dark_vessels.src.real_ais_loader import load_ais_file
-from backend.dark_vessels.src.regions import REGIONS
+from backend.dark_vessels.src.real_data_helpers.real_ais_loader import load_ais_file
+from backend.dark_vessels.src.util.regions import REGIONS
 from backend.dark_vessels.src.feature_extraction.geo_features import GeoFeatureAugmenter
-from backend.dark_vessels.src.rendezvous_detector import RendezvousDetector
-from backend.dark_vessels.src.dark_period_predictor import DarkPeriodPredictor, VesselState
-from backend.dark_vessels.src.vessel_baseline import VesselBaselineProfiler
+from backend.dark_vessels.src.anomaly_detection.rendezvous_detector import RendezvousDetector
+from backend.dark_vessels.src.anomaly_detection.dark_period_predictor import DarkPeriodPredictor, VesselState
+from backend.dark_vessels.src.anomaly_detection.vessel_baseline import VesselBaselineProfiler
 from backend.config import config
 
 out_dir = Path("outputs")
@@ -339,7 +339,7 @@ def run_partial_track_training(
       3. Train on 70% of vessels, test on 30%
       4. Report F1 at each track length (shows how accuracy degrades with fewer obs)
     """
-    from backend.dark_vessels.src.gpu_utils import compute_device, BACKEND
+    from backend.dark_vessels.src.util.gpu_utils import compute_device, BACKEND
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -593,7 +593,7 @@ def run_enhanced_intelligence(
 
     # ── 4. Train classifier + vessel baseline ─────────────────────────────────
     print("[4/6] Training classifier + per-vessel behavioural baselines …")
-    from backend.dark_vessels.src.classifier import ActivityIntelligenceClassifier
+    from backend.dark_vessels.src.classifiers.classifier import ActivityIntelligenceClassifier
 
     # Add missing required columns if absent
     for col, val in [("true_activity", "transit"), ("vessel_type_key", "unknown"),
@@ -611,7 +611,7 @@ def run_enhanced_intelligence(
 
     # Derive pseudo true_activity from nav_status if present
     if "nav_status" in df.columns:
-        from backend.dark_vessels.src.real_ais_loader import NAV_STATUS_ACTIVITY
+        from backend.dark_vessels.src.real_data_helpers.real_ais_loader import NAV_STATUS_ACTIVITY
         ns_mode = (
             df.groupby("mmsi")["nav_status"]
             .agg(lambda x: pd.to_numeric(x, errors="coerce").dropna().astype(int).mode().iloc[0]

@@ -10,7 +10,7 @@ arguments:
 import time
 import argparse
 import backend.dark_vessels.main as dark_vessels
-import backend.dark_vessels.train_rl_agent as train_rl_agent
+import backend.dark_vessels.src.reinforcement_learning.train_rl_agent as train_rl_agent
 
 def build_model():
     print("Building the RL model...")

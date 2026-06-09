@@ -33,8 +33,8 @@ import pandas as pd
 ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
 
-import src.tracking_scenarios as _scen_mod
-from src.tracking_scenarios import _GENERATORS, SCENARIO_LABELS
+import backend.dark_vessels.src.simulation.tracking_scenarios as _scen_mod
+from backend.dark_vessels.src.simulation.tracking_scenarios import _GENERATORS, SCENARIO_LABELS
 
 
 # ══════════════════════════════════════════════════════════════════════════════

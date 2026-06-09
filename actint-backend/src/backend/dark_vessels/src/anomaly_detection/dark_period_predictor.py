@@ -354,3 +354,4 @@ class DarkPeriodPredictor:
                     })
 
         return pd.DataFrame(records)
+

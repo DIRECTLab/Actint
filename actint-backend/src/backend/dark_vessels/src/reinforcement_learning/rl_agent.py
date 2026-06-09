@@ -39,7 +39,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .classifier import ACTIVITY_FEATURES
+from ..classifiers.classifier import ACTIVITY_FEATURES
 from .rl_env import (
     AISActivityEnv, IDX_TO_LABEL, LABEL_LIST, N_ACTIONS, shaped_reward
 )

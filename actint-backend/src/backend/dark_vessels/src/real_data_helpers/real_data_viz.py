@@ -20,7 +20,7 @@ from .real_data import (
     region_fishing_stats, build_real_data_heatmap,
     GFW_GEARTYPE_MAP, MONTHS,
 )
-from .regions import REGIONS
+from ..util.regions import REGIONS
 
 
 GEAR_COLORS = {

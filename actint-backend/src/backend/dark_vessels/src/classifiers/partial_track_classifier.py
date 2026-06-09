@@ -35,8 +35,8 @@ import joblib
 from joblib import Parallel, delayed
 import multiprocessing
 
-from .gpu_utils import make_activity_classifier, make_type_classifier, N_CORES
-from .real_ais_loader import NAV_STATUS_ACTIVITY
+from ..util.gpu_utils import make_activity_classifier, make_type_classifier, N_CORES
+from ..real_data_helpers.real_ais_loader import NAV_STATUS_ACTIVITY
 
 # ── Sensor metadata ──────────────────────────────────────────────────────────
 

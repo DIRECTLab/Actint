@@ -26,8 +26,8 @@ from .real_ais_loader import (
     load_ais_file, fleet_summary, type_distribution,
     NAV_STATUS_ACTIVITY, VESSEL_TYPE_LABELS,
 )
-from .feature_extraction.features import compute_segment_features
-from .classifier import ActivityIntelligenceClassifier
+from ..feature_extraction.features import compute_segment_features
+from ..classifiers.classifier import ActivityIntelligenceClassifier
 
 # ── Activity colours (consistent with existing visualiser) ──────────────────
 ACTIVITY_COLORS = {
@@ -300,7 +300,7 @@ def _plot_type_distribution(type_dist: pd.DataFrame,
 
 
 def _plot_real_confusion(eval_results: dict, output_path: str) -> None:
-    from .visualizer import plot_confusion_matrix
+    from ..util.visualizer import plot_confusion_matrix
     plot_confusion_matrix(
         eval_results["confusion_matrix"],
         eval_results["labels"],
