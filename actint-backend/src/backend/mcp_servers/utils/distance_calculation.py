@@ -46,3 +46,15 @@ def bearing_to_cardinal(bearing: float) -> str:
                   "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
     index = round(bearing / 22.5) % 16
     return directions[index]
+
+
+def calculate_sog(lat1: float, lon1: float, time1: float, lat2: float, lon2: float, time2: float) -> float:
+    """Calculate speed over ground in knots.
+    
+    Time 1 and time 2 are datetime objects"""
+    distance_nm = haversine_distance_nm(lat1, lon1, lat2, lon2)
+    time_hours = (time2 - time1).total_seconds() / 3600.0
+    if time_hours > 0:
+        return distance_nm / time_hours
+    else:
+        return 0.0

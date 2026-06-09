@@ -105,8 +105,10 @@ class PingFeatureExtractor:
         # Turning rate (degrees/min)
         if "cog" in df.columns and "timestamp" in df.columns:
             ts_s = pd.to_datetime(df["timestamp"], utc=True, errors="coerce").astype(np.int64) / 1e9
-            dt   = np.diff(ts_s, prepend=ts_s[0])
-            dcog = np.diff(df["cog"].fillna(method="ffill").values, prepend=0)
+            # dt   = np.diff(ts_s, prepend=ts_s[0])
+            dt = np.diff(ts_s, prepend=ts_s.iloc[0])
+            # dcog = np.diff(df["cog"].fillna(method="ffill").values, prepend=0)
+            dcog = np.diff(df["cog"].ffill().values, prepend=0)
             dcog = (dcog + 180) % 360 - 180   # wrap to [-180, 180]
             tr   = np.where(dt > 0, dcog / (dt / 60.0), 0.0)
             out[:, 9] = np.clip(tr / 30.0, -1, 1)   # normalise
@@ -114,8 +116,10 @@ class PingFeatureExtractor:
         # Acceleration
         if "sog" in df.columns and "timestamp" in df.columns:
             ts_s = pd.to_datetime(df["timestamp"], utc=True, errors="coerce").astype(np.int64) / 1e9
-            dt   = np.diff(ts_s, prepend=ts_s[0])
-            dsog = np.diff(df["sog"].fillna(method="ffill").values, prepend=0)
+            # dt   = np.diff(ts_s, prepend=ts_s[0])
+            dt = np.diff(ts_s, prepend=ts_s.iloc[0])
+            # dsog = np.diff(df["sog"].fillna(method="ffill").values, prepend=0)
+            dsog = np.diff(df["sog"].ffill().values, prepend=0)
             acc  = np.where(dt > 0, dsog / (dt / 60.0), 0.0)
             out[:, 10] = np.clip(acc / 2.0, -1, 1)
 
@@ -428,3 +432,41 @@ class SequenceClassifier:
                 rec["vessel_type_key"] = mode_vt.iloc[0] if len(mode_vt) > 0 else "unknown"
             records.append(rec)
         return records
+    
+
+    import pandas as pd
+
+    def ais_to_dataframe(self, ais_data):
+        """
+        Convert a list of AIS pings (dicts) into a DataFrame suitable for
+        SequenceClassifier.predict().
+        
+        Takes input from the AIS database and produces a pandas dataframe.
+        
+        Output DataFrame columns:
+        ['mmsi', 'timestamp', 'lat', 'lon', 'sog', 'cog']
+        """
+        
+        # Map the dictionary keys to the columns expected by SequenceClassifier
+        records = []
+        for ping in ais_data:
+            record = {
+                "mmsi": ping["mmsi"],
+                "timestamp": ping["basedatetime"],
+                "lat": ping["lat"],
+                "lon": ping["lon"],
+                "sog": ping["sog"],
+                "cog": ping["cog"],
+            }
+            records.append(record)
+        
+        df = pd.DataFrame(records)
+        
+        # Sort by MMSI and timestamp, just in case
+        df.sort_values(by=["mmsi", "timestamp"], inplace=True)
+        df.reset_index(drop=True, inplace=True)
+        
+        return df
+
+
+

@@ -338,27 +338,6 @@ def _build_track(
             "true_activity": phase,
             "had_dark_period": len(dark_segments) > 0,
         })
-
-        print({
-            "mmsi": mmsi,
-            "vessel_type_key": vessel_key,
-            "vessel_type_code": tmpl["type_code"],
-            "timestamp": t,
-            "lat": round(lat + RNG.normal(0, 0.0002), 5),
-            "lon": round(lon + RNG.normal(0, 0.0002), 5),
-            "sog": round(reported_sog, 1),
-            "cog": round(reported_cog, 1),
-            "heading": round(reported_cog + RNG.normal(0, 2), 1) % 360,
-            "nav_status": nav_status,
-            "length": int(length),
-            "width": int(width),
-            "draught": draught,
-            "name": name,
-            "flag": flag,
-            "ais_on": True,
-            "true_activity": phase,
-            "had_dark_period": len(dark_segments) > 0,
-        })
         
         lat, lon = _step(lat, lon, sog, cog, dt_sec)
         t += timedelta(seconds=dt_sec)
