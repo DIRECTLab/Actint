@@ -113,7 +113,10 @@ class PingFeatureExtractor:
             dcog = np.diff(df["cog"].ffill().values, prepend=0)
         
             dcog = (dcog + 180) % 360 - 180   # wrap to [-180, 180]
-            tr   = np.where(dt > 0, dcog / (dt / 60.0), 0.0)
+
+            # tr   = np.where(dt > 0, dcog / (dt / 60.0), 0.0)
+            tr = np.divide(dcog, dt / 60.0, out=np.zeros_like(dcog), where=dt > 0)
+            
             out[:, 9] = np.clip(tr / 30.0, -1, 1)   # normalise
 
         # Acceleration
@@ -125,8 +128,10 @@ class PingFeatureExtractor:
             dt = np.diff(ts_s, prepend=ts_s.iloc[0])
             # dsog = np.diff(df["sog"].fillna(method="ffill").values, prepend=0)
             dsog = np.diff(df["sog"].ffill().values, prepend=0)
-        
-            acc  = np.where(dt > 0, dsog / (dt / 60.0), 0.0)
+            # acc  = np.where(dt > 0, dsog / (dt / 60.0), 0.0)
+            acc = np.divide(dsog, dt / 60.0, out=np.zeros_like(dsog), where=dt > 0)
+
+
             out[:, 10] = np.clip(acc / 2.0, -1, 1)
 
         # Vessel dims
