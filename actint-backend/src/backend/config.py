@@ -40,6 +40,7 @@ class Config:
     INFERENCE_SERVER_PORT: int = env_int("INFERENCE_SERVER_PORT", 8000)
     INFERENCE_SERVER_HOST: str = env_str("INFERENCE_SERVER_HOST", "127.0.0.1")
     INFERENCE_SERVER_URL: str = f"http://{INFERENCE_SERVER_HOST}:{INFERENCE_SERVER_PORT}/v1"
+    MODEL_API_KEY: str | None = env_str("MODEL_API_KEY", "")
 
 
 config = Config()

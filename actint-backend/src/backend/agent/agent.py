@@ -80,7 +80,7 @@ print(check_openai_health(), file=sys.stderr)
 model = OpenAIModel(
     model_id="local",
     api_base=config.INFERENCE_SERVER_URL,
-    api_key="dummy"
+    api_key=config.MODEL_API_KEY if config.MODEL_API_KEY else ""
 )
 
 def create_agent(
