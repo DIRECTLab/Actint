@@ -99,8 +99,8 @@ class ActivityIntelligenceClassifier:
 
     # This decides between using XGBoost, LGBMWrapper, and RandomForestClassifier which are all similar python packages for making decisoin trees. It will pick depending on what is on your computer.
         self.activity_clf   = make_activity_classifier(n_classes=len(ACTIVITY_LABELS))
-
-    # almost the exact same thing, but it has a couple different parameters for the 
+        
+    # Similar to self.activity_clf, but has some different parameters to be used for vessel type classification.
         self.vessel_clf     = make_type_classifier(n_classes=len(VESSEL_TYPE_LABELS))
 
         # This encodes strings/labels as numbers and has a couple methods that can classify labels, count the number of each label and inverse classify them (get the label from the number.)
@@ -112,21 +112,21 @@ class ActivityIntelligenceClassifier:
     # Training
     # ------------------------------------------------------------------
 
-    # This basically adds the vessel features matched with the vessels and the activity features matched with the true activity.
+    # This essentially adds the vessel features matched with the vessels and seperately, activity features matched with the true activity.
     def fit(self, feat_df: pd.DataFrame) -> "ActivityIntelligenceClassifier":
+        
         """Train on feature DataFrame (must include true_activity and vessel_type_key)."""
         feat_df = feat_df.dropna(subset=["true_activity", "vessel_type_key"])
 
         # Activity model
-
-        #selects all the activity vessels for everything with a true activity, and then it selects all the true activities. 
-
+        # Selects all vessels with a true activity, and extracts their features and true activities
         act_mask = feat_df["true_activity"].isin(ACTIVITY_LABELS)
         X_act = feat_df.loc[act_mask, ACTIVITY_FEATURES].fillna(0).values
         y_act = feat_df.loc[act_mask, "true_activity"].values
+        
         if len(X_act) > 0:
 
-            # This is what actually is doing the training. Adds the labels and features to the model.
+            # This is where the training loop is. Adds the labels and features to the model.
             self.activity_clf.fit(X_act, y_act)
             # Keep LabelEncoder in sync for evaluate()
             self.activity_enc.fit(y_act)

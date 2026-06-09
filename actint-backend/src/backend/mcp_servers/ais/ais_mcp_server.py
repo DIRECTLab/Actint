@@ -63,6 +63,151 @@ mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 # ============================================================================
 
 
+# ============================================================================
+# Dark Vessel Detection Tools
+# ============================================================================
+
+@mcp.tool()
+def evaluate_area_risk() -> str:
+    """Summarise information about dark vessels in the database."""
+    try:
+        # Placeholder implementation - replace with actual logic
+        summary = {
+            "total_dark_vessels": 42,
+            "recent_dark_vessels": 5,
+            "regions_with_dark_vessels": ["Gulf of Aden", "Strait of Malacca"],
+        }
+        return json.dumps(summary, indent=2)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+@mcp.tool()
+def evaluate_vessel_risk() -> str:
+    """Evaluate risk level of vessels based on dark behavior patterns."""
+    try:
+        # Placeholder implementation - replace with actual logic
+        risk_evaluation = {
+            "high_risk_vessels": 10,
+            "medium_risk_vessels": 20,
+            "low_risk_vessels": 12,
+        }
+        return json.dumps(risk_evaluation, indent=2)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+@mcp.tool()
+def get_dark_analysis(mmsi):
+    #Calls a helper function in the helpers/dark_vessel_helper.py file of the same name
+    pass
+
+# ============================================================================
+# Health & Info Endpoints
+# ============================================================================
+
+@mcp.tool()
+def say_hello() -> str:
+    """Simple tool to test connectivity and responsiveness of the MCP server."""
+    message = "Hello! The AIS Vessel Intelligence MCP server is up and running."
+    print("Printed Message:", message)#, file=sys.stderr)
+    return message
+
+
+@mcp.tool()
+def get_vessel_current_position(mmsi: int | str) -> str:
+    """Get the most recent position of a vessel.
+    
+    Args:
+        mmsi (int): Maritime Mobile Service Identity number of the vessel
+    
+    Returns:
+        str: JSON object with current position, speed, heading, and timestamp
+    """
+    try:
+        mmsi = int(mmsi)
+        locations = get_vehicle_locations(mmsi)
+        if locations:
+            loc = locations[0]  # Most recent
+            result = {
+                "mmsi": loc.mmsi,
+                "vessel_name": loc.vessel_name,
+                "timestamp": loc.timestamp,
+                "latitude": loc.lat,
+                "longitude": loc.lon,
+                "speed_over_ground": loc.sog,
+                "course_over_ground": loc.cog,
+                "heading": loc.heading,
+            }
+            return json.dumps(result, indent=2)
+        else:
+            return json.dumps({"error": "No positions found for this vessel"})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+@mcp.tool()
+def ship_following_analysis(mmsi1: int | str, mmsi2: int | str) -> str:
+    """Determine if one vessel has been following another vessel's path.
+    
+    Args:
+        mmsi1 (int): MMSI of the initial vessel
+        mmsi2 (int): MMSI of the vessel to check if following
+    
+    Returns:
+        str: Analysis string indicating how many times vessel 2 was near vessel 1
+    """
+    try:
+        mmsi1 = int(mmsi1)
+        mmsi2 = int(mmsi2)
+        result = ship_following(mmsi1, mmsi2)
+        return json.dumps({"analysis": result})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+    
+
+# ============================================================================
+# Tools: Using tools that Mario originally wrote
+# ============================================================================
+@mcp.tool()
+def search_region_for_ships(region: str) -> dict:
+    """Get information about dark vessels in a given region
+    
+    Args:
+        region (str): Key of the region to search (e.g. "gulf_of_aden")
+
+    Returns:
+        str: String with information about concerning (dark?) vessels in the region
+
+    """
+    if region not in REGIONS:
+        return {
+            "success": False,
+            "error": "INVALID_REGION",
+            "available_regions": [
+                {"key": k, "name": v["name"]}
+                for k, v in REGIONS.items()
+            ]
+        }
+
+    try:
+        region_data = run_region(region)
+
+        return {
+            "success": True,
+            "region": region,
+            "data": region_data
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": "EXECUTION_ERROR",
+            "message": str(e)  # force safe serialization
+        }
+
+# ============================================================================
+# Tools: Translation
+# ============================================================================
 @mcp.tool()
 def get_vessel_mmsi(vessel_name: str) -> str:
     """Get the MMSI for a given vessel.

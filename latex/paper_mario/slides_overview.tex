@@ -1,0 +1,187 @@
+\documentclass[aspectratio=169,11pt]{beamer}
+
+\usetheme{metropolis}
+\usepackage{booktabs}
+\usepackage{graphicx}
+
+\definecolor{navyblue}{RGB}{0,51,102}
+\definecolor{oceanblue}{RGB}{0,102,179}
+\definecolor{alertred}{RGB}{204,0,0}
+
+\setbeamercolor{frametitle}{bg=navyblue, fg=white}
+\setbeamercolor{progress bar}{fg=oceanblue}
+\setbeamercolor{alerted text}{fg=alertred}
+
+\setbeamertemplate{footline}{}
+\setbeamertemplate{navigation symbols}{}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{The Problem: Vessels Go Dark and Disguise Their Activity}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      \textbf{90,000 vessels} of regulatory concern are active at any
+      given moment — and the picture is incomplete by design.
+
+      \bigskip
+      \alert{75\% of industrial fishing vessels} intentionally disable
+      their AIS transponders to avoid detection.
+
+      \bigskip
+      Even when a vessel \emph{is} visible, analysts must answer two
+      questions from limited, noisy data:
+
+      \medskip
+      \begin{itemize}
+        \item \textbf{What is it doing?}\\
+              Fishing · Transiting · Loitering · Ship-to-Ship transfer
+        \item \textbf{What type of vessel is it?}\\
+              Trawler · Cargo · Naval · Unknown contact
+      \end{itemize}
+
+      \bigskip
+      The data may be a full day of AIS pings — or a \textbf{single
+      satellite image}.
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/figures/B2_dark_period_uncertainty_cones.png}
+
+      \smallskip
+      \includegraphics[width=\textwidth]{../outputs/figures/C3_sts_rendezvous.png}
+      {\small\textit{Top: position uncertainty after AIS loss.\\
+      Bottom: ship-to-ship transfer — a key evasion tactic.}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{The Scale: Where Fishing Actually Happens}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      The system is grounded in \textbf{real fleet data} from Global
+      Fishing Watch — 2023 effort across four operationally critical
+      regions.
+
+      \bigskip
+      \begin{tabular}{lrr}
+        \toprule
+        Region & Records & Fishing hrs \\
+        \midrule
+        Brazil EEZ         & 309,711 & 1,382,042 \\
+        Philippine EEZ     & 61,460  & — \\
+        Strait of Malacca  & 54,040  & — \\
+        Gulf of Guinea     & 59,954  & — \\
+        \bottomrule
+      \end{tabular}
+
+      \bigskip
+      Fishing effort is \textbf{not uniformly distributed} — it clusters
+      around productive grounds and shifts seasonally.
+
+      \medskip
+      Our synthetic simulator is calibrated against these real
+      distributions, keeping speed profiles, gear-type ratios,
+      and dark-event rates realistic.
+
+      \medskip
+      Speed profile KL-divergence vs.\ GFW real data:\\
+      mean $D_{KL} < 0.15$ nats across all gear types.
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/figures/B1_gfw_fishing_effort_asia_pacific.png}
+      {\small\textit{GFW 2023 fishing effort — Asia-Pacific.
+      Dense clusters mark productive grounds in the Philippine EEZ
+      and South China Sea. The Strait of Malacca corridor is a
+      key chokepoint for both fishing and transit traffic.}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{The System: Classify Any Vessel from Any Observation}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      We built an \textbf{Activity Intelligence Engine} that works
+      regardless of how much data is available.
+
+      \bigskip
+      \textbf{Inputs:} AIS, radar, satellite imagery (EO/SAR),
+      or any combination — down to a single observation.
+
+      \bigskip
+      \textbf{Outputs per vessel:}
+      \begin{itemize}
+        \item Activity class (fishing / transit / anchored / STS / loitering)
+        \item Vessel type (12 classes)
+        \item Dark-vessel risk score (0--1)
+        \item Calibrated confidence — conservative for sparse data
+      \end{itemize}
+
+      \bigskip
+      \textbf{How it handles missing data:}\\
+      A GPU-accelerated XGBoost model learns what each feature's
+      \emph{absence} means — no imputation, no minimum track length
+      required.
+
+      \bigskip
+      Trained and evaluated on \textbf{5,121 real vessels} from NOAA
+      AIS data across three independent datasets.
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/figures/B5_risk_score_dashboard.png}
+      {\small\textit{Risk score dashboard — IUU and dark vessel scores
+      per vessel. All flagged vessels are fishing-registered.}}
+
+      \bigskip
+      \includegraphics[width=\textwidth]{../outputs/brazil_eez/feature_importance.png}
+      {\small\textit{Top features: speed mean, \% time slow, loiter index.}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Results: Robust Performance Across Regions and Sensors}
+  \begin{columns}[T]
+    \begin{column}{0.50\textwidth}
+      \begin{tabular}{lc}
+        \toprule
+        \textbf{What we measure} & \textbf{Result} \\
+        \midrule
+        Activity classification $F_1$    & \textbf{0.900--1.000} \\
+        Vessel type $F_1$ (12 classes)   & \textbf{0.969} \\
+        Performance at $N=1$ observation & \textbf{same as $N=50$} \\
+        \midrule
+        Regions validated (synthetic)    & 4 \\
+        \quad Brazil EEZ                 & $F_1 = 0.993$ \\
+        \quad Strait of Malacca          & $F_1 = 0.999$ \\
+        \quad Gulf of Guinea             & $F_1 = 0.992$ \\
+        \quad Philippine EEZ             & $F_1 = 0.992$ \\
+        \midrule
+        Dark vessels flagged             & \textbf{49} \\
+        \quad All fishing-registered     & \checkmark \\
+        Training time (216k examples)   & \textbf{82 seconds} \\
+        \bottomrule
+      \end{tabular}
+
+      \bigskip
+      {\small The most significant open challenge is EO/SAR-only
+      contacts where speed is unavailable.
+      Geography-prior features and SAR foundation models are the
+      next step.}
+    \end{column}
+    \begin{column}{0.47\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/figures/A2_partial_track_f1_vs_length.png}
+      {\small\textit{Classification accuracy is flat from a single
+      observation to a full 50-ping track — no minimum custody
+      duration needed.}}
+
+      \bigskip
+      \includegraphics[width=\textwidth]{../outputs/brazil_eez/confusion_matrix.png}
+      {\small\textit{Confusion matrix — Brazil EEZ.}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\end{document}

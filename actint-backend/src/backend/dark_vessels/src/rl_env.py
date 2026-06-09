@@ -149,7 +149,7 @@ class AISActivityEnv(gym.Env):
         df = df[df["true_activity"].isin(valid_labels)].copy()
         df = df.reset_index(drop=True)
 
-        # Group into per-vessel episodes by mmsi; each group = one episode
+        # Group into per-vessel episodes with mmsi; each group = one episode
         self._episodes: list[pd.DataFrame] = [
             ep.reset_index(drop=True)
             for _, ep in df.groupby("mmsi", sort=False)

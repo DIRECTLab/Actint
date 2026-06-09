@@ -2,7 +2,7 @@
 run with python dark_vesel_analysis.py
 arguments:
     --build: build the RL model (this will also run the analysis after building)
-    --vis: visualise the model on building and the analysis results # United Kindom
+    --vis: visualise the model on building and the analysis results
     --all: run analysis on all regions instead of just brazil_eez
 """
 
@@ -23,9 +23,9 @@ def run_analysis(visualise=False, all=False):
     print("Running dark vessel analysis...")
     start_time = time.time()
     if all:
-        dark_vessels.main(visualise=visualise)# United Kindom
+        dark_vessels.main(visualise=visualise)
     else:
-        dark_vessels.run_region("brazil_eez", visualise=visualise)# United Kindom
+        dark_vessels.run_region("brazil_eez", visualise=visualise)
     end_time = time.time()
     print(f"Dark vessel analysis time: {end_time - start_time:.2f} seconds")
 
@@ -44,4 +44,4 @@ if __name__ == "__main__":
 
     if args.build:
         build_model()
-    run_analysis(visualise=args.vis, all=args.all) # United Kindom
+    run_analysis(visualise=args.vis, all=args.all)

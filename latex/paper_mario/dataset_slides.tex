@@ -1,0 +1,582 @@
+\documentclass[aspectratio=169,11pt]{beamer}
+
+\usetheme{metropolis}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{hyperref}
+
+\definecolor{navyblue}{RGB}{0,51,102}
+\definecolor{oceanblue}{RGB}{0,102,179}
+\definecolor{alertred}{RGB}{204,0,0}
+\definecolor{codeblue}{RGB}{88,166,255}
+\definecolor{textgrey}{RGB}{139,148,158}
+\definecolor{darkbg}{RGB}{13,17,23}
+\definecolor{accent}{RGB}{63,185,80}
+
+\setbeamercolor{frametitle}{bg=navyblue, fg=white}
+\setbeamercolor{progress bar}{fg=oceanblue}
+\setbeamercolor{alerted text}{fg=alertred}
+\setbeamertemplate{footline}{}
+\setbeamertemplate{navigation symbols}{}
+
+\newcommand{\scenrow}[3]{%
+  \textbf{#1} & #2 & #3 \\[1pt]%
+}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\title{AIS Tracking Challenge Dataset}
+\subtitle{13 Scenario Types · 20 Geographic Variants Each · 39,340 Annotated Pings}
+\author{Activity Intelligence Engine}
+\date{April 2026}
+% ─────────────────────────────────────────────────────────────────────────────
+
+\begin{document}
+
+% ────────────────────────────────── TITLE ────────────────────────────────────
+\begin{frame}
+  \titlepage
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{What's In This Package}
+
+  \begin{columns}[T]
+    \begin{column}{0.54\textwidth}
+      \textbf{Purpose} \\
+      A reproducible benchmark dataset for evaluating AIS data-association
+      and activity-classification algorithms against the hardest real-world
+      tracking problems.
+
+      \bigskip
+      \textbf{Contents}
+      \begin{itemize}
+        \item \textbf{13 scenario types} — each a canonically difficult tracking problem
+        \item \textbf{20 variants per type} — different geographic regions, RNG seeds,
+              and speed scales
+        \item \textbf{260 CSV files} + 13 merged per-type files + 1 master flat file
+        \item \textbf{manifest.json} — machine-readable metadata index
+        \item Ground-truth \texttt{true\_activity} label on every row
+      \end{itemize}
+
+      \bigskip
+      \textbf{Total} \\
+      39,340 annotated position reports
+    \end{column}
+    \begin{column}{0.44\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/tracking_dataset/figures/overview_all_scenarios.png}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Dataset Schema}
+
+  Every row in every CSV shares the same 18-column schema:
+
+  \medskip
+  \small
+  \begin{tabularx}{\textwidth}{@{}lX@{}}
+    \toprule
+    \textbf{Column} & \textbf{Description} \\
+    \midrule
+    \texttt{mmsi} & Vessel MMSI — may repeat across tracks (clone/spoofing scenarios) \\
+    \texttt{timestamp} & ISO 8601 UTC — sort ascending for sequential replay \\
+    \texttt{lat}, \texttt{lon} & WGS-84 decimal degrees \\
+    \texttt{sog} & Speed over ground, knots (NaN during dark-gap rows) \\
+    \texttt{cog}, \texttt{heading} & Course/heading, degrees (NaN during dark-gap rows) \\
+    \texttt{sensor\_type} & \texttt{ais} | \texttt{satellite\_ais} | \texttt{radar} | \texttt{eo} | \texttt{none} \\
+    \texttt{true\_activity} & Ground-truth label: \textit{fishing, transit, anchored, sts,}
+                               \textit{bunkering, spoofed, loiter} \\
+    \texttt{vessel\_type} & \textit{cargo, tanker, fishing, trawler, purse\_seiner,} \ldots \\
+    \texttt{nav\_status} & AIS navigation status integer code \\
+    \texttt{scenario} & Canonical scenario key \\
+    \texttt{track\_id} & Per-scenario track identifier (e.g.\ \texttt{A}, \texttt{clone}, \texttt{burst\_3}) \\
+    \texttt{is\_dark} & \texttt{True} for AIS-gap / dead-reckoning interpolated rows \\
+    \texttt{variant\_id} & 1–20; identifies the geographic/parametric variant \\
+    \texttt{region} & Maritime region label for this variant \\
+    \texttt{rng\_seed} & NumPy seed; re-run generator with this seed for exact reproduction \\
+    \texttt{speed\_scale} & SOG multiplier applied (0.85–1.15) \\
+    \bottomrule
+  \end{tabularx}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Scenario Index}
+
+  \small
+  \begin{tabularx}{\textwidth}{@{}llX@{}}
+    \toprule
+    \textbf{\#} & \textbf{Scenario} & \textbf{Core challenge} \\
+    \midrule
+    1  & Crossing Tracks           & ID swap at crossing; nearest-neighbour failure \\
+    2  & Near-Parallel Tracks      & $<$0.3 nm separation, identical COG/SOG \\
+    3  & STS Rendezvous            & Converge → 60 min dwell → diverge \\
+    4  & Dark Reacquisition        & 4 h AIS gap; reappears off dead-reckoned position \\
+    5  & Trawling Pattern          & S-curve hauls at 3 kn → 10 kn transit transition \\
+    6  & Coordinated Fleet         & 6 purse seiners in $\leq$0.2 nm orbit \\
+    7  & MMSI Clone                & Same MMSI from two positions 15 nm apart \\
+    8  & Evasive Maneuvering       & Turn rates $>$20°/min; breaks CV prediction \\
+    9  & Noisy Multi-Sensor Track  & AIS gaps + EO outliers + 3-phase speed jump \\
+    10 & Dense Cluster             & 12 vessels in 0.5 nm radius \\
+    11 & Position Spoofing         & Frozen GPS broadcast vs.\ satellite truth \\
+    12 & Track Fragmentation       & 6 bursts (3–7 pings) with 20–60 min gaps \\
+    13 & Bunkering Rendezvous      & Near-stationary pair triggers false STS alert \\
+    \bottomrule
+  \end{tabularx}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{1 · Crossing Tracks}
+  \begin{columns}[T]
+    \begin{column}{0.60\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/tracking_dataset/figures/scenario_crossing_tracks.png}
+    \end{column}
+    \begin{column}{0.38\textwidth}
+      \textbf{What happens} \\
+      Two vessels cross at near-right angles. At closest approach ($\approx$0.2 nm),
+      a nearest-neighbour tracker swaps identities.
+
+      \bigskip
+      \textbf{Why it's hard} \\
+      Proximity-based gating fails when range temporarily drops below gate radius.
+      Bearing-rate and vessel-type continuity are required to resolve the swap.
+
+      \bigskip
+      \textbf{Ground truth} \\
+      \texttt{track\_id=A} and \texttt{track\_id=B} never exchange identity
+      in the labelled data.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{2 · Near-Parallel Tracks}
+  \begin{columns}[T]
+    \begin{column}{0.60\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/tracking_dataset/figures/scenario_near_parallel.png}
+    \end{column}
+    \begin{column}{0.38\textwidth}
+      \textbf{What happens} \\
+      Two cargo vessels travel north at 10 kn, separated by only $\sim$0.25 nm
+      ($\approx$450 m). Courses and speeds are nearly identical.
+
+      \bigskip
+      \textbf{Why it's hard} \\
+      Any tracker with a gate radius $\geq$0.25 nm conflates the two tracks
+      into one (ghost-track). Fine-grained position accuracy is the only separator.
+
+      \bigskip
+      \textbf{Ground truth} \\
+      Both vessels maintain independent \texttt{track\_id}s throughout.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{3 · STS Rendezvous}
+  \begin{columns}[T]
+    \begin{column}{0.60\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/tracking_dataset/figures/scenario_sts_rendezvous.png}
+    \end{column}
+    \begin{column}{0.38\textwidth}
+      \textbf{What happens} \\
+      Tanker and support vessel converge over 45 min, hold position together
+      for 60 min (STS transfer), then depart on opposite headings.
+
+      \bigskip
+      \textbf{Why it's hard} \\
+      During the dwell phase both vessels are near-stationary and $<$0.1 nm apart.
+      The tracker must maintain distinct IDs through overlap and correctly
+      assign post-departure tracks.
+
+      \bigskip
+      \textbf{Ground truth} \\
+      Activity transitions: \texttt{transit} → \texttt{sts} → \texttt{transit}.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{4 · Dark Reacquisition}
+  \begin{columns}[T]
+    \begin{column}{0.60\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/tracking_dataset/figures/scenario_dark_reacquisition.png}
+    \end{column}
+    \begin{column}{0.38\textwidth}
+      \textbf{What happens} \\
+      Fishing vessel transmits for 90 min, goes AIS-dark for 4 h, then
+      reappears 2–4 nm from the dead-reckoned mean position.
+
+      \bigskip
+      \textbf{Why it's hard} \\
+      The tracker must decide whether the reacquired contact is the same
+      vessel (plausible at 4–8 kn over 4 h) or a new object. The
+      uncertainty cone expands rapidly.
+
+      \bigskip
+      \textbf{Ground truth} \\
+      \texttt{is\_dark=True} rows mark the gap;
+      \texttt{sensor\_type=none} confirms no fix.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{5 · Trawling Pattern}
+  \begin{columns}[T]
+    \begin{column}{0.60\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/tracking_dataset/figures/scenario_trawling_pattern.png}
+    \end{column}
+    \begin{column}{0.38\textwidth}
+      \textbf{What happens} \\
+      A trawler executes 5 paired haul-and-turn cycles (3–4 kn, 180° turns
+      every $\sim$20 min) then transitions to a 10 kn transit to port.
+
+      \bigskip
+      \textbf{Why it's hard} \\
+      Activity changes mid-track. A static-window classifier labels the
+      post-transition segment as fishing due to residual low-speed history.
+
+      \bigskip
+      \textbf{Ground truth} \\
+      \texttt{true\_activity} transitions from \texttt{fishing} → \texttt{transit}
+      at the last turn point.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{6 · Coordinated Fishing Fleet}
+  \begin{columns}[T]
+    \begin{column}{0.60\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/tracking_dataset/figures/scenario_coordinated_fleet.png}
+    \end{column}
+    \begin{column}{0.38\textwidth}
+      \textbf{What happens} \\
+      6 purse seiners start spread 0.8 nm apart, converge on a bait ball,
+      then orbit a common centre at $\leq$0.2 nm separation.
+
+      \bigskip
+      \textbf{Why it's hard} \\
+      At orbit density, individual track gates overlap completely. Only
+      vessel-type priors and staggered phase offsets allow disambiguation.
+
+      \bigskip
+      \textbf{Ground truth} \\
+      Each vessel has a distinct \texttt{track\_id} (0–5) and transitions
+      \texttt{transit} → \texttt{fishing} at the orbit phase.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{7 · MMSI Cloning}
+  \begin{columns}[T]
+    \begin{column}{0.60\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/tracking_dataset/figures/scenario_mmsi_clone.png}
+    \end{column}
+    \begin{column}{0.38\textwidth}
+      \textbf{What happens} \\
+      A fishing vessel clones a legitimate cargo vessel's MMSI. Both broadcast
+      simultaneously from positions 15 nm apart.
+
+      \bigskip
+      \textbf{Why it's hard} \\
+      The data layer reports a single MMSI with two conflicting positions.
+      Implied velocity between the two reports is physically impossible,
+      which is the primary detection signal.
+
+      \bigskip
+      \textbf{Ground truth} \\
+      \texttt{track\_id=legitimate} vs \texttt{track\_id=clone} distinguish
+      the two physical vessels.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{8 · Evasive Maneuvering}
+  \begin{columns}[T]
+    \begin{column}{0.60\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/tracking_dataset/figures/scenario_evasive_maneuvering.png}
+    \end{column}
+    \begin{column}{0.38\textwidth}
+      \textbf{What happens} \\
+      A vessel executes 6 sharp heading changes ($>$20°/min angular rate)
+      in 70 minutes, with speed variations at each turn.
+
+      \bigskip
+      \textbf{Why it's hard} \\
+      A single-model Kalman filter loses the track after the first manoeuvre.
+      IMM or manoeuvre-adaptive filters with wide process noise are required.
+
+      \bigskip
+      \textbf{Ground truth} \\
+      Activity is labelled \texttt{loiter} throughout; no nav-status
+      justification exists for the maneuvering pattern.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{9 · Multi-Sensor Noisy Track}
+  \begin{columns}[T]
+    \begin{column}{0.60\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/tracking_dataset/figures/scenario_speed_jump_noisy.png}
+    \end{column}
+    \begin{column}{0.38\textwidth}
+      \textbf{What happens} \\
+      AIS, EO (satellite), and radar pings interleave. 15\% of rows are
+      dark. 4 outlier positions (3–8 nm error) are injected. The vessel
+      transitions: \texttt{fishing} → \texttt{transit} → \texttt{anchored}.
+
+      \bigskip
+      \textbf{Why it's hard} \\
+      Sensor heterogeneity, position outliers, and missing data all coincide
+      with genuine activity transitions, requiring robust outlier rejection
+      and multi-modal fusion.
+
+      \bigskip
+      \textbf{Ground truth} \\
+      \texttt{sensor\_type} distinguishes AIS, EO, and gap rows.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{10 · Dense Vessel Cluster}
+  \begin{columns}[T]
+    \begin{column}{0.60\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/tracking_dataset/figures/scenario_dense_cluster.png}
+    \end{column}
+    \begin{column}{0.38\textwidth}
+      \textbf{What happens} \\
+      12 vessels (8 fishing, 2 support, 1 cargo, 1 tug) operate within
+      a 0.5 nm radius simultaneously.
+
+      \bigskip
+      \textbf{Why it's hard} \\
+      Individual track gates overlap across the entire cluster for the
+      full scenario duration. Only vessel-type priors and characteristic
+      speed profiles allow any disambiguation.
+
+      \bigskip
+      \textbf{Ground truth} \\
+      Each vessel has a unique \texttt{mmsi} and \texttt{track\_id} with
+      consistent \texttt{vessel\_type} throughout.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{11 · GPS Position Spoofing}
+  \begin{columns}[T]
+    \begin{column}{0.60\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/tracking_dataset/figures/scenario_position_spoofing.png}
+    \end{column}
+    \begin{column}{0.38\textwidth}
+      \textbf{What happens} \\
+      AIS broadcast freezes position for 3 h (reporting anchored, SOG$\approx$0)
+      while satellite-AIS reveals continuous transit at 14 kn.
+
+      \bigskip
+      \textbf{Why it's hard} \\
+      AIS-only systems classify the vessel as anchored for 3 h. The impossibly
+      large position jump when honest AIS resumes is the retroactive detection
+      signal. Cross-sensor fusion is required in near real-time.
+
+      \bigskip
+      \textbf{Ground truth} \\
+      \texttt{track\_id=broadcast} (AIS) vs \texttt{track\_id=true} (satellite).
+      \texttt{true\_activity=spoofed} marks the frozen phase.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{12 · Track Fragmentation}
+  \begin{columns}[T]
+    \begin{column}{0.60\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/tracking_dataset/figures/scenario_track_fragmentation.png}
+    \end{column}
+    \begin{column}{0.38\textwidth}
+      \textbf{What happens} \\
+      A single fishing vessel transmits in 6 short bursts (3–7 pings each)
+      with 20–60 min dark gaps between them.
+
+      \bigskip
+      \textbf{Why it's hard} \\
+      Each fragment is individually too short for confident classification.
+      Stitching the fragments into one track requires dead-reckoning
+      plausibility checks across each gap.
+
+      \bigskip
+      \textbf{Ground truth} \\
+      \texttt{track\_id} labels each burst (\texttt{burst\_1}–\texttt{burst\_6});
+      \texttt{track\_id=gap} marks interpolated dark rows.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{13 · Bunkering Rendezvous}
+  \begin{columns}[T]
+    \begin{column}{0.60\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/tracking_dataset/figures/scenario_bunkering_rendezvous.png}
+    \end{column}
+    \begin{column}{0.38\textwidth}
+      \textbf{What happens} \\
+      A bunker barge meets a Panamax cargo in a port-approach anchorage.
+      The fuel transfer lasts 90 min. Three transiting vessels provide
+      background clutter.
+
+      \bigskip
+      \textbf{Why it's hard} \\
+      The near-stationary pair triggers false STS alerts and is easily
+      confused with anchored contacts. High traffic density in the anchorage
+      complicates track assignment.
+
+      \bigskip
+      \textbf{Ground truth} \\
+      \texttt{true\_activity=bunkering} during transfer; background vessels
+      labelled \texttt{transit}.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Geographic Variants — 20 Regions per Scenario}
+
+  Each scenario type is instantiated in 20 maritime regions:
+
+  \medskip
+  \small
+  \begin{tabularx}{\textwidth}{@{}lXlX@{}}
+    \toprule
+    \textbf{ID} & \textbf{Region} & \textbf{ID} & \textbf{Region} \\
+    \midrule
+     1 & Singapore Strait (base)    & 11 & North Sea \\
+     2 & Malacca Strait (N)         & 12 & Baltic Sea \\
+     3 & South China Sea            & 13 & Caribbean Sea \\
+     4 & Gulf of Thailand           & 14 & Gulf of Mexico \\
+     5 & Bay of Bengal              & 15 & US East Coast approaches \\
+     6 & Arabian Sea                & 16 & Pacific (Hawaii area) \\
+     7 & Red Sea                    & 17 & Sea of Japan \\
+     8 & Gulf of Aden               & 18 & Korea Strait \\
+     9 & West Africa / Gulf of Guinea & 19 & Taiwan Strait \\
+    10 & Mediterranean (W)          & 20 & Indian Ocean (central) \\
+    \bottomrule
+  \end{tabularx}
+
+  \medskip
+  Each variant also applies an independent NumPy seed (1001–1020) and a
+  speed scale factor (0.85–1.15) to vary traffic density and manoeuvre intensity.
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{How to Use This Dataset}
+
+  \begin{columns}[T]
+    \begin{column}{0.50\textwidth}
+      \textbf{Quick-start (Python)}
+      \vspace{4pt}
+      \small
+      \texttt{\# Load one scenario type} \\
+      \texttt{import pandas as pd} \\
+      \texttt{df = pd.read\_csv(} \\
+      \texttt{\ \ "crossing\_tracks/variant\_01.csv")} \\[6pt]
+      \texttt{\# Replay in time order} \\
+      \texttt{df = df.sort\_values("timestamp")} \\[6pt]
+      \texttt{\# Split live vs dark rows} \\
+      \texttt{live = df[~df.is\_dark]} \\
+      \texttt{dead\_reck = df[df.is\_dark]} \\[6pt]
+      \texttt{\# Load all 20 variants} \\
+      \texttt{df = pd.read\_csv(} \\
+      \texttt{\ \ "crossing\_tracks\_all\_variants.csv")}
+
+      \vspace{8pt}
+      \normalsize
+      \textbf{Manifest} \\
+      \texttt{manifest.json} contains per-variant bounding boxes,
+      ping counts, sensor types, and activity sets — use it to
+      filter without parsing CSVs.
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{Evaluation notes}
+      \begin{itemize}
+        \item \texttt{true\_activity} is the ground truth — compare your
+              classifier output against this column
+        \item Filter \texttt{is\_dark=True} rows when feeding a live
+              classifier; they carry no real sensor observation
+        \item \texttt{rng\_seed} + \texttt{speed\_scale} in the manifest
+              allow exact reproduction of any variant
+        \item The master file \texttt{all\_scenarios.csv} contains all
+              39,340 rows with a \texttt{scenario} column for slicing
+      \end{itemize}
+
+      \bigskip
+      \textbf{Directory layout}
+      {\small
+      \begin{itemize}
+        \item[] \texttt{<scenario>/variant\_NN.csv}
+        \item[] \texttt{<scenario>\_all\_variants.csv}
+        \item[] \texttt{all\_scenarios.csv}
+        \item[] \texttt{manifest.json}
+        \item[] \texttt{figures/scenario\_<name>.png}
+      \end{itemize}
+      }
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Technical Notes}
+
+  \begin{columns}[T]
+    \begin{column}{0.50\textwidth}
+      \textbf{Simulation model} \\
+      Tracks are generated by dead-reckoning propagation with Gaussian
+      course and speed noise. All positions are in WGS-84 decimal degrees.
+      The spherical-Earth approximation is used (accuracy $<$0.1\% at these
+      scales).
+
+      \bigskip
+      \textbf{Reproducibility} \\
+      Every variant is seeded deterministically. Re-run
+      \texttt{build\_tracking\_dataset.py} to regenerate identical files.
+      The \texttt{rng\_seed} column identifies the seed used.
+
+      \bigskip
+      \textbf{Coordinate frame (figures)} \\
+      Figures normalise each variant to a nautical-mile frame centred on
+      its track midpoint, so all 20 variants overlay cleanly regardless
+      of their absolute geographic position.
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{Activity label set}
+      \begin{itemize}
+        \item \texttt{fishing} — active gear deployment
+        \item \texttt{transit} — underway at cruise speed
+        \item \texttt{anchored} — stationary / moored
+        \item \texttt{sts} — ship-to-ship transfer
+        \item \texttt{bunkering} — fuel transfer
+        \item \texttt{loiter} — slow / erratic, no defined activity
+        \item \texttt{spoofed} — reported position known to be falsified
+      \end{itemize}
+
+      \bigskip
+      \textbf{Sensor type codes}
+      \begin{itemize}
+        \item \texttt{ais} — terrestrial AIS
+        \item \texttt{satellite\_ais} — S-AIS cross-check
+        \item \texttt{eo} — electro-optical satellite fix
+        \item \texttt{none} — no observation (dark gap)
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\end{document}

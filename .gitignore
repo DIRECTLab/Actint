@@ -233,5 +233,10 @@ results/
 *.err
 *.out
 
+#Mario human-readable output
+actint-backend/src/backend/mario_tools/outputs/
+outputs/
+
+
 actint-backend/.env
 actint-backend/src/backend/mcp_servers/ais/test.py

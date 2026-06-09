@@ -105,10 +105,13 @@ class PingFeatureExtractor:
         # Turning rate (degrees/min)
         if "cog" in df.columns and "timestamp" in df.columns:
             ts_s = pd.to_datetime(df["timestamp"], utc=True, errors="coerce").astype(np.int64) / 1e9
+
+        # These are bug fixes for my machine/version of python, if it causes you errors, try setting it back
             # dt   = np.diff(ts_s, prepend=ts_s[0])
             dt = np.diff(ts_s, prepend=ts_s.iloc[0])
             # dcog = np.diff(df["cog"].fillna(method="ffill").values, prepend=0)
             dcog = np.diff(df["cog"].ffill().values, prepend=0)
+        
             dcog = (dcog + 180) % 360 - 180   # wrap to [-180, 180]
             tr   = np.where(dt > 0, dcog / (dt / 60.0), 0.0)
             out[:, 9] = np.clip(tr / 30.0, -1, 1)   # normalise
@@ -116,10 +119,13 @@ class PingFeatureExtractor:
         # Acceleration
         if "sog" in df.columns and "timestamp" in df.columns:
             ts_s = pd.to_datetime(df["timestamp"], utc=True, errors="coerce").astype(np.int64) / 1e9
+
+        # These are bug fixes for my machine/version of python, if it causes you errors, try setting it back
             # dt   = np.diff(ts_s, prepend=ts_s[0])
             dt = np.diff(ts_s, prepend=ts_s.iloc[0])
             # dsog = np.diff(df["sog"].fillna(method="ffill").values, prepend=0)
             dsog = np.diff(df["sog"].ffill().values, prepend=0)
+        
             acc  = np.where(dt > 0, dsog / (dt / 60.0), 0.0)
             out[:, 10] = np.clip(acc / 2.0, -1, 1)
 
@@ -433,8 +439,6 @@ class SequenceClassifier:
             records.append(rec)
         return records
     
-
-    import pandas as pd
 
     def ais_to_dataframe(self, ais_data):
         """

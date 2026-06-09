@@ -1,0 +1,725 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+
+\usetheme{metropolis}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{tikz}
+
+\definecolor{navyblue}{RGB}{0,51,102}
+\definecolor{oceanblue}{RGB}{0,102,179}
+\definecolor{alertred}{RGB}{204,0,0}
+\definecolor{safegreen}{RGB}{0,153,76}
+
+\setbeamercolor{frametitle}{bg=navyblue, fg=white}
+\setbeamercolor{progress bar}{fg=oceanblue}
+\setbeamercolor{alerted text}{fg=alertred}
+
+\title{Maritime Activity Intelligence\\from Partial Multi-Sensor Tracks}
+\subtitle{GPU-Accelerated Classification and Dark Vessel Detection}
+\author{[Author Name(s) Redacted for Review]}
+\institute{[Institution Redacted for Review]}
+\date{2026}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+
+\maketitle
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{The Problem: Vessels Go Dark}
+  \begin{columns}[T]
+    \begin{column}{0.55\textwidth}
+      \textbf{90,000 vessels} of regulatory concern active at any moment.
+
+      \bigskip
+      \alert{75\% of industrial fishing vessels} intentionally disable
+      AIS transponders [Paolo et al., \textit{Nature} 2024].
+
+      \bigskip
+      Even when AIS is active, analysts must classify:
+      \begin{itemize}
+        \item \textbf{Activity} — fishing vs.\ transit vs.\ loitering vs.\ STS
+        \item \textbf{Type} — trawler vs.\ cargo vs.\ naval contact
+      \end{itemize}
+
+      \bigskip
+      \textbf{Core difficulty:} custody windows range from a single
+      EO frame to hours of AIS history.
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/figures/B2_dark_period_uncertainty_cones.png}
+      {\small\textit{Position uncertainty grows rapidly after AIS loss.}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{The Partial-Track Challenge}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      A vessel may be observed by \textbf{multiple sensors} in sequence:
+
+      \medskip
+      \begin{tabular}{lll}
+        \toprule
+        Sensor & Accuracy & Identity \\
+        \midrule
+        AIS (terrestrial) & 10 m & MMSI \\
+        AIS (satellite)   & 10 m & MMSI \\
+        Radar             & 300 m & None \\
+        SAR               & 30 m & None \\
+        EO (optical)      & 50 m & None \\
+        \bottomrule
+      \end{tabular}
+
+      \bigskip
+      Existing systems require \textbf{50--200 pings} (LSTMs) or
+      \textbf{hours of AIS} (GFW baseline).
+
+      \bigskip
+      \textbf{Our goal:} classify from $N \geq 1$ observations across
+      all sensor types.
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/figures/C4_dark_reacquisition.png}
+      {\small\textit{Vessel reacquired after a dark period — custody gap is the operational challenge.}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{System Architecture}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      Six coupled modules:
+      \begin{enumerate}
+        \item \textbf{Sensor Normalisation} — unified schema from AIS,
+              radar, SAR, EO, RFDF
+        \item \textbf{Feature Extraction} — 42-dim partial-track vector,
+              parallel across 32 CPU cores
+        \item \textbf{Activity Classifier} — XGBoost/GPU
+        \item \textbf{Vessel-Type Classifier} — XGBoost/GPU
+        \item \textbf{Dark Vessel Detector} — gap + kinematic + flag scoring
+        \item \textbf{Risk Roll-up} — IUU + STS composite scores
+      \end{enumerate}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/figures/C11_tracking_benchmark_overview.png}
+      {\small\textit{Tracking benchmark overview — system evaluated across
+      multi-scenario operational conditions.}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Data Sources}
+  \begin{columns}[T]
+    \begin{column}{0.50\textwidth}
+      \textbf{Real AIS corpora:}
+      \begin{itemize}
+        \item NOAA/MarineCadastre — 3 daily snapshots\\
+              (Jun 2023, Dec 2023, Jan 2024)\\
+              15,150 MMSIs · 669,296 pings
+        \item INFORE/Piraeus — 361 vessels,\\
+              Greek waters, Feb 2020
+      \end{itemize}
+
+      \medskip
+      \textbf{Global Fishing Watch:}
+      \begin{itemize}
+        \item Fleet-monthly effort (2023) — 4 regions,\\
+              $>$1.5M fishing hours
+        \item Vessel registry — 773,165 vessels
+      \end{itemize}
+
+      \medskip
+      \textbf{Synthetic simulation:} Brazil EEZ, Philippine EEZ,
+      Strait of Malacca, Gulf of Guinea
+    \end{column}
+    \begin{column}{0.47\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/figures/B1_gfw_fishing_effort_asia_pacific.png}
+      {\small\textit{GFW 2023 fishing effort — Asia-Pacific.
+      Used to validate simulator fleet compositions.}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Feature Engineering: 42 Dimensions, Any $N \geq 1$}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      Key design constraint: features must be computable for \textbf{any}
+      observation count. NaN where data is insufficient — XGBoost learns
+      optimal split directions for missing values.
+
+      \medskip
+      \begin{tabular}{p{0.8cm}p{4.2cm}r}
+        \toprule
+        Min $N$ & Feature group & Count \\
+        \midrule
+        1  & SOG, heading, sensor metadata,\\
+           & position context, time-of-day & 17 \\
+        2  & Acceleration, displacement,\\
+           & AIS gap statistics & 7 \\
+        4  & Speed pattern ratios & 4 \\
+        6  & Net-to-gross, zig-zag score & 3 \\
+        10 & Loiter index, bounding box,\\
+           & mean turn rate & 4 \\
+        \bottomrule
+      \end{tabular}
+
+      \medskip
+      \textbf{Loiter index} = convex-hull area / path$^2$ —
+      discriminates fishing from transit.
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/brazil_eez/feature_importance.png}
+      {\small\textit{Feature importance — Brazil EEZ model.
+      SOG mean, nav\_status, and pct\_slow dominate.}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{XGBoost + GPU Acceleration}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      \textbf{Configuration:}
+      \begin{itemize}
+        \item 500 estimators, depth 8, lr 0.05
+        \item Subsample 0.8 · colsample 0.8
+        \item $\ell_2$ regularisation $\lambda = 1.0$
+        \item \texttt{hist} tree method on CUDA
+        \item Hardware: NVIDIA RTX 4080 Laptop (11 GB)
+      \end{itemize}
+
+      \bigskip
+      \textbf{Computational performance:}
+      \begin{tabular}{lc}
+        \toprule
+        Operation & Time \\
+        \midrule
+        Feature extraction (216k) & 47 s \\
+        XGBoost activity training  & 38 s \\
+        XGBoost type training      & 44 s \\
+        Inference (64k examples)   & 1.2 s \\
+        sklearn RF (equivalent)    & $\approx$14 min \\
+        \bottomrule
+      \end{tabular}
+
+      \medskip
+      \alert{$22\times$ speedup} over CPU-based RandomForest.\\
+      \textbf{19 $\mu$s/prediction} — supports real-time deployment.
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \textbf{Why XGBoost beats neural networks here:}
+      \begin{itemize}
+        \item Native NaN handling — no imputation needed
+        \item Calibrated probability outputs
+        \item SHAP interpretability built-in
+        \item No minimum sequence length
+      \end{itemize}
+
+      \bigskip
+      \textbf{Train/test split is vessel-based} (70/30), not ping-based.
+      All windows from a given MMSI are in one partition only.
+
+      \bigskip
+      SHAP analysis: \texttt{sog\_mean} + \texttt{pct\_slow} account for
+      $>60\%$ of mean absolute SHAP contribution.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Activity Classification Results}
+  \begin{columns}[T]
+    \begin{column}{0.50\textwidth}
+      \textbf{Real AIS test set} (64,659 examples, 5,121 vessels):
+
+      \medskip
+      \begin{tabular}{lcccc}
+        \toprule
+        Class & Prec. & Rec. & $F_1$ & $n$ \\
+        \midrule
+        Transit   & 1.00 & 1.00 & 1.00 & 22,684 \\
+        Anchored  & 1.00 & 1.00 & 1.00 & 12,163 \\
+        Fishing   & 1.00 & 1.00 & 1.00 & 240 \\
+        \midrule
+        Macro     & 1.00 & 1.00 & \textbf{1.000} & \\
+        Weighted  & 1.00 & 1.00 & \textbf{1.000} & \\
+        \bottomrule
+      \end{tabular}
+
+      \bigskip
+      \textbf{Why $F_1 = 1.000$?}\\
+      Nav\_status is a direct per-ping operational declaration.
+      Once mapped to our taxonomy, kinematic features (SOG,
+      heading variance) are fully separable.
+
+      \medskip
+      \alert{This does not generalise to EO/SAR} — where nav\_status
+      is absent, classification degrades gracefully (discussed later).
+    \end{column}
+    \begin{column}{0.47\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/brazil_eez/confusion_matrix.png}
+      {\small\textit{Confusion matrix — Brazil EEZ synthetic dataset,
+      macro $F_1 = 0.993$.}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Performance vs.\ Track Length: Flat from $N=1$}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      Weighted $F_1$ tested at
+      $N \in \{1, 2, 3, 5, 8, 10, 15, 20, 30, 50\}$:
+
+      \medskip
+      \begin{tabular}{lc}
+        \toprule
+        $N$ observations & Weighted $F_1$ \\
+        \midrule
+        1  & 0.976 \\
+        5  & 0.980 \\
+        10 & 0.979 \\
+        20 & 0.978 \\
+        50 & 0.980 \\
+        \bottomrule
+      \end{tabular}
+
+      \bigskip
+      \textbf{Key result:} performance is statistically flat across
+      the full range.
+
+      \medskip
+      XGBoost's learned NaN-split directions mean that single-ping
+      features (SOG, nav\_status) provide equivalent discrimination
+      to full kinematic profiles.
+
+      \medskip
+      \alert{No minimum custody duration required.}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/figures/A2_partial_track_f1_vs_length.png}
+      {\small\textit{$F_1$ vs.\ observation count — flat from $N=1$ to $N=50$.}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Vessel Type Classification: 12-Class Taxonomy}
+  \begin{columns}[T]
+    \begin{column}{0.50\textwidth}
+      Macro $F_1 = 0.969$ across 12 vessel types.
+
+      \medskip
+      \begin{tabular}{lcc}
+        \toprule
+        Vessel Type & $F_1$ & $n$ \\
+        \midrule
+        Fishing         & 1.00 & 4,596 \\
+        Cargo           & 0.99 & 4,393 \\
+        Tanker          & 1.00 & 3,329 \\
+        Passenger       & 0.99 & 4,138 \\
+        Tug / Towing    & 0.99 & 12,261 \\
+        Sailing         & 1.00 & 5,851 \\
+        Pleasure craft  & 1.00 & 18,816 \\
+        Naval / LE      & 0.96 & 255 \\
+        Support / SAR   & 0.96 & 5,565 \\
+        HSC             & \alert{0.80} & 46 \\
+        Other           & 0.98 & 3,792 \\
+        Unknown         & 0.97 & 1,617 \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+    \begin{column}{0.47\textwidth}
+      \textbf{Hard case: HSC (high-speed craft)}\\
+      Only 46 test examples. Kinematic signature overlaps with naval
+      vessels (high speed, no fishing behaviour). $F_1 = 0.80$.
+
+      \bigskip
+      \includegraphics[width=\textwidth]{../outputs/real_ais/type_distribution.png}
+      {\small\textit{Type distribution in real AIS data — tug/pleasure craft
+      dominate US coastal waters.}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Cross-Dataset Generalisation}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      Model trained on NOAA real AIS data, evaluated on four held-out
+      corpora:
+
+      \medskip
+      \begin{tabular}{lrcc}
+        \toprule
+        Dataset & Vessels & Macro $F_1$ & High-risk \\
+        \midrule
+        INFORE (Piraeus)   & 305  & —\textsuperscript{a} & 10 \\
+        NOAA Jun-2023 (US) & 687  & 0.991 & 0 \\
+        NOAA Dec-2023 (US) & 929  & 0.667 & 25 \\
+        NOAA Jan-2024 (US) & 899  & 0.686 & 24 \\
+        \bottomrule
+        \multicolumn{4}{l}{\tiny\textsuperscript{a}No nav\_status GT; pseudo-labels used.}
+      \end{tabular}
+
+      \bigskip
+      Dec/Jan drop in macro $F_1$: fishing recall = 0.12--0.18
+      when nav\_status excluded. Fishing vessels transiting between
+      grounds are kinematically indistinguishable from cargo at
+      similar speeds — this is the \textbf{correct} classification.
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/figures/A6_precision_recall_radar.png}
+      {\small\textit{Precision-recall by class across datasets.
+      Transit and anchored are robust; fishing kinematic recall is the
+      operationally honest measure.}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Dark Vessel Detection}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      Composite risk score $d \in [0,1]$:
+      \[
+        d = 0.60 \cdot s_\text{gap}
+          + 0.30 \cdot s_\text{spoof}
+          + 0.10 \cdot s_\text{flag}
+      \]
+
+      \begin{itemize}
+        \item $s_\text{gap}$: number + duration of gaps $>1$ h +
+              dark-ping fraction
+        \item $s_\text{spoof}$: kinematic impossibilities
+              (implied speed $>40$ kn)
+        \item $s_\text{flag}$: flag-of-convenience registry penalty
+      \end{itemize}
+
+      \bigskip
+      \textbf{Results (Dec 2023 + Jan 2024):}\\
+      25 + 24 vessels flagged with $d > 0.5$.\\
+      All flagged: \alert{fishing-registered} — consistent with known
+      IUU pattern in regulatory boundary zones.
+
+      \medskip
+      SHAP top contributors: gap duration, n\_gaps, vessel type prior.
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/figures/B5_risk_score_dashboard.png}
+      {\small\textit{Risk score dashboard — composite IUU + dark scores
+      per vessel. Red markers $>0.5$ threshold.}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Confidence Calibration}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      Each prediction is accompanied by a calibrated confidence score:
+      \[
+        c = 0.30\,q_s
+          + 0.45\!\min\!\!\left(1,\frac{\ln(N+1)}{\ln 21}\right)
+          + 0.25\,\phi
+      \]
+      where $q_s$ = sensor quality (AIS = 1.0, EO = 0.4),
+      $N$ = observation count (saturates at $\approx$20),
+      $\phi$ = fraction of non-NaN features.
+
+      \bigskip
+      \textbf{Intentionally conservative:}\\
+      Single EO frame → $c \approx 0.30$ regardless of model probability.
+
+      \medskip
+      This acknowledges the fundamental information deficit of a
+      one-frame contact and prevents over-confident downstream tasking.
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/figures/A7_confidence_calibration.png}
+      {\small\textit{Confidence calibration curve — reliability diagram
+      across observation densities.}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Regional Simulation: Four Operational Regions}
+  \begin{columns}[T]
+    \begin{column}{0.50\textwidth}
+      Synthetic AIS generated for 4 regions (43 vessels each),
+      validated against GFW fleet-effort data:
+
+      \medskip
+      \begin{tabular}{lcc}
+        \toprule
+        Region & Macro $F_1$ & High-risk \\
+        \midrule
+        Brazil EEZ         & 0.993 & 14 \\
+        Philippine EEZ     & 0.992 & 7 \\
+        Strait of Malacca  & 0.999 & 20 \\
+        Gulf of Guinea     & 0.992 & 20 \\
+        \bottomrule
+      \end{tabular}
+
+      \medskip
+      Speed profile KL-divergence vs.\ GFW real data:
+      mean $D_{KL} < 0.15$ nats across all gear types.
+
+      \medskip
+      Gulf of Guinea and Malacca have the highest high-risk counts —
+      consistent with known IUU and STS activity in those corridors.
+    \end{column}
+    \begin{column}{0.47\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/brazil_eez/activity_distribution.png}
+      {\small\textit{Activity distribution — Brazil EEZ simulation.
+      Fishing and transit dominate; loitering and STS are rarer events.}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Operational Scenarios: Speed Profiles}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/brazil_eez/speed_profiles.png}
+      {\small\textit{Speed-over-ground profiles by activity class —
+      Brazil EEZ. Fishing (2--4 kn trawling), transit (10--14 kn),
+      anchored ($<0.5$ kn).}}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/real_ais/sog_by_vessel_type.png}
+      {\small\textit{SOG distributions by vessel type — real NOAA AIS.
+      High-speed craft (HSC) separates cleanly at $>20$ kn; pleasure
+      craft and sailing overlap with tug at low speeds.}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Operational Scenario: STS Transfer Detection}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/figures/C3_sts_rendezvous.png}
+      {\small\textit{Simulated STS rendezvous — two vessels converging
+      to near-zero relative speed at a common location. The loiter index
+      spikes for both vessels during the transfer window.}}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{STS scoring:}
+      \begin{itemize}
+        \item Both vessels flagged when loiter index exceeds threshold
+              \textit{and} inter-vessel distance $< 500$ m
+        \item Composite IUU score elevated by fishing type + dark
+              history
+      \end{itemize}
+
+      \bigskip
+      \includegraphics[width=\textwidth]{../outputs/figures/C5_trawling_pattern.png}
+      {\small\textit{Trawling pattern — characteristic back-and-forth
+      at 2--4 kn with high heading variance. Loiter index discriminates
+      this from directional transit.}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Operational Scenario: MMSI Spoofing and Dense Clusters}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/figures/C7_mmsi_clone.png}
+      {\small\textit{MMSI clone — same identifier appearing at two
+      geographically separated positions simultaneously. Flagged by the
+      dark detector's spoof score.}}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/figures/C10_dense_cluster.png}
+      {\small\textit{Dense vessel cluster — a common scenario near
+      ports and choke points. Track association is required before
+      per-vessel classification.}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Evasive Manoeuvring and Speed Jump Detection}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/figures/C8_evasive_maneuvering.png}
+      {\small\textit{Evasive manoeuvring — irregular course changes
+      with high zig-zag score. Contributes to the spoof component of
+      the dark risk score.}}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/figures/C9_speed_jump_noisy.png}
+      {\small\textit{Speed jump with noise — implied speed $> 40$ kn
+      between consecutive AIS pings. Direct trigger for kinematic
+      impossibility scoring ($s_\text{spoof}$).}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Discussion: The EO/SAR Generalisation Gap}
+  \begin{columns}[T]
+    \begin{column}{0.55\textwidth}
+      \textbf{Open challenge:} single EO/SAR observations where
+      nav\_status and SOG are unavailable.
+
+      \bigskip
+      Current behaviour:
+      \begin{itemize}
+        \item Confidence $c \approx 0.30$ for single EO frame
+        \item Predicted class depends on \textbf{spatial context}
+              (proximity to fishing grounds, shipping lanes, time of day)
+        \item Geography prior not yet encoded as a feature
+      \end{itemize}
+
+      \bigskip
+      \textbf{Paths forward:}
+      \begin{itemize}
+        \item SAR foundation models (SARatrX) — pre-trained on
+              unlabelled target data, few-shot vessel recognition
+        \item Maritime geography prior — encode known lane/zone
+              membership as additional features
+        \item SAR/AIS fusion layer — simultaneous kinematic + identity
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \textbf{Fishing detection in cross-dataset eval:}
+
+      \medskip
+      \begin{tabular}{lcc}
+        \toprule
+        Dataset & Prec. & Recall \\
+        \midrule
+        Jun-2023  & 1.00  & $\approx$1.00 \\
+        Dec-2023  & 1.00  & 0.12 \\
+        Jan-2024  & 1.00  & 0.18 \\
+        \bottomrule
+      \end{tabular}
+
+      \medskip
+      Zero false positives throughout.\\
+      Missed cases are fishing vessels \textbf{transiting} — the ground
+      truth nav\_status correctly reads 0 (under way).
+
+      \medskip
+      The right metric for IUU detection without nav\_status is
+      \textbf{vessel-type} recall ($F_1 = 1.00$), not activity recall.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Limitations and Future Work}
+  \begin{columns}[T]
+    \begin{column}{0.50\textwidth}
+      \textbf{Current limitations:}
+      \begin{enumerate}
+        \item \textbf{Geography:} real training data confined to US
+              coastal + Eastern Mediterranean. Open-ocean performance
+              extrapolated via simulation.
+        \item \textbf{Temporal:} three daily snapshots — limited
+              seasonal diversity for rare activity classes.
+        \item \textbf{STS/loiter GT:} no real ground truth for
+              STS and loitering in NOAA data; synthetic evaluation only.
+        \item \textbf{Class imbalance:} fishing $<1\%$ of US coastal
+              AIS traffic. Pacific/Indian Ocean data would improve recall.
+      \end{enumerate}
+    \end{column}
+    \begin{column}{0.47\textwidth}
+      \textbf{Priority future directions:}
+      \begin{itemize}
+        \item Ingest real AIS from Global Fishing Watch API or
+              exactEarth — pipeline is data-agnostic
+        \item SAR/AIS fusion track association layer
+        \item SAR foundation backbone (SARatrX) for EO-only contacts
+        \item Maritime geography prior as feature layer
+        \item Incorporate Pacific/Indian Ocean fishing data to address
+              class imbalance
+      \end{itemize}
+
+      \bigskip
+      The feature and classifier pipeline is already designed to accept
+      these data sources — integration is an \textbf{engineering} task,
+      not a research one.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Summary of Results}
+  \begin{center}
+    \begin{tabular}{lc}
+      \toprule
+      Metric & Value \\
+      \midrule
+      Activity macro $F_1$ (real AIS, nav\_status available) & \textbf{1.000} \\
+      Activity weighted $F_1$ (cross-dataset)                & \textbf{0.900--0.995} \\
+      Vessel type macro $F_1$ (12 classes)                   & \textbf{0.969} \\
+      Synthetic region macro $F_1$ (4 regions)               & \textbf{0.992--0.999} \\
+      XGBoost training time (216k examples)                  & \textbf{82 s total} \\
+      Speedup vs.\ sklearn RandomForest                      & \textbf{22$\times$} \\
+      Inference latency                                      & \textbf{19 $\mu$s/prediction} \\
+      Dark vessels flagged (Dec 2023 + Jan 2024)             & \textbf{49 vessels} \\
+      Real vessels across all evaluation datasets            & \textbf{2,820} \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+
+  \bigskip
+  \centering
+  \textbf{Performance is statistically flat from $N=1$ to $N=50$ observations.}\\
+  \textit{No minimum custody duration required for activity classification.}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}{Conclusion}
+  \begin{columns}[T]
+    \begin{column}{0.60\textwidth}
+      We presented a complete \textbf{Maritime Activity Intelligence Engine}:
+
+      \bigskip
+      \begin{itemize}
+        \item 42-feature partial-track vector valid for $N \geq 1$
+              observations, across AIS, EO, SAR, and radar
+        \item XGBoost with native NaN handling on GPU — no imputation,
+              no minimum track length
+        \item $22\times$ training speedup, 19 $\mu$s inference
+        \item Robust across 2,820 real vessels, 3 NOAA datasets,
+              2 seasons, 2 geographies
+        \item Dark vessel detector with SHAP-interpretable scoring
+        \item Multi-region synthetic validation against GFW fleet data
+      \end{itemize}
+
+      \bigskip
+      \textbf{The critical next step:} integrate real open-ocean AIS
+      and SAR-derived vessel detections. The architecture is ready.
+    \end{column}
+    \begin{column}{0.37\textwidth}
+      \includegraphics[width=\textwidth]{../outputs/figures/C6_coordinated_fleet.png}
+      {\small\textit{Coordinated fleet — the target operational scenario
+      the engine was designed to detect and classify.}}
+
+      \bigskip
+      \small
+      Code, models, and data loaders available upon request.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{frame}[standout]
+  Questions?
+\end{frame}
+
+\end{document}

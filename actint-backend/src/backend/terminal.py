@@ -13,7 +13,6 @@ except ImportError:
 
 try:
     import socketio
-
     SOCKETIO_AVAILABLE = True
 except ImportError:
     SOCKETIO_AVAILABLE = False

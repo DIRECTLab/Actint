@@ -112,7 +112,7 @@ class DuelingQNetwork(nn.Module):
     (e.g., most AIS segments are "transit" and all actions give similar Q).
     """
 
-#This is interesting, this code splits of into two different heads with one head (V) correlates to how interesting/suspicious the vessel is and the other head (A) is the most likely readons why the situation is interesting.
+# The neural network splits of into two different heads with one head (V) correlating to how interesting/suspicious the vessel is and the other head (A) is the most likely readons why the situation is interesting.
 # Q is the combination of both of those. 
 
     def __init__(self, obs_dim: int, n_actions: int, hidden: int = 256):
@@ -150,8 +150,6 @@ class DuelingQNetwork(nn.Module):
 # DQN Agent
 # ══════════════════════════════════════════════════════════════════════════════
 
-
-# This only learns from two sequential vessel data points. It seems like it would be significanly better for the AI to learn from at least a few data point in a row so that it has more it can learn.
 class DQNAgent:
     """
     Double-DQN agent for sequential AIS activity classification.
@@ -253,8 +251,7 @@ class DQNAgent:
             #The reason for this little bit of extra added complexty from the last two commands is to keep the neural network grounded for a few hundred steps so it doesn't move too drasically
 
             #calculate what the Q value should have been using rewards/punishments. (0 if done, epsilon is a constant which slightly decreases the pull of q on the whole system.)
-            # It is important to note (at least for me) that q is just an approximaton. 
-            #The reward is relatively large at the beginnind and smaller as the AI trains itself and its output q values (confidence values) become larger. 
+            # Because the confidence gets larger, the reward is relatively smaller (becuase it is constant)
             target_q = rewards + self.gamma * next_q * (1 - dones)
 
         # Get the Q for what the AI actually predicted. 
@@ -269,7 +266,7 @@ class DQNAgent:
         # trace back through the neural network and calculate how much each neuron contributed to the error
         loss.backward()
 
-        # add a safety cap so that wights can't be updated at such an extreme level if the gradient is super large so that things break. 
+        # For safety so gradients can't be massively changed. Too large of a change can cause problems.
         nn.utils.clip_grad_norm_(self.q_net.parameters(), 10.0)
 
         # Actually modify the weights in a way that lessens the error.
@@ -333,7 +330,7 @@ class DQNAgent:
         ep_losses = []
 
         step = 0
-        #This just loops through and trains. Stores teh result, stores the loss and gets the next step every loop. Fairly basic function. There is a lot of printing and logging though.
+        #This just loops through and trains. Stores the result, stores the loss and gets the next step every loop. Fairly basic function. There is a lot of printing and logging though.
         while step < total_steps:
             action  = self.select_action(obs)
             next_obs, reward, terminated, truncated, info = env.step(action)
@@ -393,7 +390,7 @@ class DQNAgent:
 
     # ── Evaluation ────────────────────────────────────────────────────────────
 
-#just returns information about the training
+# Returns information about the training
     def evaluate(
         self,
         env:         AISActivityEnv,
