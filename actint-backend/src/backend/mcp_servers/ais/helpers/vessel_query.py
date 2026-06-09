@@ -126,3 +126,25 @@ def query_dynamic_data_helper(searchQuery: dict, sort=False):
         return sorted_vessels
 
     return results
+
+
+def evaluate_country_code(code: int):
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT country FROM mmsi_mid_country WHERE mid = %s;", (code,))
+    result = cursor.fetchone()
+    conn.close()
+    if result:
+        return result[0]
+    return "Unknown Country Code"
+
+
+def evaluate_vessel_type(code: int):
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT vessel_type FROM vessel_type WHERE vessel_type_code = %s;", (code,))
+    result = cursor.fetchone()
+    conn.close()
+    if result:
+        return result[0]
+    return "Unknown Vessel Type Code"

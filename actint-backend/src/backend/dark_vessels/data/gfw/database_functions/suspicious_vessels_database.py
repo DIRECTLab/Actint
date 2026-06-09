@@ -4,7 +4,7 @@ from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_position_his
 from backend.config import config
 import psycopg
 from backend.dark_vessels.data.gfw.regions.region_coordinates import region_evaluator
-from backend.data_processing.ship_types import AIS_COUNTRY_CODES, AIS_VESSEL_TYPE_CODES
+from backend.mcp_servers.ais.helpers.vessel_query import evaluate_vessel_type, evaluate_country_code
 
 
 def _connect_to_suspicious_db():
@@ -84,7 +84,7 @@ def prepare_data_for_ML(data):
             object = {
                 "mmsi": static_data['mmsi'],
                 "vessel_type_code": static_data["vesseltype"],
-                "vessel_type_key": AIS_VESSEL_TYPE_CODES.get(static_data["vesseltype"], "Unknown"),
+                "vessel_type_key": evaluate_vessel_type(static_data["vesseltype"]),
                 "timestamp": detection["basedatetime"],
                 "lat": detection["lat"],
                 "lon": detection["lon"],
@@ -96,7 +96,7 @@ def prepare_data_for_ML(data):
                 "width": static_data["width"],
                 "draught": static_data["draft"],
                 "name": static_data["vesselname"],
-                "flag": AIS_COUNTRY_CODES.get(static_data["origincountry"], "Unknown"),
+                "flag": evaluate_country_code(static_data["origincountry"]),
                 "ais_on": True,
                 "true_activity": None,
                 "had_dark_period": None,

@@ -7,7 +7,8 @@ import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence
 
-
+"""
+This is more of a proof of concept than anything. It was also me (Daxton) learning how to use pytoch"""
 class AISDataset(Dataset):
     def __init__(self, prepared_data):
         self.tracks = prepared_data['tracks'] #This is a list of lists of training data
@@ -224,7 +225,7 @@ def train(model, dataset, epochs=200, batch_size=32, lr=1e-3):
 
 if __name__ == "__main__":
     from backend.mcp_servers.ais.helpers.vessel_query import get_all_mmsis, get_vessel_position_history_helper, query_static_data_helper
-    from backend.dark_vessels.src.Daxtons_AI_slop.AIS_types import get_vessel_class
+    from backend.data_processing.ship_types import get_vessel_class
     mmsis = get_all_mmsis()
     vessel_numbers = []
     AIS_dynamic = []
