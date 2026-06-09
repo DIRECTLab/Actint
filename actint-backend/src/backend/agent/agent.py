@@ -63,15 +63,15 @@ ais_mcp_client = MCPClient(ais_server_params, structured_output=False)
 ais_mcp_tools = ais_mcp_client.get_tools()
 
 
-adsb_server_params = StdioServerParameters(
-    command=python_path,
-    args=[adsb_mcp_server.__file__],
-    env=os.environ.copy(),
-    cwd=os.getcwd()
-)
+# adsb_server_params = StdioServerParameters(
+#     command=python_path,
+#     args=[adsb_mcp_server.__file__],
+#     env=os.environ.copy(),
+#     cwd=os.getcwd()
+# )
 
-adsb_mcp_client = MCPClient(adsb_server_params, structured_output=False)
-adsb_mcp_tools = adsb_mcp_client.get_tools()
+# adsb_mcp_client = MCPClient(adsb_server_params, structured_output=False)
+# adsb_mcp_tools = adsb_mcp_client.get_tools()
 
 
 print(f"""\033[1;33mChecking connection to llm inference server {config.INFERENCE_SERVER_URL}\033[0m""", file=sys.stderr)
@@ -90,7 +90,7 @@ def create_agent(
     """Creates an agent, injecting relevant tools."""
     tools = []
     tools += ais_mcp_tools
-    tools += adsb_mcp_tools
+    # tools += adsb_mcp_tools
     managed_agents = []
     if additional_tools:
         tools.extend(additional_tools)
