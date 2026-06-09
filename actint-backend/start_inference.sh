@@ -54,4 +54,5 @@ llama-server \
     -c ${MAX_CONTEXT_LENGTH:-132000} \
     --host 0.0.0.0 \
     --port $INFERENCE_SERVER_PORT \
+    --api-key "${MODEL_API_KEY}"
     -n ${MAX_NEW_TOKENS:-2000}
