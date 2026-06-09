@@ -18,9 +18,11 @@ from sqlalchemy import create_engine
 import pandas as pd
 import numpy as np
 
+from colorama import Fore
+
 from backend.dark_vessels.src.simulator import simulate_region
 from backend.dark_vessels.src.sequence_classifier import SequenceClassifier
-from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_position_history_helper
+from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_position_history_helper, get_all_mmsis
 
 # ── project imports ──────────────────────────────────────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
@@ -922,4 +924,8 @@ if __name__ == "__main__":
 
     vessel_locations = get_vessel_position_history_helper(209641000)
     vessel_locations_dataframe = sq.ais_to_dataframe(vessel_locations)
-    print(sq.predict(vessel_locations_dataframe))
+    #print(Fore.BLUE + str(vessel_locations_dataframe) + Fore.RESET)
+    #predictions = sq.predict(vessel_locations_dataframe)
+    #print(Fore.GREEN + str(sq.predict(vessel_locations_dataframe)) + Fore.RESET)
+
+    #predictions.to_sql("dark_vessel_predictions", con=engine, if_exists="replace", index=False)
