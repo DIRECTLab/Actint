@@ -32,9 +32,6 @@ from src.rl_env      import (AISActivityEnv, RunningNormaliser,
                               LABEL_LIST, N_ACTIONS, IDX_TO_LABEL)
 from src.rl_agent    import DQNAgent
 
-OUT_DIR = Path("outputs/rl")
-OUT_DIR.mkdir(parents=True, exist_ok=True)
-
 BG    = "#0d1117"
 PANEL = "#161b22"
 GRID  = "#21262d"

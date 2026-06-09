@@ -13,6 +13,7 @@ import sys
 import json
 from pathlib import Path
 from datetime import datetime
+from sqlalchemy import create_engine
 
 import pandas as pd
 import numpy as np
@@ -47,8 +48,18 @@ from src.geo_features import GeoFeatureAugmenter
 from src.rendezvous_detector import RendezvousDetector
 from src.dark_period_predictor import DarkPeriodPredictor, VesselState
 from src.vessel_baseline import VesselBaselineProfiler
+from backend.config import config
 
-OUTPUT_DIR = Path(__file__).parent / "outputs"
+out_dir = Path("outputs")
+
+db_url = (
+    f"postgresql+psycopg2://"
+    f"{config.DB_USER}:{config.DB_PASS}"
+    f"@{config.DB_HOST}:{config.DB_PORT}"
+    f"/{config.FISHY_REPORTS_DB_NAME}"
+)
+
+engine = create_engine(db_url)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -83,9 +94,6 @@ def run_region(region_key: str, n_fishing: int = 20, n_cargo: int = 12, visualis
     print(f"\n{'═'*80}")
     print(f"  ACTIVITY INTELLIGENCE ENGINE — {region_name.upper()}")
     print(f"{'═'*80}")
-
-    out_dir = OUTPUT_DIR / region_key
-    out_dir.mkdir(parents=True, exist_ok=True)
 
     # ── 1. Simulate AIS data ─────────────────────────────────────────────────
     print("\n[1/6] Simulating AIS vessel tracks ...")
@@ -191,20 +199,20 @@ def run_region(region_key: str, n_fishing: int = 20, n_cargo: int = 12, visualis
     # ── 6. Output ────────────────────────────────────────────────────────────
     print("[6/6] Generating outputs ...")
 
-    # Save CSVs
-    raw_df.to_csv(out_dir / "raw_tracks.csv", index=False)
-    feat_df.to_csv(out_dir / "features.csv",  index=False)
-    seg_df.to_csv(out_dir / "segments.csv",   index=False)
-    seg_preds.to_csv(out_dir / "segment_predictions.csv", index=False)
-    results_df.to_csv(out_dir / "predictions.csv", index=False)
-    dark_df.to_csv(out_dir / "dark_analysis.csv",  index=False)
+    # Save to PostgreSQL
+    raw_df.to_sql("raw_tracks", engine, if_exists="replace", index=False)
+    feat_df.to_sql("features", engine, if_exists="replace", index=False)
+    seg_df.to_sql("segments", engine, if_exists="replace", index=False)
+    seg_preds.to_sql("segment_predictions", engine, if_exists="replace", index=False)
+    results_df.to_sql("predictions", engine, if_exists="replace", index=False)
+    dark_df.to_sql("dark_analysis", engine, if_exists="replace", index=False)
 
-    # Charts
-    map_path = build_region_map(
-        raw_df, results_df, dark_df, region_key,
-        str(out_dir / "map.html")
-    )
-    print(f"      Interactive map: {map_path}")
+    # # Charts
+    # map_path = build_region_map(
+    #     raw_df, results_df, dark_df, region_key,
+    #     str(out_dir / "map.html")
+    # )
+    # print(f"      Interactive map: {map_path}")
 
     if visualise:
         plot_activity_distribution(
