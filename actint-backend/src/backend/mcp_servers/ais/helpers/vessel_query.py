@@ -46,11 +46,15 @@ def get_vessel_mmsi_helper(vessel_name: str) -> int:
         return result[0]
     raise ValueError("No Vessel with that name.")
 
-def get_vessel_position_history_helper(mmsi: int) -> list[dict]:
+def get_vessel_position_history_helper(mmsi: int, limit=15) -> list[dict]:
     """Get the position history of a vessel given its MMSI."""
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM ais_dynamic_data WHERE mmsi = %s ORDER BY basedatetime DESC;", (mmsi,))
+    if limit:
+        limit = int(limit)
+        cursor.execute("SELECT * FROM ais_dynamic_data WHERE mmsi = %s ORDER BY basedatetime DESC LIMIT %s;", (mmsi, limit))
+    else:
+        cursor.execute("SELECT * FROM ais_dynamic_data WHERE mmsi = %s ORDER BY basedatetime DESC;", (mmsi,))
     results = cursor.fetchall()
     conn.close()
 
@@ -122,3 +126,25 @@ def query_dynamic_data_helper(searchQuery: dict, sort=False):
         return sorted_vessels
 
     return results
+
+
+def evaluate_country_code(code: int):
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT country FROM mmsi_mid_country WHERE mid = %s;", (code,))
+    result = cursor.fetchone()
+    conn.close()
+    if result:
+        return result[0]
+    return "Unknown Country Code"
+
+
+def evaluate_vessel_type(code: int):
+    conn = get_conn()
+    cursor = conn.cursor()
+    cursor.execute("SELECT type FROM vessel_type WHERE vessel_type_codes = %s;", (code,))
+    result = cursor.fetchone()
+    conn.close()
+    if result:
+        return result[0]
+    return "Unknown Vessel Type Code"
