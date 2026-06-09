@@ -142,7 +142,7 @@ def evaluate_country_code(code: int):
 def evaluate_vessel_type(code: int):
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("SELECT type FROM vessel_type WHERE vessel_type_codes = %s;", (code,))
+    cursor.execute("SELECT vessel_type FROM vessel_type WHERE vessel_type_code = %s;", (code,))
     result = cursor.fetchone()
     conn.close()
     if result:
