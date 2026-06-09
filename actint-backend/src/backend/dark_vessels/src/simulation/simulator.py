@@ -352,7 +352,7 @@ def _build_track(
 def simulate_fishing_fleet(region_key: str, n_vessels: int = 15,
                             duration_hours: float = 72.0) -> pd.DataFrame:
     """Simulate a fishing fleet operating in a region."""
-    from .regions import REGIONS
+    from ..regions import REGIONS
     region = REGIONS[region_key]
     bbox = region["bbox"]
     flags = FLAGS.get(region_key, ["XX"])
@@ -418,7 +418,7 @@ def simulate_fishing_fleet(region_key: str, n_vessels: int = 15,
 def simulate_cargo_traffic(region_key: str, n_vessels: int = 10,
                            duration_hours: float = 48.0) -> pd.DataFrame:
     """Simulate cargo/tanker transit through a region."""
-    from .regions import REGIONS
+    from ..regions import REGIONS
     region = REGIONS[region_key]
     bbox = region["bbox"]
     flags = FLAGS.get(region_key, ["XX"])
@@ -471,7 +471,7 @@ def simulate_cargo_traffic(region_key: str, n_vessels: int = 10,
 
 def simulate_sts_event(region_key: str, event_idx: int = 0) -> pd.DataFrame:
     """Simulate a ship-to-ship transfer (sanctions evasion / oil transfer)."""
-    from .regions import REGIONS
+    from ..regions import REGIONS
     region = REGIONS[region_key]
     bbox = region["bbox"]
     start_time = datetime(2024, 6, 3, 2, 0, 0) + timedelta(hours=event_idx * 18)
@@ -509,7 +509,7 @@ def simulate_sts_event(region_key: str, event_idx: int = 0) -> pd.DataFrame:
 
 def simulate_loiterers(region_key: str, n_vessels: int = 4) -> pd.DataFrame:
     """Simulate vessels loitering (possible waiting for instructions / smuggling)."""
-    from .regions import REGIONS
+    from ..regions import REGIONS
     region = REGIONS[region_key]
     bbox = region["bbox"]
     start_time = datetime(2024, 6, 2, 18, 0, 0)
@@ -543,7 +543,7 @@ def simulate_loiterers(region_key: str, n_vessels: int = 4) -> pd.DataFrame:
 
 def simulate_anchored_fleet(region_key: str, n_vessels: int = 5) -> pd.DataFrame:
     """Simulate vessels anchored at sea (offshore, waiting for berth, etc.)."""
-    from .regions import REGIONS
+    from ..regions import REGIONS
     region = REGIONS[region_key]
     bbox   = region["bbox"]
     ports  = region.get("primary_ports", [])
@@ -584,7 +584,7 @@ def simulate_transshipment(region_key: str, event_idx: int = 0) -> pd.DataFrame:
     both go slow / nearly stationary during the transfer, then separate.
     This is a key IUU indicator (catch transferred without port inspection).
     """
-    from .regions import REGIONS
+    from ..regions import REGIONS
     region = REGIONS[region_key]
     bbox   = region["bbox"]
     start_time = datetime(2024, 6, 4, 8, 0, 0)
@@ -654,7 +654,7 @@ def simulate_bunkering(region_key: str, event_idx: int = 0) -> pd.DataFrame:
     Dwell is short (1-2h); both vessels then depart in different directions.
     Common near major waypoints (Singapore Strait, off Lagos, Santos).
     """
-    from .regions import REGIONS
+    from ..regions import REGIONS
     region = REGIONS[region_key]
     ports  = region.get("primary_ports", [])
     start_time = datetime(2024, 6, 5, 4, 0, 0) + timedelta(hours=event_idx * 14)
@@ -802,7 +802,7 @@ def simulate_survey(region_key: str, n_vessels: int = 1) -> pd.DataFrame:
     Survey vessels produce a characteristic parallel-comb track pattern at
     very low speed (3-5 kn), which can be confused with slow fishing.
     """
-    from .regions import REGIONS
+    from ..regions import REGIONS
     region = REGIONS[region_key]
     bbox = region["bbox"]
     start_time = datetime(2024, 6, 6, 0, 0, 0)
@@ -888,7 +888,7 @@ def simulate_patrol(region_key: str, n_vessels: int = 2) -> pd.DataFrame:
     """
     Simulate coast-guard / EEZ patrol vessels doing expanding-square sweeps.
     """
-    from .regions import REGIONS
+    from ..regions import REGIONS
     region = REGIONS[region_key]
     bbox = region["bbox"]
     start_time = datetime(2024, 6, 7, 6, 0, 0)
@@ -918,7 +918,7 @@ def simulate_dredging(region_key: str, n_vessels: int = 1) -> pd.DataFrame:
     Dredgers run back-and-forth at 1-2.5 kn along a narrow channel axis,
     with short repositioning transits at the channel ends.
     """
-    from .regions import REGIONS
+    from ..regions import REGIONS
     region = REGIONS[region_key]
     ports  = region.get("primary_ports", [])
     start_time = datetime(2024, 6, 8, 0, 0, 0)

@@ -103,7 +103,7 @@ def compute_vessel_features(df: pd.DataFrame, region_key: str | None = None) -> 
 
     Returns one row per MMSI with ~30 features.
     """
-    from .regions import REGIONS, nearest_port, nearest_fishing_ground
+    from ..regions import REGIONS, nearest_port, nearest_fishing_ground
 
     rows = []
     for mmsi, grp in df.groupby("mmsi"):
@@ -334,7 +334,7 @@ def compute_segment_features(
     GeoFeatureAugmenter.  Requires the GFW effort cache to be built on
     first call (~30 s); subsequent calls load from disk instantly.
     """
-    from .regions import REGIONS, nearest_port, nearest_fishing_ground
+    from ..regions import REGIONS, nearest_port, nearest_fishing_ground
 
     ports = fishing_grounds = []
     if region_key and region_key in REGIONS:
@@ -370,7 +370,7 @@ def _compute_segment_features_serial(
     step_size: int = 10,
 ) -> pd.DataFrame:
     """Serial fallback — kept for reference."""
-    from .regions import REGIONS, nearest_port, nearest_fishing_ground
+    from ..regions import REGIONS, nearest_port, nearest_fishing_ground
 
     rows = []
     for mmsi, grp in df.groupby("mmsi"):

@@ -1,4 +1,4 @@
-from backend.dark_vessels.src.simulator import simulate_region
+from backend.dark_vessels.src.simulation.simulator import simulate_region
 from backend.dark_vessels.src.sequence_classifier import SequenceClassifier
 from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_position_history_helper
 

@@ -13,42 +13,60 @@ import sys
 import json
 from pathlib import Path
 from datetime import datetime
+from sqlalchemy import create_engine
 
 import pandas as pd
 import numpy as np
 
+OUTPUT_DIR = '~/Actint/actint-backend/src/backend/dark_vessels/'
+
+
+from backend.dark_vessels.src.simulation.simulator import simulate_region
+from backend.dark_vessels.src.sequence_classifier import SequenceClassifier
+from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_position_history_helper, get_all_mmsis
+
 # ── project imports ──────────────────────────────────────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
-from src.simulator        import simulate_region
-from src.features         import compute_vessel_features, compute_segment_features
-from src.classifier       import ActivityIntelligenceClassifier
-from src.dark_vessel_detector import DarkVesselDetector
-from src.visualizer       import (
+from backend.dark_vessels.src.simulation.simulator        import simulate_region
+from backend.dark_vessels.src.feature_extraction.features         import compute_vessel_features, compute_segment_features
+from backend.dark_vessels.src.classifier       import ActivityIntelligenceClassifier
+from backend.dark_vessels.src.dark_vessel_detector import DarkVesselDetector
+from backend.dark_vessels.src.visualizer       import (
     build_region_map,
     plot_activity_distribution,
     plot_confusion_matrix,
     plot_feature_importance,
     plot_speed_profiles,
 )
-from src.real_data_viz import (
+from backend.dark_vessels.src.real_data_viz import (
     build_real_fishing_map,
     plot_real_fleet_composition,
     plot_model_vs_reality,
     print_region_intelligence_report,
 )
-from src.real_ais_validator import validate_real_ais
-from src.partial_track_classifier import (
+from backend.dark_vessels.src.real_ais_validator import validate_real_ais
+from backend.dark_vessels.src.partial_track_classifier import (
     PartialTrackClassifier, build_training_data, PARTIAL_FEATURES,
     UNIFIED_VESSEL_TYPES, ACTIVITY_LABELS,
 )
-from src.real_ais_loader import load_ais_file
-from src.regions import REGIONS
-from src.geo_features import GeoFeatureAugmenter
-from src.rendezvous_detector import RendezvousDetector
-from src.dark_period_predictor import DarkPeriodPredictor, VesselState
-from src.vessel_baseline import VesselBaselineProfiler
+from backend.dark_vessels.src.real_ais_loader import load_ais_file
+from backend.dark_vessels.src.regions import REGIONS
+from backend.dark_vessels.src.feature_extraction.geo_features import GeoFeatureAugmenter
+from backend.dark_vessels.src.rendezvous_detector import RendezvousDetector
+from backend.dark_vessels.src.dark_period_predictor import DarkPeriodPredictor, VesselState
+from backend.dark_vessels.src.vessel_baseline import VesselBaselineProfiler
+from backend.config import config
 
-OUTPUT_DIR = Path(__file__).parent / "outputs"
+out_dir = Path("outputs")
+
+db_url = (
+    f"postgresql+psycopg2://"
+    f"{config.DB_USER}:{config.DB_PASS}"
+    f"@{config.DB_HOST}:{config.DB_PORT}"
+    f"/{config.FISHY_REPORTS_DB_NAME}"
+)
+
+engine = create_engine(db_url)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -84,9 +102,6 @@ def run_region(region_key: str, n_fishing: int = 20, n_cargo: int = 12, visualis
     print(f"  ACTIVITY INTELLIGENCE ENGINE — {region_name.upper()}")
     print(f"{'═'*80}")
 
-    out_dir = OUTPUT_DIR / region_key
-    out_dir.mkdir(parents=True, exist_ok=True)
-
     # ── 1. Simulate AIS data ─────────────────────────────────────────────────
     print("\n[1/6] Simulating AIS vessel tracks ...")
     raw_df = simulate_region(region_key)
@@ -95,7 +110,7 @@ def run_region(region_key: str, n_fishing: int = 20, n_cargo: int = 12, visualis
     n_pings    = len(raw_df)
     dark_pings = int((~raw_df["ais_on"]).sum())
     print(f"      {n_vessels} vessels  |  {n_pings:,} AIS pings  |  "
-          f"{dark_pings:,} dark pings ({dark_pings/n_pings:.1%})")                  # If I can get real AIS data to look like the dataframe, I'll be cooking
+          f"{dark_pings:,} dark pings ({dark_pings/n_pings:.1%})")
 
     # ── 2. Feature engineering ───────────────────────────────────────────────
     print("[2/6] Computing segment features (sliding window) ...")
@@ -191,16 +206,15 @@ def run_region(region_key: str, n_fishing: int = 20, n_cargo: int = 12, visualis
     # ── 6. Output ────────────────────────────────────────────────────────────
     print("[6/6] Generating outputs ...")
 
-    # Save CSVs
-    raw_df.to_csv(out_dir / "raw_tracks.csv", index=False)
-    feat_df.to_csv(out_dir / "features.csv",  index=False)
-    seg_df.to_csv(out_dir / "segments.csv",   index=False)
-    seg_preds.to_csv(out_dir / "segment_predictions.csv", index=False)
-    results_df.to_csv(out_dir / "predictions.csv", index=False)
-    dark_df.to_csv(out_dir / "dark_analysis.csv",  index=False)
+    # Save to PostgreSQL
+    raw_df.to_sql("raw_tracks", engine, if_exists="replace", index=False)
+    feat_df.to_sql("features", engine, if_exists="replace", index=False)
+    seg_df.to_sql("segments", engine, if_exists="replace", index=False)
+    seg_preds.to_sql("segment_predictions", engine, if_exists="replace", index=False)
+    results_df.to_sql("predictions", engine, if_exists="replace", index=False)
+    dark_df.to_sql("dark_analysis", engine, if_exists="replace", index=False)
 
     # Charts
-
     map_path = build_region_map(
         raw_df, results_df, dark_df, region_key,
         str(out_dir / "map.html")
@@ -325,7 +339,7 @@ def run_partial_track_training(
       3. Train on 70% of vessels, test on 30%
       4. Report F1 at each track length (shows how accuracy degrades with fewer obs)
     """
-    from src.gpu_utils import compute_device, BACKEND
+    from backend.dark_vessels.src.gpu_utils import compute_device, BACKEND
     out_dir = Path(output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -579,7 +593,7 @@ def run_enhanced_intelligence(
 
     # ── 4. Train classifier + vessel baseline ─────────────────────────────────
     print("[4/6] Training classifier + per-vessel behavioural baselines …")
-    from src.classifier import ActivityIntelligenceClassifier
+    from backend.dark_vessels.src.classifier import ActivityIntelligenceClassifier
 
     # Add missing required columns if absent
     for col, val in [("true_activity", "transit"), ("vessel_type_key", "unknown"),
@@ -597,7 +611,7 @@ def run_enhanced_intelligence(
 
     # Derive pseudo true_activity from nav_status if present
     if "nav_status" in df.columns:
-        from src.real_ais_loader import NAV_STATUS_ACTIVITY
+        from backend.dark_vessels.src.real_ais_loader import NAV_STATUS_ACTIVITY
         ns_mode = (
             df.groupby("mmsi")["nav_status"]
             .agg(lambda x: pd.to_numeric(x, errors="coerce").dropna().astype(int).mode().iloc[0]
@@ -809,19 +823,7 @@ def main(visualise=False):
     parser.add_argument("--enhanced", action="store_true",
                         help="Run full enhanced intelligence pipeline (geo + rendezvous + baseline + dark predictor)")
 
-    parser.add_argument("--use-database", type=str, action="store", help="Use the database to do simulation stuff as well.")
-
     args = parser.parse_args()
-
-    # if args.use_database:
-    #     print("using database")
-    #     from backend.dark_vessels.data.gfw.database_functions.suspicious_vessels_database import get_ais_in_region, prepare_data_for_ML
-    #     location = args.use_database
-    #     ship_data = get_ais_in_region(location)
-    #     ML_ready_data = prepare_data_for_ML(ship_data)
-    #     print("Finished creating ML ready data")
-
-
 
     if args.list_regions:
         print("\nAvailable regions:")
@@ -905,4 +907,34 @@ def main(visualise=False):
 
 
 if __name__ == "__main__":
+
+
     main()
+
+
+    # data = simulate_region('philippines_eez')
+    # print(data)
+    # sq = SequenceClassifier()
+    # sq.fit(data)
+    # print(sq.predict(data))
+    # data = simulate_region('brazil_eez')
+    # sq.fit(data)
+    # print(sq.predict(data))
+    # data = simulate_region('strait_of_malacca')
+    # sq.fit(data)
+    # print(sq.predict(data))
+    # data = simulate_region('gulf_of_guinea')
+    # sq.fit(data)
+    # print(sq.predict(data))
+    # sq.save('sequence_classifier.pkl')
+
+    # vessel_locations = get_vessel_position_history_helper(209641000)
+    # vessel_locations_dataframe = sq.ais_to_dataframe(vessel_locations)
+
+
+
+    #print(Fore.BLUE + str(vessel_locations_dataframe) + Fore.RESET)
+    #predictions = sq.predict(vessel_locations_dataframe)
+    #print(Fore.GREEN + str(sq.predict(vessel_locations_dataframe)) + Fore.RESET)
+
+    #predictions.to_sql("dark_vessel_predictions", con=engine, if_exists="replace", index=False)

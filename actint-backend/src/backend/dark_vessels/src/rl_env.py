@@ -304,8 +304,8 @@ def make_env(
     -------
     AISActivityEnv
     """
-    from .simulator import simulate_region
-    from .features  import compute_segment_features
+    from .simulation.simulator import simulate_region
+    from .feature_extraction.features  import compute_segment_features
 
     all_regions = ["brazil_eez", "philippines_eez", "strait_of_malacca", "gulf_of_guinea"]
     regions_to_use = [region_key]

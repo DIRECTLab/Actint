@@ -26,7 +26,7 @@ from .real_ais_loader import (
     load_ais_file, fleet_summary, type_distribution,
     NAV_STATUS_ACTIVITY, VESSEL_TYPE_LABELS,
 )
-from .features import compute_segment_features
+from .feature_extraction.features import compute_segment_features
 from .classifier import ActivityIntelligenceClassifier
 
 # ── Activity colours (consistent with existing visualiser) ──────────────────
