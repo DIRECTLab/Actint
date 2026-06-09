@@ -18,6 +18,10 @@ from sqlalchemy import create_engine
 import pandas as pd
 import numpy as np
 
+from backend.dark_vessels.src.simulator import simulate_region
+from backend.dark_vessels.src.sequence_classifier import SequenceClassifier
+from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_position_history_helper
+
 # ── project imports ──────────────────────────────────────────────────────────
 sys.path.insert(0, str(Path(__file__).parent))
 from src.simulator        import simulate_region
@@ -900,4 +904,22 @@ def main(visualise=False):
 
 
 if __name__ == "__main__":
-    main()
+    data = simulate_region('philippines_eez')
+    print(data)
+    sq = SequenceClassifier()
+    sq.fit(data)
+    print(sq.predict(data))
+    data = simulate_region('brazil_eez')
+    sq.fit(data)
+    print(sq.predict(data))
+    data = simulate_region('strait_of_malacca')
+    sq.fit(data)
+    print(sq.predict(data))
+    data = simulate_region('gulf_of_guinea')
+    sq.fit(data)
+    print(sq.predict(data))
+    sq.save('sequence_classifier.pkl')
+
+    vessel_locations = get_vessel_position_history_helper(209641000)
+    vessel_locations_dataframe = sq.ais_to_dataframe(vessel_locations)
+    print(sq.predict(vessel_locations_dataframe))
