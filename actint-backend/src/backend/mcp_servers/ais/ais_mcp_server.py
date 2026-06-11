@@ -95,9 +95,9 @@ def summarise_fishy_vessels_in_region():
 
 @mcp.tool()
 def evaluate_vessel_fishiness(mmsi: str):
-    """Look for a vessel in the fishy vessels database and return if a vessel is fishy and why."""
+    """Look for a vessel in the suspicious vessels database and return if a vessel is suspicious and why."""
     result = query_vessel(mmsi)
-    return json.dumps({"vessel fishiness": result}, indent=2)
+    return json.dumps({"vessel fishiness": refsult}, indent=2)
 
 
 @mcp.tool()

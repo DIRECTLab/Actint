@@ -1,12 +1,9 @@
 from backend.data_processing.query_database import get_conn, DatabaseConnectionTypes
 from backend.mcp_servers.utils.distance_calculation import haversine_distance_nm
 from backend.dark_vessels.dark_vessel_analysis import run_analysis
-#from colorama import Fore, Style #for debugging prints
 
 
 '''
-Currently this file can be run independently to test helper functions
-
 Future development should involve a function for finding suspected dark activity hotspots and getting fishy trajectories
 Pseudocode: 
 
@@ -37,22 +34,8 @@ Pseudocode:
 '''
 
 
-def query_fishy_vessels():
-    """Return the list of fishy vessels"""
-    conn = get_conn(DatabaseConnectionTypes.FISHY_VESSELS)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM dark_detections;")
-    results = cursor.fetchall()
-    conn.close()
-
-    if results is None or len(results) == 0:
-        return (f"No suspicious vessels found in region.")
-
-    return results
-
-
 def query_vessel(mmsi):
-    """See if a specific vessel is in the list of fishy vessels"""
+    """See if a specific vessel is in the list of suspicious vessels"""
     conn = get_conn(DatabaseConnectionTypes.FISHY_VESSELS)
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM dark_detections WHERE mmsi = %s;", (mmsi,))
@@ -64,24 +47,8 @@ def query_vessel(mmsi):
         return results
 
 
-def get_fishy_vessel_locations_helper():
-    """Get the most recent locations of vessels in a region marked as suspicious based on dark vessel analysis."""
-    conn = get_conn(DatabaseConnectionTypes.FISHY_VESSELS)
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM dark_detections")
-    results = cursor.fetchall()
-    conn.close()
-
-    columns = [col[0] for col in cursor.description]
-    detections = [
-        dict(zip(columns, row))
-        for row in results
-    ]
-
-    return detections
-
-
 def find_fishy_clusters(mmsi: str, number_ships: str) -> str:
+    """Detect clusters of suspicious vessels"""
     mmsi = int(mmsi)
     number_ships = int(number_ships)
     detections = get_fishy_vessel_locations_helper()
@@ -150,12 +117,4 @@ def get_vessel_latest_location_helper(mmsi: int) -> dict | None:
     conn.close()
     
     return result
-
-
-def re_evaluate_region_helper(region):
-    """Re-run region analysis for fishy vessels."""
-    # visualise can be changed to true if we want the llm to also generate visualisations
-    run_analysis(region, visualise=False)    
-    return
-
 
