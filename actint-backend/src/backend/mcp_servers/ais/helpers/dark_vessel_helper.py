@@ -37,38 +37,38 @@ Pseudocode:
 '''
 
 
-def query_region(region):
-    """Return the list of fishy vessels in a region"""
+def query_fishy_vessels():
+    """Return the list of fishy vessels"""
     conn = get_conn(DatabaseConnectionTypes.FISHY_VESSELS)
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM sampletable;")
+    cursor.execute("SELECT * FROM dark_detections;")
     results = cursor.fetchall()
     conn.close()
 
     if results is None or len(results) == 0:
-        return (f"No suspicious vessels found in region {region}.")
+        return (f"No suspicious vessels found in region.")
 
     return results
 
 
-def query_vessel(name):
+def query_vessel(mmsi):
     """See if a specific vessel is in the list of fishy vessels"""
     conn = get_conn(DatabaseConnectionTypes.FISHY_VESSELS)
     cursor = conn.cursor()
-    cursor.execute("SELECT mmsi, dark_risk_score, anomaly_flags FROM sampletable WHERE name = %s;", (name,))
+    cursor.execute("SELECT * FROM dark_detections WHERE mmsi = %s;", (mmsi,))
     results = cursor.fetchall()
     conn.close()
     if len(results) == 0:
-        return (f"No vessel with name {name} found in fishy vessels database.")
+        return (f"No vessel with mmsi {mmsi} found in fishy vessels database.")
     else: 
         return results
 
 
-def get_fishy_vessel_locations_helper(region):
+def get_fishy_vessel_locations_helper():
     """Get the most recent locations of vessels in a region marked as suspicious based on dark vessel analysis."""
     conn = get_conn(DatabaseConnectionTypes.FISHY_VESSELS)
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM sampletable WHERE region = %s;", (region,))
+    cursor.execute("SELECT * FROM dark_detections")
     results = cursor.fetchall()
     conn.close()
 
@@ -81,11 +81,11 @@ def get_fishy_vessel_locations_helper(region):
     return detections
 
 
-def find_fishy_clusters(mmsi: str, number_ships: str, region: str) -> str:
+def find_fishy_clusters(mmsi: str, number_ships: str) -> str:
     mmsi = int(mmsi)
     number_ships = int(number_ships)
-    detections = get_fishy_vessel_locations_helper(region)
-    mmsis = get_fishy_mmsis(region)
+    detections = get_fishy_vessel_locations_helper()
+    mmsis = get_fishy_mmsis()
     if mmsi not in mmsis:
         raise ValueError("MMSI not in vessels")
     primary_ship_location = get_vessel_latest_location_helper(mmsi)
@@ -131,11 +131,11 @@ def find_fishy_clusters(mmsi: str, number_ships: str, region: str) -> str:
     return output
 
 
-def get_fishy_mmsis(region):
+def get_fishy_mmsis():
     """Get the MMSIs of vessels in a region marked as suspicious based on dark vessel analysis."""
     conn = get_conn(DatabaseConnectionTypes.FISHY_VESSELS)
     cursor = conn.cursor()
-    cursor.execute("SELECT mmsi FROM sampletable WHERE region = %s;", (region,))
+    cursor.execute("SELECT mmsi FROM dark_detections")
     results = cursor.fetchall()
     conn.close()
     return [row[0] for row in results if row[0] is not None]
@@ -145,7 +145,7 @@ def get_vessel_latest_location_helper(mmsi: int) -> dict | None:
     """Get the latest known location of a vessel given its MMSI."""
     conn = get_conn(DatabaseConnectionTypes.FISHY_VESSELS)
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM sampletable WHERE mmsi = %s ORDER BY basedatetime DESC LIMIT 1;", (mmsi,))
+    cursor.execute("SELECT * FROM dark_detections WHERE mmsi = %s ORDER BY basedatetime DESC LIMIT 1;", (mmsi,))
     result = cursor.fetchone()
     conn.close()
     
@@ -159,57 +159,3 @@ def re_evaluate_region_helper(region):
     return
 
 
-def run_tests():
-    """Run tests for the functions in this file."""
-    failed = False
-
-    print("\nRunning tests for dark_vessel_helper.py...\n")
-
-    if len(query_region("brazil_eez")) == 0:
-        #print(Fore.LIGHTRED_EX) # uncomment for colour coded terminal output
-        print("query_region test failed: No vessels found in region.")
-        #print (Fore.RESET) # uncomment for colour coded terminal output
-        failed = True
-    else:
-        #print(Fore.LIGHTGREEN_EX)
-        print("query_region test passed.")
-        #print(Fore.RESET)
-
-    if len(query_vessel("steve")) == 0:
-        #print(Fore.LIGHTRED_EX)
-        print("query_vessel test failed: No vessel with name steve found.")
-        #print(Fore.RESET)
-        failed = True
-    else:
-        #print(Fore.LIGHTGREEN_EX)
-        print("query_vessel test passed.")
-        #print(Fore.RESET)
-
-    # get fishy vessel locations
-    if len(get_fishy_vessel_locations_helper("brazil_eez")) == 0:
-        #print(Fore.LIGHTRED_EX)
-        print("get_fishy_vessel_locations_helper test failed: No vessels found in region.")
-        #print(Fore.RESET)
-        failed = True
-    else: 
-        #print(Fore.LIGHTGREEN_EX)
-        print("get_fishy_vessel_locations_helper test passed.")
-        #print(Fore.RESET)
-
-    # find fishy clusters
-    if len(find_fishy_clusters("9", "5", "brazil_eez")) == 0:
-        #print(Fore.LIGHTRED_EX)
-        print("find_fishy_clusters test failed: No clusters found.")
-        #print(Fore.RESET)
-        failed = True
-    else:
-        #print(Fore.LIGHTGREEN_EX)
-        print("find_fishy_clusters test passed.")
-        #print(Fore.RESET)
-
-    if not failed:
-        print("\nAll tests passed.\n")
-
-
-if __name__ == "__main__":
-    run_tests()

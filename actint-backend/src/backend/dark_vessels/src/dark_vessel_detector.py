@@ -58,9 +58,11 @@ class DarkVesselDetector:
         anomaly flags and a composite dark_risk score.
         """
         results = []
+        df.rename(columns={"basedatetime": "timestamp"}, inplace=True)
         for mmsi, grp in df.groupby("mmsi"):
             grp = grp.sort_values("timestamp").reset_index(drop=True)
             results.append(self._analyze_vessel(grp))
+            print(f"Appended {mmsi} analysis")
         return pd.DataFrame(results)
 
     def detect_spoofed_positions(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -97,6 +99,7 @@ class DarkVesselDetector:
         """
         suspicious = []
         for mmsi, grp in df.groupby("mmsi"):
+            print(f"Is {mmsi} suspicious?")
             grp = grp.sort_values("timestamp")
             for i in range(len(grp) - 1):
                 dt_h = (grp.iloc[i+1]["timestamp"] - grp.iloc[i]["timestamp"]).total_seconds() / 3600
