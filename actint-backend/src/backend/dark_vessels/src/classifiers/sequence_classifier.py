@@ -75,17 +75,20 @@ class PingFeatureExtractor:
 
         # SOG normalised to [0,1] (max ~30 kn)
         if "sog" in df.columns:
-            out[:, 0] = np.clip(df["sog"].values / 30.0, 0, 1)
+            sog = pd.to_numeric(df["sog"], errors="coerce").fillna(0)
+            out[:, 0] = np.clip(sog.to_numpy(dtype=float) / 30.0, 0, 1)
 
         # COG sin/cos
         if "cog" in df.columns:
-            rad = np.radians(df["cog"].fillna(0).values)
+            cog = pd.to_numeric(df["cog"], errors="coerce").fillna(0)
+            rad = np.radians(cog.to_numpy(dtype=float))
             out[:, 1] = np.sin(rad)
             out[:, 2] = np.cos(rad)
 
         # Heading sin/cos
         if "heading" in df.columns:
-            rad = np.radians(df["heading"].fillna(0).values)
+            heading = pd.to_numeric(df["heading"], errors="coerce").fillna(0)
+            rad = np.radians(heading.to_numpy(dtype=float))
             out[:, 3] = np.sin(rad)
             out[:, 4] = np.cos(rad)
 
@@ -105,32 +108,36 @@ class PingFeatureExtractor:
         # Turning rate (degrees/min)
         if "cog" in df.columns and "timestamp" in df.columns:
             ts_s = pd.to_datetime(df["timestamp"], utc=True, errors="coerce").astype(np.int64) / 1e9
+            ts_s = ts_s.to_numpy(dtype=float)
 
-        # These are bug fixes for my machine/version of python, if it causes you errors, try setting it back
-            # dt   = np.diff(ts_s, prepend=ts_s[0])
-            dt = np.diff(ts_s, prepend=ts_s.iloc[0])
-            # dcog = np.diff(df["cog"].fillna(method="ffill").values, prepend=0)
-            dcog = np.diff(df["cog"].ffill().values, prepend=0)
-        
-            dcog = (dcog + 180) % 360 - 180   # wrap to [-180, 180]
+            dt = np.diff(ts_s, prepend=ts_s[0])
 
-            # tr   = np.where(dt > 0, dcog / (dt / 60.0), 0.0)
-            tr = np.divide(dcog, dt / 60.0, out=np.zeros_like(dcog), where=dt > 0)
-            
-            out[:, 9] = np.clip(tr / 30.0, -1, 1)   # normalise
+            dcog = np.diff(df["cog"].ffill().to_numpy(dtype=float), prepend=0)
+            dcog = (dcog + 180) % 360 - 180
+
+            tr = np.zeros_like(dcog, dtype=float)
+
+            mask = dt > 0
+            tr[mask] = dcog[mask] / (dt[mask] / 60.0)
+
+            out[:, 9] = np.clip(tr / 30.0, -1, 1)
 
         # Acceleration
         if "sog" in df.columns and "timestamp" in df.columns:
-            ts_s = pd.to_datetime(df["timestamp"], utc=True, errors="coerce").astype(np.int64) / 1e9
+            ts_s = pd.to_datetime(
+                df["timestamp"], utc=True, errors="coerce"
+            ).astype(np.int64) / 1e9
 
-        # These are bug fixes for my machine/version of python, if it causes you errors, try setting it back
-            # dt   = np.diff(ts_s, prepend=ts_s[0])
-            dt = np.diff(ts_s, prepend=ts_s.iloc[0])
-            # dsog = np.diff(df["sog"].fillna(method="ffill").values, prepend=0)
-            dsog = np.diff(df["sog"].ffill().values, prepend=0)
-            # acc  = np.where(dt > 0, dsog / (dt / 60.0), 0.0)
-            acc = np.divide(dsog, dt / 60.0, out=np.zeros_like(dsog), where=dt > 0)
+            ts_s = ts_s.to_numpy(dtype=float)
 
+            dt = np.diff(ts_s, prepend=ts_s[0])
+
+            dsog = np.diff(df["sog"].ffill().to_numpy(dtype=float), prepend=0)
+
+            acc = np.zeros_like(dsog, dtype=float)
+
+            mask = dt > 0
+            acc[mask] = dsog[mask] / (dt[mask] / 60.0)
 
             out[:, 10] = np.clip(acc / 2.0, -1, 1)
 
@@ -445,37 +452,45 @@ class SequenceClassifier:
         return records
     
 
-    def ais_to_dataframe(self, ais_data):
-        """
-        Convert a list of AIS pings (dicts) into a DataFrame suitable for
-        SequenceClassifier.predict().
-        
-        Takes input from the AIS database and produces a pandas dataframe.
-        
-        Output DataFrame columns:
-        ['mmsi', 'timestamp', 'lat', 'lon', 'sog', 'cog']
-        """
-        
-        # Map the dictionary keys to the columns expected by SequenceClassifier
+    def ais_to_dataframe(ais_data):
+        """Convert AIS pings to a DataFrame, skipping bad/missing coordinates."""
+        if not ais_data:
+            return pd.DataFrame(columns=["mmsi", "timestamp", "lat", "lon", "sog", "cog"])
+
         records = []
+        prev = None
         for ping in ais_data:
-            record = {
-                "mmsi": ping["mmsi"],
-                "timestamp": ping["basedatetime"],
-                "lat": ping["lat"],
-                "lon": ping["lon"],
-                "sog": ping["sog"],
-                "cog": ping["cog"],
-            }
-            records.append(record)
-        
+            lat = ping.get("lat")
+            lon = ping.get("lon")
+            try:
+                lat = float(lat)
+                lon = float(lon)
+            except (TypeError, ValueError):
+                continue
+
+            timestamp = pd.to_datetime(ping.get("basedatetime"), errors="coerce")
+            if pd.isna(timestamp):
+                continue
+
+            sog = 0.0
+            cog = 0.0
+            if prev is not None and pd.notna(prev[2]):
+                sog = calculate_sog(prev[0], prev[1], prev[2], lat, lon, timestamp)
+                cog = calculate_bearing(prev[0], prev[1], lat, lon)
+
+            records.append({
+                "mmsi": ping.get("mmsi"),
+                "timestamp": timestamp,
+                "lat": lat,
+                "lon": lon,
+                "sog": sog,
+                "cog": cog,
+            })
+            prev = (lat, lon, timestamp)
+
         df = pd.DataFrame(records)
-        
-        # Sort by MMSI and timestamp, just in case
-        df.sort_values(by=["mmsi", "timestamp"], inplace=True)
-        df.reset_index(drop=True, inplace=True)
-        
+        if df.empty:
+            return pd.DataFrame(columns=["mmsi", "timestamp", "lat", "lon", "sog", "cog"])
+
+        df = df.sort_values(by=["mmsi", "timestamp"], na_position="last").reset_index(drop=True)
         return df
-
-
-

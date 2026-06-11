@@ -57,6 +57,7 @@ from src.vessel_baseline import VesselBaselineProfiler
 from backend.config import config
 
 out_dir = Path("outputs")
+OUTPUT_DIR = Path("outputs")
 
 db_url = (
     f"postgresql+psycopg2://"
@@ -906,10 +907,14 @@ def main(visualise=False):
 
 
 if __name__ == "__main__":
+
+    start_time = datetime.now()
+
+    # data simulation for model training
     data = simulate_region('philippines_eez')
     print(data)
     sq = SequenceClassifier()
-    sq.fit(data)
+    sq.fit(data, epochs=200)
     print(sq.predict(data))
     data = simulate_region('brazil_eez')
     sq.fit(data)
@@ -922,10 +927,69 @@ if __name__ == "__main__":
     print(sq.predict(data))
     sq.save('sequence_classifier.pkl')
 
-    vessel_locations = get_vessel_position_history_helper(209641000)
-    vessel_locations_dataframe = sq.ais_to_dataframe(vessel_locations)
-    #print(Fore.BLUE + str(vessel_locations_dataframe) + Fore.RESET)
-    #predictions = sq.predict(vessel_locations_dataframe)
-    #print(Fore.GREEN + str(sq.predict(vessel_locations_dataframe)) + Fore.RESET)
+    print(Fore.GREEN)
+    time = datetime.now() - start_time
+    print("Time passed: " + str(time))
+    print(Fore.RESET)
 
-    #predictions.to_sql("dark_vessel_predictions", con=engine, if_exists="replace", index=False)
+    # vessel_locations = get_vessel_position_history_helper(209641000)
+    # vessel_locations_dataframe = sq.ais_to_dataframe(vessel_locations)
+    # print(sq.predict(vessel_locations_dataframe))
+
+    # vessel activity prediction
+    frames = []
+    mmsis = get_all_mmsis()
+
+    for mmsi in mmsis:
+        track = get_vessel_position_history_helper(mmsi)
+
+        print(Fore.BLUE)
+        print(track)
+        print(Fore.RESET)
+
+        if not track:
+            continue
+
+        df = pd.DataFrame(track)
+        df.rename(columns={"basedatetime": "timestamp"}, inplace=True)
+
+        required = {'timestamp', 'lat', 'lon', 'sog', 'cog'}
+        if not required.issubset(df.columns):
+            continue
+
+        df["mmsi"] = mmsi
+        frames.append(df)
+
+    if not frames:
+        raise ValueError("No valid AIS data after filtering")
+
+    
+    print(Fore.GREEN)
+    time = datetime.now() - start_time
+    print("Time passed: " + str(time))
+    print(Fore.RESET)
+
+    locations_dataframe = pd.concat(frames, ignore_index=True)
+    sq.fit(locations_dataframe)
+    predictions = sq.predict(locations_dataframe)
+    predictions.to_sql("dark_vessel_predictions", engine, if_exists="replace", index=False)
+
+    # dark vessel analysis
+    detector = DarkVesselDetector()
+    dark_df  = detector.analyze_fleet(locations_dataframe)
+    # print(Fore.GREEN)
+    # time = datetime.now() - start_time
+    # print("Time passed: " + str(time))
+    # print(Fore.RESET)
+    # spoofed_mmsis = detector.detect_mmsi_clones(locations_dataframe)
+
+    n_dark_flagged = int((dark_df["dark_risk_score"] > 0.3).sum())
+    print(f"      Vessels with dark risk > 0.3: {n_dark_flagged}")
+    # print(f"      Suspected MMSI clones:         {len(spoofed_mmsis)}")
+
+    dark_df.to_sql("dark_detections", engine, if_exists="replace", index=False)
+
+    print(Fore.GREEN)
+    time = datetime.now() - start_time
+    print("Final time passed: " + str(time))
+    print(Fore.RESET)

@@ -35,11 +35,9 @@ def _resolve_sqlite_path() -> Path:
 
 # Import tool functions from parent package
 from backend.mcp_servers.ais.helpers.dark_vessel_helper import (
-    query_region,
     query_vessel,
     get_fishy_vessel_locations_helper,
     find_fishy_clusters,
-    re_evaluate_region_helper,
 )
 from backend.mcp_servers.ais.helpers.ship_context import (
     get_vessel_general_information_helper,
@@ -82,12 +80,12 @@ mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 # ============================================================================
 
 @mcp.tool()
-def summarise_fishy_vessels_in_region(region: str):
+def summarise_fishy_vessels_in_region():
     """Get a number of vessels in a region marked as fishy and information about clusters of fishy vessels."""
     cluster_size = 5 # Can be adjusted based on more realistic use cases if needed
-    vessel_locations = get_fishy_vessel_locations_helper(region)
+    vessel_locations = get_fishy_vessel_locations_helper()
     number_of_vessels = len(vessel_locations)
-    cluster_info = detect_fishy_clusters(region)
+    cluster_info = detect_fishy_clusters()
 
     return json.dumps({
         "number_of_fishy_vessels": number_of_vessels,
@@ -96,36 +94,29 @@ def summarise_fishy_vessels_in_region(region: str):
 
 
 @mcp.tool()
-def evaluate_vessel_fishiness(vessel_name: str):
+def evaluate_vessel_fishiness(mmsi: str):
     """Look for a vessel in the fishy vessels database and return if a vessel is fishy and why."""
-    result = query_vessel(vessel_name)
+    result = query_vessel(mmsi)
     return json.dumps({"vessel fishiness": result}, indent=2)
 
 
 @mcp.tool()
-def get_fishy_vessel_locations(region: str):
+def get_fishy_vessel_locations():
     """Get the most recent locations of vessels in a region marked as suspicious and their tradjectories."""
-    result = get_fishy_vessel_locations_helper(region)
+    result = get_fishy_vessel_locations_helper()
     return json.dumps({"vessel_locations": result}, indent=2)
 
 
 @mcp.tool()
-def detect_fishy_clusters(region: str):
+def detect_fishy_clusters():
     """Detect clusters of vessels in a region that may indicate suspicious activity."""
     # we might get rid of this tool and just use the summarise function instead. we'll see which the llm works better with?
     cluster_size = 5
-    vessel_locations = get_fishy_vessel_locations_helper(region)
+    vessel_locations = get_fishy_vessel_locations_helper()
     clusters = []
     for detection in vessel_locations:
         clusters.append(find_fishy_clusters(detection['mmsi'], str(cluster_size), region))
     return json.dumps({"clusters": clusters}, indent=2)
-
-
-@mcp.tool()
-def re_evaluate_region(region):
-    """Re-run region analysis for fishy vessels."""
-    re_evaluate_region_helper(region)
-    return json.dumps({"message": f"Region {region} has been re-evaluated for fishy vessels."}, indent=2)
 
 
 # ============================================================================
