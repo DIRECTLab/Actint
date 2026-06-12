@@ -221,6 +221,7 @@ def run_region(region_key: str, n_fishing: int = 20, n_cargo: int = 12, visualis
     )
     print(f"      Interactive map: {map_path}")
 
+<<<<<<<< HEAD:actint-backend/src/backend/dark_vessels/main.py
     if visualise:
         plot_activity_distribution(
             results_df, region_key,
@@ -281,6 +282,19 @@ def run_region(region_key: str, n_fishing: int = 20, n_cargo: int = 12, visualis
                 title=f"FLAGGED ANOMALOUS VESSELS ({region_name})",
                 n=20,
             )
+========
+    # Real data integration (GFW 2023)
+    try:
+        real_map = build_real_fishing_map(
+            region_key, str(out_dir / "real_fishing_map.html"))
+        plot_real_fleet_composition(
+            region_key, str(out_dir / "real_fleet_composition.png"))
+        plot_model_vs_reality(
+            region_key, results_df, str(out_dir / "model_vs_reality.png"))
+        log(f"      Real-data map:   {real_map}")
+    except FileNotFoundError as e:
+        log(f"      [skipping real data: {e}]")
+>>>>>>>> 61f5899 (rebrand dark vessel code, start sketching framework for use):actint-backend/src/backend/dark_vessel/main.py
 
     # ── Console summary tables ────────────────────────────────────────────────
     # Merge results with dark scores
