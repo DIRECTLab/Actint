@@ -75,6 +75,20 @@ mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 #         return "Error:\n" + str(e)
 
 @mcp.tool()
+def get_region_info(region) -> str:
+    """Tool to get information on vessels within a particular region
+    
+    Args:
+        region (str): Region being investigated
+
+    Returns:
+        JSON information about ships in the region
+    
+    """
+    return run_region(region)
+
+
+@mcp.tool()
 def get_vessel_locations(mmsi: int | str) -> str:
     """Get all recorded positions for a specific vessel identified by MMSI.
     
@@ -155,38 +169,6 @@ def ship_following_analysis(mmsi1: int | str, mmsi2: int | str) -> str:
         return json.dumps({"analysis": result})
     except Exception as e:
         return json.dumps({"error": str(e)})
-    
-
-# ============================================================================
-# Tools: Using tools that Mario originally wrote
-# ============================================================================
-@mcp.tool()
-def search_region_for_ships(region: str) -> dict:
-    if region not in REGIONS:
-        return {
-            "success": False,
-            "error": "INVALID_REGION",
-            "available_regions": [
-                {"key": k, "name": v["name"]}
-                for k, v in REGIONS.items()
-            ]
-        }
-
-    try:
-        region_data = run_region(region)
-
-        return {
-            "success": True,
-            "region": region,
-            "data": region_data
-        }
-
-    except Exception as e:
-        return {
-            "success": False,
-            "error": "EXECUTION_ERROR",
-            "message": str(e)  # force safe serialization
-        }
 
 # ============================================================================
 # Fishy Vessel Analysis Tools
@@ -516,97 +498,6 @@ def get_future_intersections_in_area(lat: str, lon: str, radius_nm: str) -> str:
         return get_future_intersections_in_area_helper(lat, lon, radius_nm)
     except Exception as e:
         return "Error:\n" + str(e)
-
-# ============================================================================
-# Tools: Geographic Queries
-# ============================================================================
-
-@mcp.tool()
-def get_vessels_in_area(lat: str, lon: str, radius_nm: str):
-    """Retrieves the mmsis of all the vessels in the radius of a certain point.
-    
-    Args:
-        lat: Latitude of the point
-        lon: Longitude of the point
-        radius_nm: Radius in nautical miles
-    Returns: 
-        str: List of MMSIs in within the radius of the point
-    """
-    try:
-        return get_vessels_in_area_helper(lat, lon, radius_nm)
-    except Exception as e: 
-        return "Error:\n" + str(e)
-
-# ============================================================================
-# Trying out making an mcp resource
-# ============================================================================
-
-@mcp.tool()
-def get_silly_greeting() -> str:
-    """Example MCP tool that returns a silly greeting."""
-    return get_silly_greeting()
-
-@mcp.resource("resource://sillygreeting")
-def get_silly_greeting() -> str:
-    """Example MCP resource that returns a silly greeting."""
-    with open('backend/mcp_servers/ais/sillygreeting.txt', 'r') as f:
-        greeting = f.read()
-    return greeting
-
-        forbidden = [
-            "insert ", "update ", "delete ", "drop ", "alter ", "create ",
-            "attach ", "detach ", "vacuum", "pragma", "reindex", "replace ",
-            "truncate ",
-        ]
-        if any(tok in ql for tok in forbidden):
-            return json.dumps({"error": "Query contains forbidden keywords"})
-
-        # Disallow multi-statement execution; allow a single trailing semicolon
-        if ";" in query.rstrip(";"):
-            return json.dumps({"error": "Multiple SQL statements are not allowed"})
-
-        if max_rows <= 0:
-            max_rows = 200
-        if max_rows > 5000:
-            max_rows = 5000
-
-        conn = sqlite3.connect(str(_resolve_sqlite_path()))
-        cursor = conn.cursor()
-
-        cursor.execute(query)
-        
-        # Get column names
-        columns = [description[0] for description in cursor.description] if cursor.description else []
-        
-        # Fetch bounded results
-        rows = cursor.fetchmany(max_rows + 1)
-        
-        # Convert rows to list of dicts
-        result_list = []
-        truncated = False
-        if len(rows) > max_rows:
-            truncated = True
-            rows = rows[:max_rows]
-
-        for row in rows:
-            row_dict = {col: val for col, val in zip(columns, row)}
-            result_list.append(row_dict)
-        
-        conn.close()
-        
-        result = {
-            "columns": columns,
-            "row_count": len(result_list),
-            "truncated": truncated,
-            "max_rows": max_rows,
-            "rows": result_list
-        }
-        return json.dumps(result, indent=2)
-    except sqlite3.Error as e:
-        return json.dumps({"error": f"Database error: {str(e)}"})
-    except Exception as e:
-        return json.dumps({"error": f"Query error: {str(e)}"})
-
 
 # ============================================================================
 # Server Entry Point
