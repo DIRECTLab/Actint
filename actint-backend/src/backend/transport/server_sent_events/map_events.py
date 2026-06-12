@@ -23,11 +23,11 @@ async def add_marker(sid, lat, lon, popup_description):
         "popup": popup_description
     }, to=sid)
 
-async def draw_vessel_trajectory(sid, lat, lon, degree, distance_nm, color="blue"): #I need to add the ability for the AI to choose a color
+async def draw_vessel_trajectory(sid, lat, lon, heading, distance_nm, color="blue"): #I need to add the ability for the AI to choose a color
     await sio.emit("draw_vessel_trajectory", {
         "lat": lat,
         "lon": lon,
-        "degree": degree,
+        "heading": heading,
         "distance_nm": distance_nm,
     }, to=sid)
 

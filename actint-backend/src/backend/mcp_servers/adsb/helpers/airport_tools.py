@@ -25,7 +25,9 @@ from backend.mcp_servers.adsb.helpers.adsb_locations import (
 from backend.mcp_servers.utils.distance_calculation import calculate_bearing, haversine_distance_nm
 
 from backend.data_processing.query_database import DatabaseConnectionTypes, get_conn
+from backend.config import config
 
+PH = "?" if config.DB_USING_SQLITE else "%s"
 
 def get_airport_by_ident(ident: str) -> Optional[dict[str, Any]]:
     ident_n = (ident or "").strip().upper()
@@ -42,7 +44,7 @@ def get_airport_by_ident(ident: str) -> Optional[dict[str, Any]]:
             gps_code, icao_code, iata_code, local_code,
             home_link, wikipedia_link, keywords, score, last_updated
         FROM airports
-        WHERE ident = %s
+        WHERE ident = {PH}
         LIMIT 1;
     """
 
@@ -68,10 +70,29 @@ def search_airports(
     if limit > 1000:
         limit = 1000
 
-    name_q = (name_contains or "").strip()
-    muni_q = (municipality_contains or "").strip()
+    name_pattern = f"%{name_contains.strip()}%" if (name_contains or "").strip() else None
+    muni_pattern = f"%{municipality_contains.strip()}%" if (municipality_contains or "").strip() else None
 
-    sql = """
+    conditions: list[str] = []
+    params: list[Any] = []
+
+    if name_pattern:
+        conditions.append("name ILIKE {PH}")
+        params.append(name_pattern)
+    if muni_pattern:
+        conditions.append("municipality ILIKE {PH}")
+        params.append(muni_pattern)
+    if iso_country:
+        conditions.append("iso_country = {PH}")
+        params.append(iso_country)
+    if iso_region:
+        conditions.append("iso_region = {PH}")
+        params.append(iso_region)
+
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    params.append(limit)
+
+    sql = f"""
         SELECT
             id, ident, type, name,
             latitude_deg, longitude_deg,
@@ -80,30 +101,14 @@ def search_airports(
             iata_code, icao_code,
             score
         FROM airports
-        WHERE (%s = '' OR name ILIKE '%' || %s || '%')
-          AND (%s = '' OR municipality ILIKE '%' || %s || '%')
-          AND (%s IS NULL OR iso_country = %s)
-          AND (%s IS NULL OR iso_region = %s)
+        {where}
         ORDER BY score DESC NULLS LAST, name ASC
-        LIMIT %s;
+        LIMIT {PH};
     """
 
     with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                sql,
-                (
-                    name_q,
-                    name_q,
-                    muni_q,
-                    muni_q,
-                    iso_country,
-                    iso_country,
-                    iso_region,
-                    iso_region,
-                    limit,
-                ),
-            )
+            cur.execute(sql, params)
             cols = [d.name for d in cur.description]
             return [dict(zip(cols, r)) for r in cur.fetchall()]
 
@@ -121,7 +126,20 @@ def get_airport_runways(
 
     ident_q = (airport_ident or "").strip().upper() if airport_ident else None
 
-    sql = """
+    conditions: list[str] = []
+    params: list[Any] = []
+
+    if ident_q:
+        conditions.append("airport_ident = {PH}")
+        params.append(ident_q)
+    if airport_ref is not None:
+        conditions.append("airport_ref = {PH}")
+        params.append(airport_ref)
+
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    params.append(limit)
+
+    sql = f"""
         SELECT
             id, airport_ref, airport_ident,
             length_ft, width_ft, surface,
@@ -129,15 +147,14 @@ def get_airport_runways(
             le_ident, le_latitude_deg, le_longitude_deg, le_elevation_ft, le_heading_degt,
             he_ident, he_latitude_deg, he_longitude_deg, he_elevation_ft, he_heading_degt
         FROM runways
-        WHERE (%s IS NULL OR airport_ident = %s)
-          AND (%s IS NULL OR airport_ref = %s)
+        {where}
         ORDER BY length_ft DESC NULLS LAST
-        LIMIT %s;
+        LIMIT {PH};
     """
 
     with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (ident_q, ident_q, airport_ref, airport_ref, limit))
+            cur.execute(sql, params)
             cols = [d.name for d in cur.description]
             return [dict(zip(cols, r)) for r in cur.fetchall()]
 
@@ -154,22 +171,36 @@ def get_airport_frequencies(
     if limit > 2000:
         limit = 2000
 
-    ident_q = (airport_ident or "").strip().upper() if airport_ident else None
-    type_q = (freq_type or "").strip() if freq_type else None
+    ident_q = (airport_ident or "").strip().upper() or None
+    type_q = (freq_type or "").strip() or None
 
-    sql = """
+    conditions: list[str] = []
+    params: list[Any] = []
+
+    if ident_q:
+        conditions.append("airport_ident = {PH}")
+        params.append(ident_q)
+    if airport_ref is not None:
+        conditions.append("airport_ref = {PH}")
+        params.append(airport_ref)
+    if type_q:
+        conditions.append("type = {PH}")
+        params.append(type_q)
+
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    params.append(limit)
+
+    sql = f"""
         SELECT id, airport_ref, airport_ident, type, description, frequency_mhz
         FROM airport_frequencies
-        WHERE (%s IS NULL OR airport_ident = %s)
-          AND (%s IS NULL OR airport_ref = %s)
-          AND (%s IS NULL OR type = %s)
+        {where}
         ORDER BY type ASC, frequency_mhz ASC
-        LIMIT %s;
+        LIMIT {PH};
     """
 
     with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (ident_q, ident_q, airport_ref, airport_ref, type_q, type_q, limit))
+            cur.execute(sql, params)
             cols = [d.name for d in cur.description]
             return [dict(zip(cols, r)) for r in cur.fetchall()]
 
@@ -201,8 +232,8 @@ def find_nearest_airport(
             iso_country, iso_region,
             municipality, iata_code, icao_code
         FROM airports
-        WHERE latitude_deg BETWEEN %s AND %s
-          AND longitude_deg BETWEEN %s AND %s
+        WHERE latitude_deg BETWEEN {PH} AND {PH}
+          AND longitude_deg BETWEEN {PH} AND {PH}
         LIMIT 5000;
     """
 
@@ -268,8 +299,8 @@ def get_possible_airport_destinations(
     sql = """
         SELECT id, ident, name, type, latitude_deg, longitude_deg, iso_country, iso_region, municipality
         FROM airports
-        WHERE latitude_deg BETWEEN %s AND %s
-          AND longitude_deg BETWEEN %s AND %s
+        WHERE latitude_deg BETWEEN {PH} AND {PH}
+          AND longitude_deg BETWEEN {PH} AND {PH}
         LIMIT 10000;
     """
 

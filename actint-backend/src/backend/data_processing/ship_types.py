@@ -1,4 +1,4 @@
-def get_vessel_class(ship_type):
+def classify_vessel(ship_type):
 
     # Not available
     if ship_type == 0:

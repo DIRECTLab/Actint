@@ -14,7 +14,9 @@ Tools provided:
 """
 
 from pathlib import Path
+from backend.mcp_servers.ais.helpers.area_context import get_future_intersections_in_area_helper
 from fastmcp import FastMCP
+import json
 # Import tool functions from parent package
 from backend.mcp_servers.ais.helpers.ship_context import (
     get_vessel_general_information_helper,
@@ -32,8 +34,6 @@ from backend.mcp_servers.ais.helpers.similartiy import (
     get_similar_fleet_names,
 )
 from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_mmsi_helper
-
-from backend.mcp_servers.ais.helpers.area_context import get_future_intersections_in_area_helper
 # from backend.data_processing.query_database import query_vessels
 
 
@@ -47,6 +47,21 @@ mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 # ============================================================================
 # General Information
 # ============================================================================
+
+""" This isn't very good, there is too much output, there are too many ships"""
+
+# @mcp.tool()
+# def get_vessels_last_seen():
+#     try: 
+#         return get_vessels_last_seen_helper()
+#     except Exception as e:
+#         return "Error:\n" + str(e)
+
+
+# ============================================================================
+# Vessel Information
+# ============================================================================
+
 
 """ This isn't very good, there is too much output, there are too many ships"""
 
@@ -243,7 +258,7 @@ def get_vessel_general_information(mmsi: str) -> str:
     """Get information about a vessel. This includes the name, time and most rescent location, heading, cargo, course and speed overground, ect.
     
     Args: 
-        mmsi (int): Maritime Mobile Service Identity number of the vessel
+        mmsi (str): Maritime Mobile Service Identity number of the vessel
         
     Returns: 
         str: Informatioon about the vessel
@@ -273,14 +288,14 @@ If this was a very minor typo, please proceed with the most accurate option, oth
 
 @mcp.tool()
 def get_vessel_locations(mmsi: str, page: str) -> str:
-    """Get all recorded positions for a specific vessel identified by MMSI.
+    """Get recorded positions for a specific vessel identified by MMSI. Data is broken up into pages to avoid returning too much information.
     
     Args:
         mmsi (str): Maritime Mobile Service Identity number of the vessel
-        page (str): Page number of detections. Start with '1'.
+        page (str): Page number of positions. Start with '1'.
     
     Returns:
-        A list of detections
+        A list of vessel positions.
     """
     print("started")
     try:
@@ -372,7 +387,6 @@ If this was a very minor typo, please proceed with the most accurate option, oth
 
 # Future vessel_anomoly_and_activity_report(mmsi:str) -> str:
 
-
 @mcp.tool()
 def get_fleets_information():
     """Gets information about all the fleets
@@ -426,7 +440,6 @@ def get_future_intersections_in_area(lat: str, lon: str, radius_nm: str) -> str:
         return get_future_intersections_in_area_helper(lat, lon, radius_nm)
     except Exception as e:
         return "Error:\n" + str(e)
-
 
 # ============================================================================
 # Tools: Geographic Queries

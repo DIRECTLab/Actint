@@ -19,6 +19,9 @@ from backend.mcp_servers.adsb.helpers.basic_tools import bbox_from_radius_nm
 from backend.mcp_servers.utils.distance_calculation import haversine_distance_nm
 from backend.data_processing.query_database import DatabaseConnectionTypes, get_conn
 
+from backend.config import config
+
+PH = "?" if config.DB_USING_SQLITE else "%s"
 
 def get_country_info(code: str) -> Optional[dict[str, Any]]:
     code_n = (code or "").strip().upper()
@@ -28,7 +31,7 @@ def get_country_info(code: str) -> Optional[dict[str, Any]]:
     sql = """
         SELECT id, code, name, continent, wikipedia_link, keywords
         FROM avi_countries
-        WHERE code = %s
+        WHERE code = {PH}
         LIMIT 1;
     """
 
@@ -55,9 +58,9 @@ def search_countries(name_contains: str, limit: int = 20) -> list[dict[str, Any]
     sql = """
         SELECT id, code, name, continent
         FROM avi_countries
-        WHERE name ILIKE '%' || %s || '%'
+        WHERE name ILIKE '%' || {PH} || '%'
         ORDER BY name ASC
-        LIMIT %s;
+        LIMIT {PH};
     """
 
     with get_conn(DatabaseConnectionTypes.ADSB) as conn:
@@ -75,7 +78,7 @@ def get_region_info(code: str) -> Optional[dict[str, Any]]:
     sql = """
         SELECT id, code, local_code, name, continent, iso_country, wikipedia_link, keywords
         FROM avi_regions
-        WHERE code = %s
+        WHERE code = {PH}
         LIMIT 1;
     """
 
@@ -102,10 +105,10 @@ def search_regions(name_contains: str, iso_country: str | None = None, limit: in
     sql = """
         SELECT id, code, name, continent, iso_country
         FROM avi_regions
-        WHERE name ILIKE '%' || %s || '%'
-          AND (%s IS NULL OR iso_country = %s)
+        WHERE name ILIKE '%' || {PH} || '%'
+          AND ({PH} IS NULL OR iso_country = {PH})
         ORDER BY name ASC
-        LIMIT %s;
+        LIMIT {PH};
     """
 
     with get_conn(DatabaseConnectionTypes.ADSB) as conn:
@@ -134,8 +137,8 @@ def get_navaid_by_ident(ident: str, limit: int = 50) -> list[dict[str, Any]]:
             iso_country, dme_frequency_khz, dme_channel,
             associated_airport
         FROM avi_navaids
-        WHERE ident = %s
-        LIMIT %s;
+        WHERE ident = {PH}
+        LIMIT {PH};
     """
 
     with get_conn(DatabaseConnectionTypes.ADSB) as conn:
@@ -158,8 +161,8 @@ def get_navaids_for_airport(airport_ident: str, limit: int = 50) -> list[dict[st
     sql = """
         SELECT id, ident, name, type, frequency_khz, latitude_deg, longitude_deg, iso_country
         FROM avi_navaids
-        WHERE associated_airport = %s
-        LIMIT %s;
+        WHERE associated_airport = {PH}
+        LIMIT {PH};
     """
 
     with get_conn(DatabaseConnectionTypes.ADSB) as conn:
@@ -186,20 +189,31 @@ def find_nearest_navaids(
         radius_nm = 200.0
 
     lat_min, lat_max, lon_min, lon_max = bbox_from_radius_nm(lat, lon, float(radius_nm))
-    type_q = (navaid_type or "").strip() if navaid_type else None
+    type_q = (navaid_type or "").strip() or None
 
-    sql = """
-        SELECT id, ident, name, type, frequency_khz, latitude_deg, longitude_deg, iso_country, associated_airport
+    conditions = [
+        "latitude_deg BETWEEN {PH} AND {PH}",
+        "longitude_deg BETWEEN {PH} AND {PH}",
+    ]
+    params: list[Any] = [lat_min, lat_max, lon_min, lon_max]
+
+    if type_q:
+        conditions.append("type = {PH}")
+        params.append(type_q)
+
+    params.append(20000)
+
+    sql = f"""
+        SELECT id, ident, name, type, frequency_khz,
+               latitude_deg, longitude_deg, iso_country, associated_airport
         FROM avi_navaids
-        WHERE (%s IS NULL OR type = %s)
-          AND latitude_deg BETWEEN %s AND %s
-          AND longitude_deg BETWEEN %s AND %s
-        LIMIT 20000;
+        WHERE {" AND ".join(conditions)}
+        LIMIT {PH};
     """
 
     with get_conn(DatabaseConnectionTypes.ADSB) as conn:
         with conn.cursor() as cur:
-            cur.execute(sql, (type_q, type_q, lat_min, lat_max, lon_min, lon_max))
+            cur.execute(sql, params)
             cols = [d.name for d in cur.description]
             rows = [dict(zip(cols, r)) for r in cur.fetchall()]
 

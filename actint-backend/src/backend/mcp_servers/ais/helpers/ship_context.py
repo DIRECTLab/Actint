@@ -11,8 +11,7 @@ from typing import Optional, Tuple
 from backend.mcp_servers.utils.distance_calculation import haversine_distance_nm
 from backend.mcp_servers.utils.important_locations import MARITIME_REGIONS, MAJOR_PORTS, STRATEGIC_WATERWAYS, CONTINENTS
 from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_latest_location_helper, get_all_mmsis, get_all_latest_detections_helper, get_vessel_latest_location_helper
-from backend.mcp_servers.ais.helpers.vessel_query import query_static_data_helper, get_vessel_latest_location_helper, get_vessel_position_history_helper
-from backend.mcp_servers.ais.helpers.vessel_query import evaluate_vessel_type, evaluate_country_code
+from backend.mcp_servers.ais.helpers.vessel_query import query_static_data_helper, get_vessel_latest_location_helper, get_vessel_position_history_helper, evaluate_country_code
 # We may want to have a reverse georder eventually
 
 def get_vessel_general_information_helper(mmsi: str):
@@ -27,10 +26,10 @@ def get_vessel_general_information_helper(mmsi: str):
     return_string = f"""
 Ship Information for MMSI {mmsi}:
 Name: {vessel_info['vesselname']}
-Origin Country: {evaluate_country_code(vessel_info['origincountry'])}
 Home Base: {vessel_info['homebase']}
 Parent Command: {vessel_info['parentcommand']}
 Fleet: {vessel_info['fleet']}
+Origin Country: {evaluate_country_code(vessel_info['origincountry'])}
 Last Detction:
     Timestamp: {latest_location_info['basedatetime']}
     Lat: {latest_location_info['lat']}, Lon: {latest_location_info['lon']}

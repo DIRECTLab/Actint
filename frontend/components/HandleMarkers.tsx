@@ -80,7 +80,7 @@ export function HandleMarkers({ vehiclesPreviousPositions, vehicleCurrentPositio
                             key={index}
                             lat={obj.data.lat}
                             lon={obj.data.lon}
-                            degree={obj.data.degree}
+                            heading={obj.data.heading}
                             distance_nm={obj.data.distance_nm}
                         ></Trajectory>
                     )
