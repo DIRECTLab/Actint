@@ -127,6 +127,44 @@ def re_evaluate_region(region):
 
 
 # ============================================================================
+# Dark Vessel Detection Tools
+# ============================================================================
+
+@mcp.tool()
+def run_dark_vessel_startup() -> str:
+    """Run the dark vessel startup script to analyze dark vessel patterns."""
+    dark_vessel_startup.run()
+
+@mcp.tool()
+def summarise_dark_vessels() -> str:
+    """Summarise information about dark vessels in the database."""
+    try:
+        # Placeholder implementation - replace with actual logic
+        summary = {
+            "total_dark_vessels": 42,
+            "recent_dark_vessels": 5,
+            "regions_with_dark_vessels": ["Gulf of Aden", "Strait of Malacca"],
+        }
+        return json.dumps(summary, indent=2)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+@mcp.tool()
+def evaluate_vessel_risk() -> str:
+    """Evaluate risk level of vessels based on dark behavior patterns."""
+    try:
+        # Placeholder implementation - replace with actual logic
+        risk_evaluation = {
+            "high_risk_vessels": 10,
+            "medium_risk_vessels": 20,
+            "low_risk_vessels": 12,
+        }
+        return json.dumps(risk_evaluation, indent=2)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+# ============================================================================
 # Health & Info Endpoints
 # ============================================================================
 
@@ -138,37 +176,6 @@ def re_evaluate_region(region):
 #         return get_vessels_last_seen_helper()
 #     except Exception as e:
 #         return "Error:\n" + str(e)
-
-@mcp.tool()
-def get_vessel_locations(mmsi: int | str) -> str:
-    """Get all recorded positions for a specific vessel identified by MMSI.
-    
-    Args:
-        mmsi (int): Maritime Mobile Service Identity number of the vessel
-    
-    Returns:
-        str: JSON list of vessel positions with coordinates, timestamps, and speed data
-    """
-    try:
-        mmsi = int(mmsi)
-        locations = get_vehicle_locations(mmsi)
-        result_data = [
-            {
-                "mmsi": loc.mmsi,
-                "vessel_name": loc.vessel_name,
-                "timestamp": loc.timestamp,
-                "latitude": loc.lat,
-                "longitude": loc.lon,
-                "speed_over_ground": loc.sog,
-                "course_over_ground": loc.cog,
-                "heading": loc.heading,
-            }
-            for loc in locations
-        ]
-        return json.dumps(result_data, indent=2)
-    except Exception as e:
-        return json.dumps({"error": str(e)})
-
 
 @mcp.tool()
 def get_vessel_current_position(mmsi: int | str) -> str:
