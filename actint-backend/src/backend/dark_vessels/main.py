@@ -936,6 +936,8 @@ if __name__ == "__main__":
     data = simulate_region('gulf_of_guinea')
     sq.fit(data)
     print(sq.predict(data))
+
+    #save data to this filepath. It can be loaded later with sq.load(filepath)
     sq.save('sequence_classifier.pkl')
 
     print(Fore.GREEN)
@@ -951,6 +953,7 @@ if __name__ == "__main__":
     frames = []
     mmsis = get_all_mmsis()
 
+    # Get every AIS track, put it in a dataframe
     for mmsi in mmsis:
         track = get_vessel_position_history_helper(mmsi)
 
@@ -980,6 +983,7 @@ if __name__ == "__main__":
     print("Time passed: " + str(time))
     print(Fore.RESET)
 
+    # Make several predictions on what AIS tracks are doing.
     locations_dataframe = pd.concat(frames, ignore_index=True)
     sq.fit(locations_dataframe)
     predictions = sq.predict(locations_dataframe)
