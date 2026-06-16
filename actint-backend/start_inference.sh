@@ -45,7 +45,7 @@ if [ -n "$MODEL_PATH" ]; then
     echo "Model: ${MODEL_PATH}"
 else
     MODEL_SPECIFIER="-hf $MODEL_ID:$MODEL_QUANT_FORMAT"
-    echo "Model: ${MODEL_ID}:${MODEL_QUANT_FORM}"
+    echo "Model: ${MODEL_ID}:${MODEL_QUANT_FORMAT}"
 fi
 
 
@@ -54,5 +54,5 @@ llama-server \
     -c ${MAX_CONTEXT_LENGTH:-132000} \
     --host 0.0.0.0 \
     --port $INFERENCE_SERVER_PORT \
-    --api-key "${MODEL_API_KEY}"
+    --api-key "${MODEL_API_KEY}" \
     -n ${MAX_NEW_TOKENS:-2000}
