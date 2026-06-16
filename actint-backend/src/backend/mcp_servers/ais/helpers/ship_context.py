@@ -15,6 +15,8 @@ from backend.mcp_servers.ais.helpers.vessel_query import query_static_data_helpe
 # We may want to have a reverse georder eventually
 
 def get_vessel_general_information_helper(mmsi: str):
+    """
+    """
     mmsi = int(mmsi)
     vessel_info = query_static_data_helper({"mmsi": mmsi})
     if vessel_info:
@@ -204,7 +206,7 @@ def get_vessels_in_area_helper(lat: str, lon: str, distance_nm: str):
 
 
 
-"""These are only potentially useful if we decide to create a ibrary of important regions and ports. Otherwise, they are pretty much useless. We can rely on the AI to know what ports there are and its pretty good at that."""
+"""These are only potentially useful if we decide to create a library of important regions and ports. Otherwise, they are pretty much useless. We can rely on the AI to know what ports there are and its pretty good at that."""
 
 
 def identify_maritime_region_helper(lat: float, lon: float) -> Optional[str]:

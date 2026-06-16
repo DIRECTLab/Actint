@@ -132,6 +132,7 @@ def query_dynamic_data_helper(searchQuery: dict, sort=False):
 
 
 def evaluate_country_code(code: int):
+    """ Takes the country code and returns the name of the papropriate country as a string."""
     conn = get_conn()
     cursor = conn.cursor()
     cursor.execute(f"SELECT country FROM mmsi_mid_country WHERE mid = {PH};", (code,))
@@ -143,6 +144,7 @@ def evaluate_country_code(code: int):
 
 
 def evaluate_vessel_type(code: int):
+    """Takes the vessel type code and returns the vessel type as a string."""
     conn = get_conn()
     cursor = conn.cursor()
     cursor.execute(f"SELECT vessel_type FROM vessel_type WHERE vessel_type_code = {PH};", (code,))

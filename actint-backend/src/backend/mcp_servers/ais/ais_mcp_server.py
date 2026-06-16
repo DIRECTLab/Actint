@@ -44,20 +44,6 @@ from backend.mcp_servers.ais.helpers.vessel_query import get_vessel_mmsi_helper
 mcp = FastMCP("AIS Vessel Intelligence", "1.0.0")
 
 # ============================================================================
-# General Information
-# ============================================================================
-
-""" This isn't very good, there is too much output, there are too many ships"""
-
-# @mcp.tool()
-# def get_vessels_last_seen():
-#     try: 
-#         return get_vessels_last_seen_helper()
-#     except Exception as e:
-#         return "Error:\n" + str(e)
-
-
-# ============================================================================
 # Vessel Information
 # ============================================================================
 
