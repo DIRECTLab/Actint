@@ -390,7 +390,7 @@ If this was a very minor typo, please proceed with the most accurate option, oth
     return general_information
 
 
-@mcp.tool() # I need to make this so that it doesn't give me a buttload of locations that caused autistic siezures with the AI
+@mcp.tool()
 def get_vessel_locations(mmsi: str, page: str) -> str:
     """Get all recorded positions for a specific vessel identified by MMSI.
     
