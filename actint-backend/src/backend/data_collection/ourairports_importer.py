@@ -1,7 +1,6 @@
-import os
-import psycopg
 from pathlib import Path
-from backend.config import config
+
+from backend.data_processing.query_database import get_conn, DatabaseConnectionTypes
 
 DATA_DIR = Path(__file__).parent / "data" / "csv" / "ourairports"
 
@@ -13,31 +12,6 @@ FILES = {
     "runways": DATA_DIR / "runways.csv",
     "navaids": DATA_DIR / "navaids.csv",
 }
-
-
-def get_conn():
-    try:
-        # Read environment variables
-        db_config = {
-            "host": config.DB_HOST,
-            "dbname": config.ADSB_DB_NAME,
-            "user": config.DB_USER,
-            "password": config.DB_PASS,
-            "port": config.DB_PORT,
-        }
-
-        # Validate required vars
-        for key, value in db_config.items():
-            if value is None:
-                raise ValueError(f"Missing environment variable: {key}")
-
-        # Connect
-        conn = psycopg.connect(**db_config)
-        return conn
-        
-    except Exception as e:
-        print("Error:")
-        print(e)
 
 
 
@@ -266,7 +240,7 @@ def load_all(conn):
 
 
 def main():
-    with get_conn() as conn:
+    with get_conn(conn_type=DatabaseConnectionTypes.ADSB) as conn:
         create_schema(conn)
         load_all(conn)
 

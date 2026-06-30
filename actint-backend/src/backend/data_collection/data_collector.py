@@ -21,9 +21,8 @@ import io
 from alive_progress import alive_bar
 import re
 import gc
-import psycopg
 
-from backend.config import config
+from backend.data_processing.query_database import get_conn, DatabaseConnectionTypes
 
 # Paths
 
@@ -89,33 +88,33 @@ def process_full_day(day,year):
 
             bar.title = 'Ingesting ADS-B JSON -> SQL'
 
-            conn = get_conn()
+            with get_conn(conn_type=DatabaseConnectionTypes.ADSB) as conn:
 
-            for member in tar.getmembers():
+                for member in tar.getmembers():
 
-                bar.text(f"File: {member.name[-11:]}")
+                    bar.text(f"File: {member.name[-11:]}")
 
-                # Match files in traces/00-ff/ ending in .json
-                if re.match(r'^./traces/[0-9a-fA-F]{2}/.*\.json$', member.name): #all json matched
-                    f = tar.extractfile(member)
-                    if f:
-                        with gzip.open(f, 'rt', encoding='utf-8') as gz:
-                            try:
-                                data = json.load(gz)
-                                normed_data = normalize_data([data])
+                    # Match files in traces/00-ff/ ending in .json
+                    if re.match(r'^./traces/[0-9a-fA-F]{2}/.*\.json$', member.name): #all json matched
+                        f = tar.extractfile(member)
+                        if f:
+                            with gzip.open(f, 'rt', encoding='utf-8') as gz:
+                                try:
+                                    data = json.load(gz)
+                                    normed_data = normalize_data([data])
 
-                                insert_to_sqlite(conn, normed_data)
+                                    insert_to_sqlite(conn, normed_data)
 
-                                #all_records.append(normed_data)
-                            except (json.JSONDecodeError, gzip.BadGzipFile):
-                                continue
+                                    #all_records.append(normed_data)
+                                except (json.JSONDecodeError, gzip.BadGzipFile):
+                                    continue
 
-                            #clean up unused objects now that all data is saved 
-                            del data
-                            del gz
-                            del f
-                            gc.collect()
-                            bar() #increments the alive progress bar
+                                #clean up unused objects now that all data is saved 
+                                del data
+                                del gz
+                                del f
+                                gc.collect()
+                                bar() #increments the alive progress bar
 
 
 
@@ -135,34 +134,34 @@ def process_vehicle_list(day, year, vehicle_list):
 
             bar.title = 'Ingesting ADS-B JSON -> SQL'
 
-            conn = get_conn()
+            with get_conn(conn_type=DatabaseConnectionTypes.ADSB) as conn:
 
-            for member in vehicle_list:
+                for member in vehicle_list:
 
-                bar.text(f"File: {member[-11:]}")
+                    bar.text(f"File: {member[-11:]}")
 
-                try:
-                    f = tar.extractfile(member)
-                    if f:
-                        with gzip.open(f, 'rt', encoding='utf-8') as gz:
-                            try:
-                                data = json.load(gz)
-                                normed_data = normalize_data([data])
+                    try:
+                        f = tar.extractfile(member)
+                        if f:
+                            with gzip.open(f, 'rt', encoding='utf-8') as gz:
+                                try:
+                                    data = json.load(gz)
+                                    normed_data = normalize_data([data])
 
-                                insert_to_sqlite(conn, normed_data)
+                                    insert_to_sqlite(conn, normed_data)
 
-                                #all_records.append(normed_data)
-                            except (json.JSONDecodeError, gzip.BadGzipFile):
-                                continue
+                                    #all_records.append(normed_data)
+                                except (json.JSONDecodeError, gzip.BadGzipFile):
+                                    continue
 
-                            #clean up unused objects now that all data is saved 
-                            del data
-                            del gz
-                            del f
-                            gc.collect()
-                            bar() #increments the alive progress bar
-                except:
-                    continue
+                                #clean up unused objects now that all data is saved 
+                                del data
+                                del gz
+                                del f
+                                gc.collect()
+                                bar() #increments the alive progress bar
+                    except:
+                        continue
 
 
 
@@ -738,32 +737,6 @@ def drop_aircraft_foreign_key(conn) -> None:
         cursor.close()
 
 
-def get_conn():
-    try:
-        # Read environment variables
-        db_config = {
-            "host": config.DB_HOST,
-            "dbname": config.ADSB_DB_NAME,
-            "user": config.DB_USER,
-            "password": config.DB_PASS,
-            "port": config.DB_PORT,
-        }
-
-        # Validate required vars
-        for key, value in db_config.items():
-            if value is None:
-                raise ValueError(f"Missing environment variable: {key}")
-
-        # Connect
-        conn = psycopg.connect(**db_config)
-        return conn
-        
-    except Exception as e:
-        print("Error:")
-        print(e)
-
-
-
 
 def main():
     
@@ -773,29 +746,29 @@ def main():
 
     #DB_DIR.mkdir(parents=True, exist_ok=True)
 
-    conn = get_conn()
+    with get_conn(conn_type=DatabaseConnectionTypes.ADSB) as conn:
 
-    drop_aircraft_foreign_key(conn)
-    create_sql_schema(conn)
-    create_monthly_partitions(conn, args.start, args.end)
+        drop_aircraft_foreign_key(conn)
+        create_sql_schema(conn)
+        create_monthly_partitions(conn, args.start, args.end)
+        
+        if(vehicle_count):
+
+            #get first vehicle_count vehicles that appear in all check days in check_range
+            check_range = get_check_range(args.start, args.end)
+            vehicle_list = get_valid_vehicles(check_range, vehicle_count)
+
+            for day in days:
+                print(f"\n[DATE] {day.date()}")
+                process_vehicle_list(day, day.year, vehicle_list)
+                
+        else: #default to downloading full day (all vehicles)
     
-    if(vehicle_count):
+            for day in days:
+                print(f"\n[DATE] {day.date()}")
+                process_full_day(day, day.year)
 
-        #get first vehicle_count vehicles that appear in all check days in check_range
-        check_range = get_check_range(args.start, args.end)
-        vehicle_list = get_valid_vehicles(check_range, vehicle_count)
-
-        for day in days:
-            print(f"\n[DATE] {day.date()}")
-            process_vehicle_list(day, day.year, vehicle_list)
-            
-    else: #default to downloading full day (all vehicles)
- 
-        for day in days:
-            print(f"\n[DATE] {day.date()}")
-            process_full_day(day, day.year)
-
-    add_aircraft_foreign_key(conn)
+        add_aircraft_foreign_key(conn)
 
 
 if __name__ == "__main__":

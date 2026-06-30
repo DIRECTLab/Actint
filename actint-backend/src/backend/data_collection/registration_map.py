@@ -1,5 +1,4 @@
-import os
-import psycopg
+from backend.data_processing.query_database import get_conn, DatabaseConnectionTypes
 
 #registration number to country ISO code mapping, taken from various sources
 reg_num_to_country_iso = [
@@ -249,32 +248,6 @@ reg_num_to_country_iso = [
     ]
 
 
-def get_conn():
-    from backend.config import config
-    try:
-        # Read environment variables
-        db_config = {
-            "host": config.DB_HOST,
-            "dbname": config.ADSB_DB_NAME,
-            "user": config.DB_USER,
-            "password": config.DB_PASS,
-            "port": config.DB_PORT,
-        }
-
-        # Validate required vars
-        for key, value in db_config.items():
-            if value is None:
-                raise ValueError(f"Missing environment variable: {key}")
-
-        # Connect
-        conn = psycopg.connect(**db_config)
-        return conn
-        
-    except Exception as e:
-        print("Error:")
-        print(e)
-
-
 
 def create_schema(conn):
     with conn.cursor() as cur:
@@ -323,7 +296,7 @@ def insert_aircraft_prefixes(conn):
 
 
 def main():
-    with get_conn() as conn:
+    with get_conn(conn_type=DatabaseConnectionTypes.ADSB) as conn:
         create_schema(conn)
         insert_aircraft_prefixes(conn)
 
