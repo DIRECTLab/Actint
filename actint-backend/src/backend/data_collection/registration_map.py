@@ -1,6 +1,7 @@
 import os
 import psycopg
 
+#registration number to country ISO code mapping, taken from various sources
 reg_num_to_country_iso = [
         ('N', 'US'),
         ('C', 'CA'),
@@ -274,9 +275,7 @@ def get_conn():
         print(e)
 
 
-# ----------------------------
-# SCHEMA
-# ----------------------------
+
 def create_schema(conn):
     with conn.cursor() as cur:
 
@@ -322,9 +321,7 @@ def insert_aircraft_prefixes(conn):
 
 
 
-# ----------------------------
-# MAIN
-# ----------------------------
+
 def main():
     with get_conn() as conn:
         create_schema(conn)

@@ -37,7 +37,6 @@ SQLITE_PATH = DB_DIR / "adsb.db"
 BASE_URL = "https://github.com/adsblol/globe_history_{year}/releases/download"
 
 
-# Argument parsing
 
 def parse_args():
     parser = argparse.ArgumentParser(description="ADS-B Data Collector")
@@ -49,9 +48,11 @@ def parse_args():
     return parser.parse_args()
 
 
-# Date range
 
 def build_date_range(day_delta, start_str, end_str=None):
+    """
+    build a list of dates going from start_str to end_str and skipping day_delta days
+    """
     start = datetime.strptime(start_str, "%m/%d/%y")
     end = datetime.strptime(end_str, "%m/%d/%y") if end_str else start
     current = start
@@ -62,10 +63,11 @@ def build_date_range(day_delta, start_str, end_str=None):
     return days
 
 
-# Downloading TAR to memory
 
 def process_full_day(day,year): 
-    
+    """
+    Processes a full day of ADSB data: downloads, extracts, normalizes, and inserts into DB
+    """
     tar_buffer = download_Tar_File(day, year)
 
     if not tar_buffer:
@@ -116,10 +118,11 @@ def process_full_day(day,year):
                             bar() #increments the alive progress bar
 
 
-# Downloading TAR to memory and extract fixed vehicle list
 
 def process_vehicle_list(day, year, vehicle_list): 
-
+    """
+    Similiar to process_full_day() but filters for ADSB data in the vehicle_list 
+    """
     tar_buffer = download_Tar_File(day, year)
 
     if not tar_buffer:
@@ -162,10 +165,12 @@ def process_vehicle_list(day, year, vehicle_list):
                     continue
 
 
-# Normalize JSON data (flatten and map added keys)
+
 
 def normalize_data(json_data):
-
+    """
+    Normalize JSON data (flatten and map added keys)
+    """
     flattened = []
 
     for record in json_data:
@@ -237,10 +242,11 @@ def normalize_data(json_data):
     return flattened
 
 
-#Creates the AIS position and aircraft tables
 
 def create_sql_schema(conn):
-    """Create SQL tables for ADS-B data."""
+    """
+    Create SQL tables for ADSB data and Aircraft metadata
+    """
     cursor = conn.cursor()
     
     # Main AIS positions table
@@ -310,9 +316,10 @@ def create_sql_schema(conn):
 
 
 
-#Create monthly partitions for adsb_positions and a DEFAULT partition for stragglers.
-
 def create_monthly_partitions(conn, start_str, end_str=None):
+    """
+    Create monthly partitions for adsb_positions sql table and a DEFAULT partition for stragglers.
+    """
 
     cur = conn.cursor()
 
@@ -352,10 +359,9 @@ def create_monthly_partitions(conn, start_str, end_str=None):
     conn.commit()
 
 
-#inserts data into the sql DB 
 
 def insert_to_sqlite(conn, data: list[dict]) -> None:
-    """Insert normalized data into SQLite."""
+    """Insert normalized data into DB."""
     cursor = conn.cursor()
     
     # Track vessels for metadata table
@@ -474,12 +480,13 @@ def insert_to_sqlite(conn, data: list[dict]) -> None:
     
 
 def get_check_range(start, end):
-
+    """
+    returns list of days to use as spot checkdays for vehicle continuity in adsb data.
+    do up to 5 checks then add checks for gaps of more than 28 days
+    examples - 4 days do 4 checks, 10 days do 5 checks, 360 days do 12 checks
+    """
     start_date = datetime.strptime(start, "%m/%d/%y")
     end_date = datetime.strptime(end, "%m/%d/%y") if end else start_date
-
-    #do up to 5 checks then add checks for gaps of more than 28 days
-    #examples - 4 days do 4 checks, 10 days do 5 checks, 360 days do 12 checks
     
     date_range_delta = (end_date - start_date).days + 1
 
@@ -501,7 +508,10 @@ def get_check_range(start, end):
 
 
 def get_valid_vehicles(check_dates, vehicle_count):
-    
+    """
+    Downloads adsb data for each check_date and adds ICAOs to all_vehicles
+    then sorts through all_vehicles sublists (days) to find first vehicle_count vehicles that appear in all days
+    """
     all_vehicles = []
     vehicles_to_use = []
 
@@ -552,12 +562,13 @@ def get_valid_vehicles(check_dates, vehicle_count):
     
     return vehicles_to_use
 
-    #do we want to check for nulls? pros: cleaner data, more consist  cons: doesn't reflect actual data we will get
-    #for now I say no 
 
 
 def download_Tar_File(day, year, iterations=0, show_bar=True):
-    
+    """
+    Download the adsb data tar file from adsb.lol git repository
+    If data is not found for the desired date check next year's repo to see if it was missplaced
+    """
     if iterations >= 2:
         print("No data found")
         return
@@ -586,7 +597,7 @@ def download_Tar_File(day, year, iterations=0, show_bar=True):
                 if response.status_code == 200:
                     parts.append(response.content)
 
-                    for b in "bcdefghijklmnopqrstuvwxyz":
+                    for b in "bcdefghijklmnopqrstuvwxyz": #skip .aa as we already found it
                         part = f"a{b}"
                         url_parts = f"{url}.{part}"
 
@@ -754,11 +765,10 @@ def get_conn():
 
 
 
-# Main
-
 def main():
+    
     args = parse_args()
-    days = build_date_range(1, args.start, args.end)
+    days = build_date_range(1, args.start, args.end) #list of days to download
     vehicle_count = int(args.vehicles) if args.vehicles else False
 
     #DB_DIR.mkdir(parents=True, exist_ok=True)
@@ -768,23 +778,18 @@ def main():
     drop_aircraft_foreign_key(conn)
     create_sql_schema(conn)
     create_monthly_partitions(conn, args.start, args.end)
-
     
     if(vehicle_count):
 
-        #data checking for vehicles 
+        #get first vehicle_count vehicles that appear in all check days in check_range
         check_range = get_check_range(args.start, args.end)
-        #print(f"check_days: {check_range}")
-        #print(f"check days count: {len(check_range)}")
-
         vehicle_list = get_valid_vehicles(check_range, vehicle_count)
-        #print(f"valid vehicles: {vehicle_list}")
 
         for day in days:
             print(f"\n[DATE] {day.date()}")
             process_vehicle_list(day, day.year, vehicle_list)
             
-    else:
+    else: #default to downloading full day (all vehicles)
  
         for day in days:
             print(f"\n[DATE] {day.date()}")

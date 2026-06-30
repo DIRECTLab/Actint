@@ -40,9 +40,7 @@ def get_conn():
         print(e)
 
 
-# ----------------------------
-# SCHEMA
-# ----------------------------
+
 def create_schema(conn):
     with conn.cursor() as cur:
 
@@ -71,8 +69,6 @@ def create_schema(conn):
             keywords TEXT
         );
         """)
-
-    
 
         # Airports
         cur.execute("""
@@ -103,8 +99,6 @@ def create_schema(conn):
             last_updated TIMESTAMPTZ
         );
         """)
-
-        
 
         # Frequencies
         cur.execute("""
@@ -174,10 +168,17 @@ def create_schema(conn):
     print("Schema created.")
 
 
-# ----------------------------
-# GENERIC COPY
-# ----------------------------
+
 def copy_csv(conn, table, columns, path, preprocess=None):
+    """
+    Generic copy function that will copy a csv to a defined pre-created sql table
+    Args:
+        conn: sql connection to DB
+        table: sql table name of the destination table
+        columns: sql column names of the destination table
+        path: path to the csv file to copy
+        preprocess: run a parsing function on the csv line to clean it as desired
+    """
     with conn.cursor() as cur:
         with open(path, "r", encoding="utf-8") as f:
             next(f)
@@ -197,9 +198,6 @@ def copy_csv(conn, table, columns, path, preprocess=None):
     print(f"Loaded {table}")
 
 
-# ----------------------------
-# PREPROCESSORS
-# ----------------------------
 
 def fix_yes_no(line):
     # Convert yes/no → true/false for scheduled_service
@@ -211,10 +209,11 @@ def fix_01_bool(line):
     return line.replace(",1,", ",true,").replace(",0,", ",false,")
 
 
-# ----------------------------
-# LOAD PIPELINE (ORDER MATTERS FOR FOREIGN KEYS)
-# ----------------------------
+
 def load_all(conn):
+    """
+    loading pipeline, order matters here for the foreign keys
+    """
 
     # 1. Countries
     copy_csv(conn, "avi_countries",
@@ -235,7 +234,6 @@ def load_all(conn):
             "municipality","scheduled_service","gps_code","icao_code","iata_code","local_code",
             "home_link","wikipedia_link","keywords","score","last_updated"],
         FILES["airports"]
-
     )
 
     # 4. Frequencies
@@ -252,7 +250,6 @@ def load_all(conn):
          "he_ident","he_latitude_deg","he_longitude_deg","he_elevation_ft",
          "he_heading_degT","he_displaced_threshold_ft"],
         FILES["runways"],
-
     )
 
     # 6. Navaids
@@ -266,9 +263,8 @@ def load_all(conn):
     )
 
 
-# ----------------------------
-# MAIN
-# ----------------------------
+
+
 def main():
     with get_conn() as conn:
         create_schema(conn)

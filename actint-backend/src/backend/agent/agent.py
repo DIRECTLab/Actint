@@ -23,7 +23,7 @@ def is_port_in_use(port: int) -> bool:
 
 if is_port_in_use(4317):
     register(project_name="Actint")
-    SmolagentsInstrumentor().instrument()
+    SmolagentsInstrumentor().instrument() #Phoenix telementry server allows a user to open a GUI to investigate an agents tool calls and see inside the loop
 else:
     print(
         "\x1b[33mPhoenix telemetry server is not running on localhost:4317. Skipping instrumentation.\033[0m",
@@ -52,6 +52,7 @@ if config.CONDA_PREFIX:
 else:
     python_path = sys.executable
 
+#Configure MCP servers that agents can access to make tool calls
 ais_server_params = StdioServerParameters(
     command=python_path,
     args=[ais_mcp_server.__file__],
@@ -87,7 +88,7 @@ def create_agent(
     additional_tools: list = [],
     
 ) -> ToolCallingAgent:
-    """Creates an agent, injecting relevant tools."""
+    """Creates an agent, and injects AIS and ADSB tools."""
     tools = []
     tools += ais_mcp_tools
     # tools += adsb_mcp_tools
@@ -130,6 +131,13 @@ async def query_agent_instance(
 #======================================Summarization Agent==================================#
 
 def summarize_last_turn(instructions: str, agent: ToolCallingAgent):
+    """
+    Given summarization instructions and an agent get the agents memory, summarize it, and return it to the agents memory 
+    This allows us to use memory more efficiently for long running sessions.
+    Args:
+        instructions (str): Initial instructions to LLM for how to summarize the steps
+        agent: agent whos memory we want to summarize 
+    """
     summarization_tools = []  # Define any tools specific to summarization if needed
 
     agent_memory = agent.memory
@@ -165,8 +173,8 @@ def summarize_last_turn(instructions: str, agent: ToolCallingAgent):
         timing=time_taken,
         step_number=1,
     )
-    del agent_memory.steps[first_step + 1:] #Keep the user's original query, just summarize the AI slop
-    agent_memory.steps.append(summarized_step)
+    del agent_memory.steps[first_step + 1:] #Keep the user's original query
+    agent_memory.steps.append(summarized_step) #Append the step as summarized by AI
     print(summary)
     return "Success"
     
