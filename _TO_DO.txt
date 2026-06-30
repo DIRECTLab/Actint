@@ -1,7 +1,7 @@
-X means crossed off/done
+To Do:
 
 backend/benchmarking: See if we want to keep this, has the benchmarking branch been merged, do we have the latest and greatest? 
-X backend/data_collection: change get_conn to use the mcp_servers helper function in all the scripts here
+
 backend/data processing: Templeton do you still use this to import AIS data or do you have another method now? 
 backend/mcp_servers/adsb: Do we want to implement Ryan's condensed tools or just merge it and have the option to use either tool set? 
 backend/mcp_servers/utils/distance_calculation: add my RDP algorithm implementation and other helpers 
@@ -10,3 +10,8 @@ backend/transport: figure out what simulation_events(deprecated) does and it we 
 
 data/db/chroma: remove this folder
 data/db/* : what are the other .db files can we delete them
+
+
+Done:
+
+backend/data_collection: change get_conn to use the correction DB helper function in all the scripts here
