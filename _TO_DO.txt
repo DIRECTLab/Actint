@@ -1,7 +1,6 @@
 To Do:
-
-backend/mcp_servers/adsb: Do we want to implement Ryan's condensed tools or just merge it and have the option to use either tool set? 
-backend/tests: Do we want to consolidate all testing scripts here? postgres and sqlite connection tests 
+    
+backend/tests: ended up removing postgres tests, do we want to remove the other tests?
 data/db/* : what are the other .db files can we delete them
 
 work through front end
@@ -16,3 +15,6 @@ backend/benchmarking: See if we want to keep this, has the benchmarking branch b
 data/db/chroma: remove this folder
 
 backend/transport: figure out what simulation_events(deprecated) does and it we want to keep it: doesn't work as we don't have helper functions and I can't find them in the git history
+backend/mcp_servers/adsb: Do we want to implement Ryan's condensed tools or just merge it and have the option to use either tool set? 
+    ended up merging his base MCP server with masters and added condensed server as the default
+ 

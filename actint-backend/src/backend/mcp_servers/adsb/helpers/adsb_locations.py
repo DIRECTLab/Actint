@@ -13,8 +13,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from backend.mcp_servers.adsb.helpers.basic_tools import normalize_icao
-from backend.mcp_servers.utils.distance_calculation import haversine_distance_nm
+from backend.mcp_servers.adsb.helpers.basic_tools import normalize_icao, bbox_from_radius_nm, icao_to_reg
+from backend.mcp_servers.utils.distance_calculation import haversine_distance_nm, calculate_bearing
 
 from backend.data_processing.query_database import DatabaseConnectionTypes, get_conn
 
@@ -269,3 +269,93 @@ def aircraft_following(
         f"within ±{threshold_time_minutes} minutes for {hits}/{total} leader positions "
         f"over the last {lookback_hours:g} hours."
     )
+
+
+def find_nearest_aircraft(
+    lat: float,
+    lon: float,
+    *,
+    lookback_hours: float = 6.0,
+    radius_nm: float = 50.0,
+    limit: int = 5,
+) -> list[dict]:
+    """Find nearest aircraft to a location using each aircraft's latest position.
+
+    This is designed for interactive queries like "closest aircraft to airport".
+    We first compute each aircraft's latest position within a time window, then
+    filter down to a bbox/radius and score by haversine distance.
+    """
+
+    if limit <= 0:
+        limit = 5
+    if limit > 50:
+        limit = 50
+
+    if lookback_hours <= 0:
+        lookback_hours = 6.0
+
+    if radius_nm <= 0:
+        radius_nm = 50.0
+
+    lat_min, lat_max, lon_min, lon_max = bbox_from_radius_nm(lat, lon, float(radius_nm))
+
+    base_sql = """
+        WITH ref AS (
+            SELECT COALESCE(MAX(timestamp), NOW()) AS t_ref
+            FROM adsb_positions
+        ),
+        latest AS (
+            SELECT DISTINCT ON (icao)
+                id, icao, timestamp, lat, lon,
+                altitude, ground_speed, track, vertical_rate,
+                flight_number, emergency, category
+            FROM adsb_positions, ref
+            WHERE timestamp >= (ref.t_ref - (%s || ' hours')::interval)
+            ORDER BY icao, timestamp DESC
+        )
+        SELECT *
+        FROM latest
+        WHERE lat BETWEEN %s AND %s
+    """
+
+    if lon_min <= lon_max:
+        sql = base_sql + """
+          AND lon BETWEEN %s AND %s
+        LIMIT 20000;
+        """
+        params = (float(lookback_hours), lat_min, lat_max, lon_min, lon_max)
+    else:
+        sql = base_sql + """
+          AND (lon >= %s OR lon <= %s)
+        LIMIT 20000;
+        """
+        params = (float(lookback_hours), lat_min, lat_max, lon_min, lon_max)
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, params)
+            colnames = [d.name for d in cur.description]
+            rows = [dict(zip(colnames, r)) for r in cur.fetchall()]
+
+        # Fetch identity fields cheaply for the final shortlist
+        scored: list[dict] = []
+        for r in rows:
+            r_lat = r.get("lat")
+            r_lon = r.get("lon")
+            if r_lat is None or r_lon is None:
+                continue
+
+            d_nm = haversine_distance_nm(lat, lon, float(r_lat), float(r_lon))
+            if d_nm > float(radius_nm):
+                continue
+
+            bearing = calculate_bearing(lat, lon, float(r_lat), float(r_lon))
+
+            out = dict(r)
+            out["distance_nm"] = d_nm
+            out["bearing_deg"] = bearing
+            out["reg_num"] = icao_to_reg(conn, str(r.get("icao", "")))
+            scored.append(out)
+
+    scored.sort(key=lambda x: x["distance_nm"])
+    return scored[:limit]

@@ -21,6 +21,7 @@ Tools provided (initial, simple set):
 from __future__ import annotations
 
 import json
+import re
 from datetime import date, datetime
 from typing import Any
 
@@ -31,6 +32,7 @@ from backend.mcp_servers.adsb.helpers.adsb_locations import (
     get_track_summary,
     get_vehicle_current_position,
     get_vehicle_locations,
+    find_nearest_aircraft,
 )
 from backend.mcp_servers.adsb.helpers.airport_tools import (
     find_nearest_airport,
@@ -397,6 +399,56 @@ def get_possible_airport_destinations_for_aircraft_tool(
         return _dumps({"error": str(e)})
 
 
+@mcp.tool()
+def find_nearest_aircraft_to_airport(
+    airport_ident: str,
+    lookback_hours: float | str = 6.0,
+    radius_nm: float | str = 50.0,
+    limit: int | str = 5,
+) -> str:
+    """Find the nearest aircraft to an airport (by ident) using latest ADS-B positions.
+
+    Args:
+        airport_ident: Airport ident/code.
+        lookback_hours: Lookback window for "latest" positions.
+        radius_nm: Search radius around the airport (nautical miles).
+        limit: Max number of aircraft candidates.
+
+    Returns:
+        str: JSON object with airport metadata and a candidate list, or an error object.
+    """
+
+    try:
+        airport = get_airport_by_ident(airport_ident)
+        if airport is None:
+            return _dumps({"error": "Airport not found"})
+
+        lat = float(airport["latitude_deg"])
+        lon = float(airport["longitude_deg"])
+
+        results = find_nearest_aircraft(
+            lat,
+            lon,
+            lookback_hours=float(lookback_hours),
+            radius_nm=float(radius_nm),
+            limit=int(limit),
+        )
+
+        return _dumps(
+            {
+                "airport": {
+                    "ident": airport.get("ident"),
+                    "name": airport.get("name"),
+                    "latitude_deg": airport.get("latitude_deg"),
+                    "longitude_deg": airport.get("longitude_deg"),
+                },
+                "candidates": results,
+            }
+        )
+    except Exception as e:
+        return _dumps({"error": str(e)})
+
+
 # ============================================================================
 # Tools: Aviation Reference
 # ============================================================================
@@ -503,48 +555,108 @@ def count_adsb_rows(table_name: str) -> str:
         return _dumps({"table": table_name, "row_count": n})
     except Exception as e:
         return _dumps({"error": str(e)})
-
+    
 
 @mcp.tool()
 def query_adsb_database(
-    sql_query: str,
-    params_json: str | None = None,
-    max_rows: str = "200",
+    sql_query: str, params_json: str | list[Any] | None = None, max_rows: int | str = 200
 ) -> str:
-    """Execute a read-only SQL query against the ADS-B Postgres database.
-    Only SELECT and WITH (CTE) queries are permitted.
+    """Execute a read-only SQL query against ADS-B Postgres and return results.
 
     Args:
-        sql_query (str): A read-only SQL query starting with SELECT or WITH.
-        params_json (str | None): Optional JSON array of positional parameters for %s placeholders (e.g., '["a1b2c3"]').
-        max_rows (str): Maximum number of rows to return. Default '200'.
+        sql_query: Read-only query starting with SELECT or WITH.
+        params_json: Optional positional parameters for %s placeholders.
+
+            Accepts either:
+            - a JSON-encoded array (e.g. `[]`, `["US", 123]`), or
+            - a JSON-encoded string containing an array (e.g. `"[]"`), or
+            - an actual Python list (some MCP clients may send this).
+        max_rows: Maximum number of rows to return.
 
     Returns:
-        Columns, row count, and rows from the query result.
+        str: JSON object with rows/columns/metadata, or an error object.
     """
+
+    def _parse_params(params_value: str | list[Any] | None) -> list[Any]:
+        def _normalize_list(lst: list[Any]) -> list[Any]:
+            # Common model bug: params_json='["[]"]' -> list ['[]']
+            if len(lst) == 1 and isinstance(lst[0], str):
+                candidate = lst[0].strip()
+                if candidate == "" or candidate.lower() == "null":
+                    return []
+                if candidate.startswith("[") and candidate.endswith("]"):
+                    try:
+                        nested: Any = json.loads(candidate)
+                        # Sometimes nested is a JSON-encoded string of JSON.
+                        for _ in range(2):
+                            if isinstance(nested, str):
+                                nested = json.loads(nested)
+                            else:
+                                break
+                        if isinstance(nested, list):
+                            return nested
+                    except Exception:
+                        pass
+            return lst
+
+        if params_value is None or params_value == "":
+            return []
+
+        if isinstance(params_value, list):
+            return _normalize_list(params_value)
+
+        raw = params_value.strip()
+        if raw == "" or raw.lower() == "null":
+            return []
+
+        # Some models/tool-callers mistakenly double-encode JSON, e.g. params_json='"[]"'.
+        parsed: Any = json.loads(raw)
+        if parsed is None:
+            return []
+
+        # Unwrap up to a couple layers of JSON-encoded strings.
+        for _ in range(2):
+            if isinstance(parsed, str):
+                parsed = json.loads(parsed)
+            else:
+                break
+
+        if parsed is None:
+            return []
+
+        if not isinstance(parsed, list):
+            raise ValueError("params_json must be a JSON array")
+        return _normalize_list(parsed)
+
+    def _count_percent_s_placeholders(query: str) -> int:
+        # Approximate placeholder count for psycopg `%s` placeholders.
+        # Ignores escaped percents like `%%s` (literal "%s").
+        return len(re.findall(r"(?<!%)%s", query or ""))
+
     try:
         max_rows_i = int(max_rows)
-        params: list[Any] = []
-        if params_json:
-            parsed = json.loads(params_json)
-            if not isinstance(parsed, list):
-                return _dumps({"error": "params_json must be a JSON array"})
-            params = parsed
+        params = _parse_params(params_json)
 
-        with _get_adsb_conn() as conn:
-            rows = execute_readonly_query(
-                conn, sql_query, params=params, max_rows=max_rows_i
-            )
+        placeholder_count = _count_percent_s_placeholders(sql_query)
+        warning: str | None = None
+        if placeholder_count == 0 and params:
+            # Another common model bug: always sending params even when the query has no placeholders.
+            warning = "Query has 0 %s placeholders; ignoring provided params_json."
+            params = []
+
+        with get_conn() as conn:
+            rows = execute_readonly_query(conn, sql_query, params=params, max_rows=max_rows_i)
 
         columns = sorted({k for r in rows for k in r.keys()})
-        return _dumps(
-            {
-                "columns": columns,
-                "row_count": len(rows),
-                "max_rows": max_rows_i,
-                "rows": rows,
-            }
-        )
+        payload: dict[str, Any] = {
+            "columns": columns,
+            "row_count": len(rows),
+            "max_rows": max_rows_i,
+            "rows": rows,
+        }
+        if warning:
+            payload["warning"] = warning
+        return _dumps(payload)
     except Exception as e:
         return _dumps({"error": str(e)})
 
