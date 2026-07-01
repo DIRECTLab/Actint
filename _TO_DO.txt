@@ -2,16 +2,19 @@ To Do:
 
 backend/benchmarking: See if we want to keep this, has the benchmarking branch been merged, do we have the latest and greatest? 
 
-backend/data processing: Templeton do you still use this to import AIS data or do you have another method now? 
 backend/mcp_servers/adsb: Do we want to implement Ryan's condensed tools or just merge it and have the option to use either tool set? 
-backend/mcp_servers/utils/distance_calculation: add my RDP algorithm implementation and other helpers 
+
 backend/tests: Do we want to consolidate all testing scripts here? postgres and sqlite connection tests 
 backend/transport: figure out what simulation_events(deprecated) does and it we want to keep it
 
 data/db/chroma: remove this folder
 data/db/* : what are the other .db files can we delete them
 
+work through front end
+
 
 Done:
 
 backend/data_collection: change get_conn to use the correction DB helper function in all the scripts here
+backend/mcp_servers/utils/distance_calculation: add my RDP algorithm implementation and other helpers 
+backend/data processing: Templeton do you still use this to import AIS data or do you have another method now? DELETED
