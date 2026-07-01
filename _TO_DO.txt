@@ -1,8 +1,11 @@
-To Do:
-    
+Backlogged: 
+
 backend/tests: ended up removing postgres tests, do we want to remove the other tests?
 data/db/* : what are the other .db files can we delete them
 
+
+To Do:
+    
 work through front end
 
 
